@@ -1,0 +1,9 @@
+*.o
+*.swp
+*github.com*
+*bin/
+*pkg/
+*.log*
+*jzlservice/
+.DS_Store
+nohup.out
