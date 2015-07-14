@@ -4,6 +4,7 @@
 *bin/
 *pkg/
 *.log*
+*.json*
 *jzlservice/
 .DS_Store
 nohup.out

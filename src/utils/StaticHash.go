@@ -4,21 +4,20 @@
 *  author : Wu Yinghao
 *  email  : wyh817@gmail.com
 *
-*  file description : 静态哈希文件实现
+*  file description : 静态哈希文件实现，线程不安全
 *
 ******************************************************************************/
 package utils
 
 import (
-	"fmt"
+	//"fmt"
 )
 
 
 type HashEntity struct{
 	Hash_Code	int64
 	Key			string
-	Value		interface{}
-	ValueInt	int64
+	Value		int64
 	Next		int64
 }
 
@@ -47,33 +46,45 @@ func NewStaticHashTable(bukets int64) *StaticHashTable{
 *
 ******************************************************************************/
 func (this *StaticHashTable) PutKeyForInt(key string) (int64){
-		hash:= ELFHash(key,this.Bukets)
-		if this.HashIndex[hash] == 0 {
-			this.Entity[this.EntityCount].Hash_Code=hash
-			this.Entity[this.EntityCount].Key=key
-			this.Entity[this.EntityCount].ValueInt=this.EntityCount
-			this.Entity[this.EntityCount].Next=this.HashIndex[hash]
-			this.HashIndex[hash]=this.EntityCount
-			this.EntityCount++
-		}else{
-			fmt.Printf("%v\n",this.Entity[this.HashIndex[hash]])
+		if this.EntityCount == this.Bukets{
+			return -1
 		}
+		if this.FindKey(key) != -1 {
+			return -1
+		}
+		hash:= ELFHash(key,this.Bukets)
+		this.Entity[this.EntityCount].Hash_Code=hash
+		this.Entity[this.EntityCount].Key=key
+		this.Entity[this.EntityCount].Value=this.EntityCount
+		this.Entity[this.EntityCount].Next=this.HashIndex[hash]
+		this.HashIndex[hash]=this.EntityCount
+		this.EntityCount++
 		
 		return this.EntityCount-1
-        //entity[i].next = hashIndex[hash];// 典型的头插入法，由于hashIndex[]是全局变量，默认值是0，初次使用时0  
-        //hashIndex[hash] = i;// 也就是说同一个hash值，第一次的hashIndex[]值为0；之后的上一次同一个hash值的每一次都是entity[]的下标值  
-        //i++;
+
 }
 
 
+
+/*****************************************************************************
+*  function name : Length	
+*  params : nil
+*  return : int64
+*
+*  description : 返回哈希表长度
+*
+******************************************************************************/
+func (this *StaticHashTable) Length() int64{
+	return this.EntityCount-1
+}
 
 func (this *StaticHashTable) FindKey(key string) (int64){
 	hash := ELFHash(key,this.Bukets)
 	var k int64
 	for k=this.HashIndex[hash]; k!=0; k=this.Entity[k].Next {  
         if key == this.Entity[k].Key {  
-			fmt.Printf("K :%v ==== Value : %v\n",k,this.Entity[k].ValueInt)
-            return this.Entity[k].ValueInt 
+			//fmt.Printf("K :%v ==== Value : %v\n",k,this.Entity[k].ValueInt)
+            return this.Entity[k].Value 
         }  
     }  
 	return -1
