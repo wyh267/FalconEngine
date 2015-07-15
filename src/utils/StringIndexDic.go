@@ -11,6 +11,10 @@
 
 package utils
 
+import(
+	"fmt"
+)
+
 
 type ItemDic struct{
 	HashCode	int64
@@ -34,6 +38,17 @@ func NewStringIdxDic(bukets int64) *StringIdxDic{
 	this.HashIndex = make([]int64,bukets)
 	return this	
 }
+
+
+func (this *StringIdxDic) Display(){
+	fmt.Printf("========================= Bukets : %v  EntityCount :%v =========================\n",this.Bukets,this.EntityCount-1)
+	var i int64
+	for i=1;i<this.EntityCount;i++ {
+		fmt.Printf("Key : %v \t\t--- Value : %v \t\t--- HashCode : %v \n",this.Entity[i].Key,this.Entity[i].Value,this.Entity[i].HashCode)
+	}
+	fmt.Printf("===============================================================================\n")
+}
+
 
 /*****************************************************************************
 *  function name : PutKeyForInt

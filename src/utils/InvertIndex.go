@@ -10,7 +10,7 @@
 package utils
 
 import (
-	
+	"fmt"
 )
 
 //
@@ -30,18 +30,68 @@ type InvertDocIdList struct {
 	DocIdList	[]DocIdInfo
 }
 
+func NewInvertDocIdList(key interface{}) *InvertDocIdList{
+	this := &InvertDocIdList{key,make([]DocIdInfo,0)}
+	return this
+}
+
+
+func (this *InvertDocIdList) Display(){
+	
+	fmt.Printf(" KEY: [ %v ] ==> [ ",this.Key)
+	for _,v := range this.DocIdList{
+		fmt.Printf(" %v ",v.DocId)
+	}
+	fmt.Printf(" ] \n")
+	
+}
+
 //
 //
 //倒排索引
 //IdxType    倒排索引类型，string,int64,float.....
 //
 //
+const TYPE_TEXT	int64 = 1	
+const TYPE_NUM	int64 = 2
+const TYPE_BOOL int64 = 3
+const TYPE_FLOAT int64 = 4
 type InvertIdx struct {
 	IdxType			int64
+	IdxName			string
 	KeyInvertList	[]InvertDocIdList 
 }
 
 
+
+func NewInvertIdx(idx_type int64,name string) *InvertIdx{
+
+	list:=make([]InvertDocIdList,1)
+	list[0]=InvertDocIdList{"nil",make([]DocIdInfo,0)}
+	this := &InvertIdx{IdxType:idx_type,IdxName:name,KeyInvertList:list}
+	return this
+	
+}
+
+
+
+func (this *InvertIdx) Display(){
+	var idxtype string
+	switch this.IdxType{
+		case TYPE_TEXT:
+			idxtype = "TEXT INDEX"
+		case TYPE_NUM:
+		case TYPE_BOOL:
+		case TYPE_FLOAT:
+	}
+	
+	fmt.Printf("\n=========== [ %v ] [ TYPE : %v ]==============\n",this.IdxName,idxtype)
+	for index,value := range this.KeyInvertList{
+		fmt.Printf("INDEX : [ %v ] ::: ",index)
+		value.Display()
+	}
+	
+}
 
 
 /*****************************************************************************

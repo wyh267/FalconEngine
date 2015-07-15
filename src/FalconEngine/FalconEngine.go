@@ -3,7 +3,7 @@ package main
 import (
 	"fmt"
 	"io"
-	//"utils"
+	"utils"
 	//"time"
 	//"encoding/json"
 	"bufio"
@@ -79,8 +79,24 @@ func main(){
 	}
 	
 	
+	
+	
+	ivt_idx:=utils.NewInvertIdx(utils.TYPE_TEXT,"测试索引") 
+	ivt_dic:=utils.NewStringIdxDic(1000)
+	
 	for _,v := range Documents{
 		fmt.Printf("ID : [%v]  [ %v ] \n",v.Id,v.Content)
+		utils.BuildTextIndex(v.Id,v.Content,utils.RULE_EN,ivt_idx,ivt_dic)
 	}
 	
+	
+	
+	
+	ivt_idx.Display()
+	ivt_dic.Display()
+	
 }
+
+
+
+//func BuildTextIndex(doc_id int64,content string,rule int64,ivt_idx InvertIdx,ivt_dic StringIdxDic) error {
