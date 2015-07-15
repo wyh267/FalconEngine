@@ -68,21 +68,6 @@ func ReadFromJson(file_name string) ([]byte,error) {
 		return nil,err
 	}
 	return buffer,nil
-	/*
-	freader := bufio.NewReader(fin)
-	buffer:=bytes.NewBuffer([]byte{})
-	for {
-		buf := make([]byte,1024)
-		n,_ := freader.Read(buf)
-		if n==0 {
-			return buffer,nil
-		}
-		
-		buffer.Write(buf)
-		
-	}
 	
-	return buffer,nil	
-	*/
 	
 }

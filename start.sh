@@ -1,6 +1,6 @@
 #!/bin/sh
 
-nohup ./bin/FalconEngine &
+./bin/FalconEngine 
 
 
 

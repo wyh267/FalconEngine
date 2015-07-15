@@ -2,16 +2,31 @@ package main
 
 import (
 	"fmt"
-	"utils"
-	"time"
-	"encoding/json"
+	"io"
+	//"utils"
+	//"time"
+	//"encoding/json"
+	"bufio"
+	"os"
 )
+
+
+
+type Document struct {
+	Content		string	`json:"content"`
+	Id			int64	`json:"id"`
+}
+
+
+
+
+
 
 
 func main(){
 	
 	fmt.Printf("init FalconEngine.....\n")
-	
+/*	
 	s:=utils.NewStaticHashTable(10)
 	fmt.Printf("%v [INFO]  %v\n",time.Now().Format("2006-01-02 15:04:05"),s.PutKeyForInt("abc"))
 	fmt.Printf("%v [INFO]  %v\n",time.Now().Format("2006-01-02 15:04:05"),s.PutKeyForInt("abc"))
@@ -20,7 +35,7 @@ func main(){
 	fmt.Printf("%v [INFO]  %v\n",time.Now().Format("2006-01-02 15:04:05"),s.PutKeyForInt("ddfe"))
 	fmt.Printf("%v [INFO]  %v\n",time.Now().Format("2006-01-02 15:04:05"),s.PutKeyForInt("ac"))
 	fmt.Printf("%v [INFO]  %v\n",time.Now().Format("2006-01-02 15:04:05"),s.PutKeyForInt("ad"))
-		fmt.Printf("%v [INFO]  %v\n",time.Now().Format("2006-01-02 15:04:05"),s.PutKeyForInt("adfdsss"))
+	fmt.Printf("%v [INFO]  %v\n",time.Now().Format("2006-01-02 15:04:05"),s.PutKeyForInt("adfdsss"))
 	
 	
 	fmt.Printf("%v [INFO]  %v\n",time.Now().Format("2006-01-02 15:04:05"),s.FindKey("ac"))
@@ -41,5 +56,31 @@ func main(){
 	
 	
 	fmt.Printf("%v [INFO]  %v\n",time.Now().Format("2006-01-02 15:04:05"),info)
+*/
+	
+	
+	Documents := make([]Document,0)
+	f,_:=os.Open("./test.dat")
+	defer f.Close()
+	buff := bufio.NewReader(f)
+	var id int64
+	id=1
+	for {
+		var doc Document
+		line,err := buff.ReadString('\n')
+		if err != nil || io.EOF == err {
+			break
+		}
+		doc.Content=line[:len(line)-1]
+		doc.Id=id
+		Documents=append(Documents,doc)
+		id++
+		
+	}
+	
+	
+	for _,v := range Documents{
+		fmt.Printf("ID : [%v]  [ %v ] \n",v.Id,v.Content)
+	}
 	
 }
