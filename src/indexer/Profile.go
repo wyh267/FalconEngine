@@ -9,8 +9,15 @@
 
 package indexer
 
+const (
+	PflNum	= iota
+	PflText
+	PflDate
+)
+
 type Profile struct{
 	Name  		string
+	Type		int64
 	Len			int64
 }
 
@@ -24,7 +31,7 @@ type Profile struct{
 *
 ******************************************************************************/
 
-func GetMaxDocId() int64{
+func (this *Profile)GetMaxDocId() int64{
 	return this.Len-1
 }
 
@@ -37,7 +44,7 @@ func GetMaxDocId() int64{
 *
 ******************************************************************************/
 
-func GetName() string {
+func (this *Profile)GetName() string {
 	return this.Name
 }
 

@@ -14,6 +14,7 @@ package indexer
 import (
 	"fmt"
 	"errors"
+	u "utils"
 )
 
 
@@ -23,8 +24,8 @@ type TextProfile struct{
 }
 
 
-func NewTextProfile(name string) *TextProfile{
-	profile := &Profile{name,1}
+func NewTextProfile(name string,ptype int64) *TextProfile{
+	profile := &Profile{name,ptype,1}
 	this := &TextProfile{profile,make([]string,1)}
 	return this
 }
@@ -63,4 +64,32 @@ func (this *TextProfile)FindValue(doc_id int64) (string,error) {
 	return this.ProfileList[doc_id],nil
 	
 }
+
+
+
+
+func (this *TextProfile)FilterValue(doc_ids []u.DocIdInfo,value string,is_forward bool) ([]u.DocIdInfo,error) {
+	
+	 res := make([]u.DocIdInfo,0,1000)
+	 if is_forward == true {
+		 
+		for i,_:=range doc_ids{
+			if this.ProfileList[doc_ids[i].DocId] == value {
+				res = append(res,doc_ids[i])
+			}
+	 	}
+		 
+		 
+	 }else{
+		 for i,_:=range doc_ids{
+			if this.ProfileList[doc_ids[i].DocId] != value {
+				res = append(res,doc_ids[i])
+			}
+	 	}
+	 }
+	 
+	 return res,nil
+}
+
+
 

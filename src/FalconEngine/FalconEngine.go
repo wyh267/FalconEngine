@@ -3,7 +3,7 @@ package main
 import (
 	"fmt"
 	"io"
-	//"utils"
+	"utils"
 	//"time"
 	"encoding/json"
 	"bufio"
@@ -63,7 +63,7 @@ func main(){
 	fmt.Printf("%v [INFO]  %v\n",time.Now().Format("2006-01-02 15:04:05"),info)
 */
 	
-	/*
+/*	
 	Documents := make([]Document,0)
 	f,_:=os.Open("./test.dat")
 	defer f.Close()
@@ -121,6 +121,8 @@ func main(){
 	
 	
 	ti :=indexer.NewTextIndex("text_indexTest",&idx,&dic)
+	
+	
 	aa,_ := ti.FindTerm("aa")
 	fmt.Printf("aa : %v \n",aa)
 	
@@ -130,11 +132,11 @@ func main(){
 	cc,_ :=ti.FindTerm("anD")
 	fmt.Printf("anD : %v \n",cc)
 	
-	*/
+*/	
 	//indexer.FindTerm("aa")
 	
+/*	
 	
-	/*
 	NumDoc := make([]NumDocument,0)
 	f,_:=os.Open("./testnum.dat")
 	defer f.Close()
@@ -182,8 +184,8 @@ func main(){
 	
 	cc,_ :=ti.FindNumber(46334)
 	fmt.Printf("46334 : %v \n",cc)
-	*/
 	
+*/
 	type StrDocument struct {
 	DocID		int64 `json:"docid"`
 	Value		string `json:"value"`
@@ -213,7 +215,7 @@ func main(){
 	}
 	
 
-	profile:=indexer.NewTextProfile("字符串正排")
+	profile:=indexer.NewTextProfile("字符串正排",1)
 	
 
 	for _,v := range StrDoc {
@@ -221,8 +223,23 @@ func main(){
 	}
 	
 	fmt.Printf("NUM_DOC : %v \n",StrDoc)
-	profile.Display()
 	
+	utils.WriteToJson(profile,"./profile.json")
+	
+	bprofile,_:=utils.ReadFromJson("./profile.json")
+	
+	var pr indexer.TextProfile
+	err := json.Unmarshal(bprofile, &pr)
+	if err != nil {
+		fmt.Printf("ERR")
+	}
+	
+	pr.Display()
+	
+	docids := []utils.DocIdInfo{{1,0},{2,0},{3,0},{5,0},{7,0},{10,0},{12,0}}
+	fmt.Printf("%v\n",docids)
+	docids,_=pr.FilterValue(docids,"24",true)
+	fmt.Printf("%v\n",docids)
 	
 	
 	

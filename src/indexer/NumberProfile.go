@@ -12,6 +12,7 @@ package indexer
 import (
 	"fmt"
 	"errors"
+	u "utils"
 )
 
 type NumberProfile struct{
@@ -20,8 +21,8 @@ type NumberProfile struct{
 }
 
 
-func NewNumberProfile(name string) *NumberProfile{
-	profile := &Profile{name,1}
+func NewNumberProfile(name string,ptype int64) *NumberProfile{
+	profile := &Profile{name,ptype,1}
 	this := &NumberProfile{profile,make([]int64,1)}
 	return this
 }
@@ -63,3 +64,29 @@ func (this *NumberProfile)FindValue(doc_id int64) (int64,error) {
 	
 }
 
+
+
+
+
+func (this *NumberProfile)FilterValue(doc_ids []u.DocIdInfo,value int64,is_forward bool) ([]u.DocIdInfo,error) {
+	
+	 res := make([]u.DocIdInfo,0,1000)
+	 if is_forward == true {
+		 
+		for i,_:=range doc_ids{
+			if this.ProfileList[doc_ids[i].DocId] == value {
+				res = append(res,doc_ids[i])
+			}
+	 	}
+		 
+		 
+	 }else{
+		 for i,_:=range doc_ids{
+			if this.ProfileList[doc_ids[i].DocId] != value {
+				res = append(res,doc_ids[i])
+			}
+	 	}
+	 }
+	 
+	 return res,nil
+}

@@ -17,15 +17,14 @@ import (
 
 
 type TextIndex struct{
-	Name  		string
-	ivtIndex	*u.InvertIdx
+	*Index
 	dicIndex	*u.StringIdxDic
 }
 
 
 func NewTextIndex(name string,ivt *u.InvertIdx,dic *u.StringIdxDic) *TextIndex{
-	
-	this := &TextIndex{name,ivt,dic}
+	index := &Index{name,ivt}
+	this := &TextIndex{index,dic}
 	return this
 	
 }

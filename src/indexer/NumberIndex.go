@@ -17,15 +17,14 @@ import (
 
 
 type NumberIndex struct{
-	Name  		string
-	ivtIndex	*u.InvertIdx
+	*Index
 	dicIndex	*u.NumberIdxDic
 }
 
 
 func NewNumberIndex(name string,ivt *u.InvertIdx,dic *u.NumberIdxDic) *NumberIndex{
-	
-	this := &NumberIndex{name,ivt,dic}
+	index := &Index{name,ivt}
+	this := &NumberIndex{index,dic}
 	return this
 	
 }
