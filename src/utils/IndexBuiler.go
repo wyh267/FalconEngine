@@ -35,24 +35,25 @@ func BuildTextIndex(doc_id int64,content string,rule int64,ivt_idx *InvertIdx,iv
 	var terms []string 
 	//英文直接按照空格切割
 	if rule == RULE_EN {
-		terms = strings.Fields(strings.ToLower(content))
+		terms = RemoveDuplicatesAndEmpty(strings.Fields(strings.ToLower(content)))
 		if len(terms) == 0{
 			return errors.New("Empty content")
 		}
 	}
 	
-	terms = RemoveDuplicatesAndEmpty(terms)
+	
 	for _,term := range terms {
-		
+		len:=ivt_dic.Length()
 		key_id := ivt_dic.Put(term)
 		if key_id == -1 {
 			return errors.New("Bukets full")
 		}
 		//新增
-		if key_id == ivt_dic.Length(){
+		if key_id > len {
 			invertList := NewInvertDocIdList(term)
 			invertList.DocIdList = append(invertList.DocIdList,DocIdInfo{doc_id,0})
 			ivt_idx.KeyInvertList = append(ivt_idx.KeyInvertList,*invertList)
+			ivt_idx.IdxLen++
 		}else{//更新
 			ivt_idx.KeyInvertList[key_id].DocIdList= append(ivt_idx.KeyInvertList[key_id].DocIdList,DocIdInfo{doc_id,0})
 		}

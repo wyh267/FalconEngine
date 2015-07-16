@@ -59,6 +59,7 @@ const TYPE_FLOAT int64 = 4
 type InvertIdx struct {
 	IdxType			int64
 	IdxName			string
+	IdxLen			int64
 	KeyInvertList	[]InvertDocIdList 
 }
 
@@ -68,8 +69,22 @@ func NewInvertIdx(idx_type int64,name string) *InvertIdx{
 
 	list:=make([]InvertDocIdList,1)
 	list[0]=InvertDocIdList{"nil",make([]DocIdInfo,0)}
-	this := &InvertIdx{IdxType:idx_type,IdxName:name,KeyInvertList:list}
+	this := &InvertIdx{IdxType:idx_type,IdxName:name,IdxLen:0,KeyInvertList:list}
 	return this
+	
+}
+
+
+
+
+func (this *InvertIdx) GetInvertIndex(index int64)([]DocIdInfo,bool){
+	
+	
+	if index > this.IdxLen || index < 1{
+		return nil,false
+	}
+	
+	return this.KeyInvertList[index].DocIdList , true
 	
 }
 
@@ -85,13 +100,16 @@ func (this *InvertIdx) Display(){
 		case TYPE_FLOAT:
 	}
 	
-	fmt.Printf("\n=========== [ %v ] [ TYPE : %v ]==============\n",this.IdxName,idxtype)
+	fmt.Printf("\n=========== [ %v ] [ TYPE : %v ] [ LEN : %v ]==============\n",this.IdxName,idxtype,this.IdxLen)
 	for index,value := range this.KeyInvertList{
 		fmt.Printf("INDEX : [ %v ] ::: ",index)
 		value.Display()
 	}
 	
 }
+
+
+
 
 
 /*****************************************************************************

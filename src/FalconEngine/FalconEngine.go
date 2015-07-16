@@ -5,9 +5,10 @@ import (
 	"io"
 	"utils"
 	//"time"
-	//"encoding/json"
+	"encoding/json"
 	"bufio"
 	"os"
+	"indexer"
 )
 
 
@@ -90,10 +91,43 @@ func main(){
 	}
 	
 	
+	utils.WriteToJson(ivt_idx,"./ivt_idx.json")
+	utils.WriteToJson(ivt_dic,"./ivt_dic.json")
+	
+	bidx,_:=utils.ReadFromJson("./ivt_idx.json")
+	bdic,_:=utils.ReadFromJson("./ivt_dic.json")
 	
 	
-	ivt_idx.Display()
-	ivt_dic.Display()
+	var idx utils.InvertIdx
+	err := json.Unmarshal(bidx, &idx)
+	if err != nil {
+		fmt.Printf("ERR")
+	}
+	
+	
+	var dic utils.StringIdxDic
+	err = json.Unmarshal(bdic, &dic)
+	if err != nil {
+		fmt.Printf("ERR")
+	}
+	
+	
+	idx.Display()
+	dic.Display()
+	
+	
+	ti :=indexer.NewTextIndex("text_indexTest",&idx,&dic)
+	aa,_ := ti.FindTerm("aa")
+	fmt.Printf("aa : %v \n",aa)
+	
+	bb,_ :=ti.FindTerm("and")
+	fmt.Printf("and : %v \n",bb)
+	
+	cc,_ :=ti.FindTerm("anD")
+	fmt.Printf("anD : %v \n",cc)
+	
+	
+	//indexer.FindTerm("aa")
 	
 }
 
