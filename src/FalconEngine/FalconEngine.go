@@ -160,25 +160,28 @@ func main(){
 	
 	ivt_idx:=utils.NewInvertIdx(utils.TYPE_NUM,"数字测试索引") 
 	ivt_dic:=utils.NewNumberIdxDic(1000)
+	profile:=indexer.NewNumberProfile("数字正排")
 	
 
 	for _,v := range NumDoc {
 		utils.BuildNumberIndex(v.DocID,v.Value,ivt_idx,ivt_dic)
+		profile.PutProfile(v.DocID,v.Value)
 	}
 	
 	fmt.Printf("NUM_DOC : %v \n",NumDoc)
 	ivt_idx.Display()
 	ivt_dic.Display()
+	profile.Display()
 	
 	ti :=indexer.NewNumberIndex("munber_indexTest",ivt_idx,ivt_dic)
 	aa,_ := ti.FindNumber(77)
-	fmt.Printf("aa : %v \n",aa)
+	fmt.Printf("77 : %v \n",aa)
 	
 	bb,_ :=ti.FindNumber(24)
-	fmt.Printf("and : %v \n",bb)
+	fmt.Printf("24 : %v \n",bb)
 	
 	cc,_ :=ti.FindNumber(46334)
-	fmt.Printf("anD : %v \n",cc)
+	fmt.Printf("46334 : %v \n",cc)
 	
 	
 }
