@@ -96,6 +96,7 @@ func (this *InvertIdx) Display(){
 		case TYPE_TEXT:
 			idxtype = "TEXT INDEX"
 		case TYPE_NUM:
+			idxtype = "NUMBER INDEX"
 		case TYPE_BOOL:
 		case TYPE_FLOAT:
 	}

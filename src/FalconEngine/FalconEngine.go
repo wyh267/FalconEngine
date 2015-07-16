@@ -20,6 +20,10 @@ type Document struct {
 
 
 
+type NumDocument struct {
+	DocID		int64 `json:"docid"`
+	Value		int64 `json:"value"`
+}
 
 
 
@@ -59,7 +63,7 @@ func main(){
 	fmt.Printf("%v [INFO]  %v\n",time.Now().Format("2006-01-02 15:04:05"),info)
 */
 	
-	
+	/*
 	Documents := make([]Document,0)
 	f,_:=os.Open("./test.dat")
 	defer f.Close()
@@ -126,8 +130,56 @@ func main(){
 	cc,_ :=ti.FindTerm("anD")
 	fmt.Printf("anD : %v \n",cc)
 	
-	
+	*/
 	//indexer.FindTerm("aa")
+	
+	
+	
+	NumDoc := make([]NumDocument,0)
+	f,_:=os.Open("./testnum.dat")
+	defer f.Close()
+	buff := bufio.NewReader(f)
+	for {
+		
+		line,err := buff.ReadString('\n')
+		if err != nil || io.EOF == err {
+			break
+		}
+		
+		
+		var doc NumDocument
+		err = json.Unmarshal([]byte(line), &doc)
+		if err != nil {
+			fmt.Printf("ERR")
+		}
+		
+		
+		NumDoc=append(NumDoc,doc)
+		
+	}
+	
+	ivt_idx:=utils.NewInvertIdx(utils.TYPE_NUM,"数字测试索引") 
+	ivt_dic:=utils.NewNumberIdxDic(1000)
+	
+
+	for _,v := range NumDoc {
+		utils.BuildNumberIndex(v.DocID,v.Value,ivt_idx,ivt_dic)
+	}
+	
+	fmt.Printf("NUM_DOC : %v \n",NumDoc)
+	ivt_idx.Display()
+	ivt_dic.Display()
+	
+	ti :=indexer.NewNumberIndex("munber_indexTest",ivt_idx,ivt_dic)
+	aa,_ := ti.FindNumber(77)
+	fmt.Printf("aa : %v \n",aa)
+	
+	bb,_ :=ti.FindNumber(24)
+	fmt.Printf("and : %v \n",bb)
+	
+	cc,_ :=ti.FindNumber(46334)
+	fmt.Printf("anD : %v \n",cc)
+	
 	
 }
 
