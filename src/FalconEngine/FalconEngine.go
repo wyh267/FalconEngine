@@ -3,7 +3,7 @@ package main
 import (
 	"fmt"
 	"io"
-	"utils"
+	//"utils"
 	//"time"
 	"encoding/json"
 	"bufio"
@@ -134,7 +134,7 @@ func main(){
 	//indexer.FindTerm("aa")
 	
 	
-	
+	/*
 	NumDoc := make([]NumDocument,0)
 	f,_:=os.Open("./testnum.dat")
 	defer f.Close()
@@ -182,6 +182,49 @@ func main(){
 	
 	cc,_ :=ti.FindNumber(46334)
 	fmt.Printf("46334 : %v \n",cc)
+	*/
+	
+	type StrDocument struct {
+	DocID		int64 `json:"docid"`
+	Value		string `json:"value"`
+	}
+	
+	StrDoc := make([]StrDocument,0)
+	f,_:=os.Open("./teststr.dat")
+	defer f.Close()
+	buff := bufio.NewReader(f)
+	for {
+		
+		line,err := buff.ReadString('\n')
+		if err != nil || io.EOF == err {
+			break
+		}
+		
+		
+		var doc StrDocument
+		err = json.Unmarshal([]byte(line), &doc)
+		if err != nil {
+			fmt.Printf("ERR")
+		}
+		
+		
+		StrDoc=append(StrDoc,doc)
+		
+	}
+	
+
+	profile:=indexer.NewTextProfile("字符串正排")
+	
+
+	for _,v := range StrDoc {
+		profile.PutProfile(v.DocID,v.Value)
+	}
+	
+	fmt.Printf("NUM_DOC : %v \n",StrDoc)
+	profile.Display()
+	
+	
+	
 	
 	
 }

@@ -1,33 +1,35 @@
 /*****************************************************************************
- *  file name : NumberProfile.go
+ *  file name : TextProfile.go
  *  author : Wu Yinghao
  *  email  : wyh817@gmail.com
  *
- *  file description : 数字正排文件
+ *  file description : 文本正牌索引
  *
 ******************************************************************************/
 
+
 package indexer
+
 
 import (
 	"fmt"
 	"errors"
 )
 
-type NumberProfile struct{
+
+type TextProfile struct{
 	*Profile
-	ProfileList	[]int64
+	ProfileList	[]string
 }
 
 
-func NewNumberProfile(name string) *NumberProfile{
+func NewTextProfile(name string) *TextProfile{
 	profile := &Profile{name,1}
-	this := &NumberProfile{profile,make([]int64,1)}
+	this := &TextProfile{profile,make([]string,1)}
 	return this
 }
 
-
-func (this *NumberProfile)Display(){
+func (this *TextProfile)Display(){
 	
 	fmt.Printf(" ========== [ NAME : %v ] [ LEN : %v ]============\n",this.Name,this.Len)
 	for index,v := range this.ProfileList{
@@ -36,8 +38,7 @@ func (this *NumberProfile)Display(){
 	fmt.Printf(" ================================================= \n")
 }
 
-
-func (this *NumberProfile)PutProfile(doc_id,value int64) error {
+func (this *TextProfile)PutProfile(doc_id int64,value string) error {
 	if doc_id > this.Len || doc_id < 1{
 		return errors.New("docid is wrong")
 	}
@@ -54,9 +55,9 @@ func (this *NumberProfile)PutProfile(doc_id,value int64) error {
 }
 
 
-func (this *NumberProfile)FindValue(doc_id int64) (int64,error) {
+func (this *TextProfile)FindValue(doc_id int64) (string,error) {
 	if doc_id >= this.Len || doc_id < 1{
-		return 0,errors.New("docid is wrong")
+		return "",errors.New("docid is wrong")
 	}
 	
 	return this.ProfileList[doc_id],nil
