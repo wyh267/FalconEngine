@@ -1,14 +1,19 @@
 package main
 
 import (
-	"fmt"
-	"io"
-	"utils"
+	//"fmt"
+	//"io"
+	//"utils"
 	//"time"
-	"encoding/json"
-	"bufio"
-	"os"
-	"indexer"
+	//"encoding/json"
+	//"bufio"
+	//"os"
+	//"indexer"
+	"BaseFunctions"
+	"flag"
+	"fmt"
+	"github.com/outmana/log4jzl"
+	"builder"
 	//"github.com/huichen/sego"
 )
 
@@ -32,6 +37,49 @@ type NumDocument struct {
 func main(){
 	
 	fmt.Printf("init FalconEngine.....\n")
+	
+	var err error
+
+	//读取启动参数
+	var configFile string
+	flag.StringVar(&configFile, "conf", "search.conf", "configure file full path")
+	flag.Parse()
+
+	//读取配置文件
+	configure, err := BaseFunctions.NewConfigure(configFile)
+	if err != nil {
+		fmt.Printf("[ERROR] Parse Configure File Error: %v\n", err)
+		return
+	}
+
+	//启动日志系统
+	logger, err := log4jzl.New("ProxyServer")
+	if err != nil {
+		fmt.Printf("[ERROR] Create logger Error: %v\n", err)
+		//return
+	}
+
+	//初始化数据库适配器
+	dbAdaptor, err := BaseFunctions.NewDBAdaptor(configure, logger)
+	if err != nil {
+		fmt.Printf("[ERROR] Create DB Adaptor Error: %v\n", err)
+		return
+	}
+	defer dbAdaptor.Release()
+	
+	
+	BaseBuilder := builder.NewBuilder(configure,dbAdaptor,logger)
+	MyBuilder := builder.NewDBBuilder(BaseBuilder)
+	MyBuilder.StartBuildIndex()
+	
+	a,err := configure.GetTableFields()
+	if err != nil {
+		fmt.Println(err)
+	}
+	
+	fmt.Println("a:",a)
+	
+	
 /*	
 	s:=utils.NewStaticHashTable(10)
 	fmt.Printf("%v [INFO]  %v\n",time.Now().Format("2006-01-02 15:04:05"),s.PutKeyForInt("abc"))
@@ -64,7 +112,7 @@ func main(){
 	fmt.Printf("%v [INFO]  %v\n",time.Now().Format("2006-01-02 15:04:05"),info)
 */
 	
-	
+	/*
 	Documents := make([]Document,0)
 	f,_:=os.Open("./test.dat")
 	defer f.Close()
@@ -135,7 +183,7 @@ func main(){
 	
 	
 	//indexer.FindTerm("aa")
-	
+	*/
 /*	
 	
 	NumDoc := make([]NumDocument,0)

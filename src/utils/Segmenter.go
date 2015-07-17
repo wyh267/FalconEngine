@@ -10,7 +10,7 @@
 package utils
 
 import (
-	"fmt"
+	//"fmt"
 	"github.com/huichen/sego"
 )
 
@@ -42,7 +42,7 @@ func (this *Segmenter)Segment(content string,search_mode bool) []string{
 	text := []byte(content)
     segments := this.segmenter.Segment(text)
 	res := sego.SegmentsToSlice(segments, search_mode)
-	fmt.Println("SEGMENT::: ",res)
+	//fmt.Println("SEGMENT::: ",res)
 	return res
 }
 
