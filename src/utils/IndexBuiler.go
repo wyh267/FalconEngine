@@ -10,10 +10,17 @@
 package utils
 
 import (
-	"strings"
+	//"strings"
 	"errors"
 	//"fmt"
 )
+
+
+
+type IndexBuilder struct {
+	Segmenter	*Segmenter
+}
+
 
 
 /*****************************************************************************
@@ -26,12 +33,13 @@ import (
 ******************************************************************************/
 const RULE_EN	int64 = 1
 const RULE_CHN	int64 = 2
-func BuildTextIndex(doc_id int64,content string,rule int64,ivt_idx *InvertIdx,ivt_dic *StringIdxDic) error {
+func (this *IndexBuilder)BuildTextIndex(doc_id int64,content string,ivt_idx *InvertIdx,ivt_dic *StringIdxDic) error {
 	
 	if ivt_idx.IdxType != TYPE_TEXT {
 		return errors.New("Wrong Type")
 	}
 	
+	/*
 	var terms []string 
 	//英文直接按照空格切割
 	if rule == RULE_EN {
@@ -40,7 +48,8 @@ func BuildTextIndex(doc_id int64,content string,rule int64,ivt_idx *InvertIdx,iv
 			return errors.New("Empty content")
 		}
 	}
-	
+	*/
+	terms := RemoveDuplicatesAndEmpty(this.Segmenter.Segment(content,true))
 	
 	for _,term := range terms {
 		len:=ivt_dic.Length()
@@ -66,7 +75,7 @@ func BuildTextIndex(doc_id int64,content string,rule int64,ivt_idx *InvertIdx,iv
 
 
 
-func BuildNumberIndex(doc_id int64,content int64,ivt_idx *InvertIdx,ivt_dic *NumberIdxDic) error {
+func (this *IndexBuilder)BuildNumberIndex(doc_id int64,content int64,ivt_idx *InvertIdx,ivt_dic *NumberIdxDic) error {
 	
 	len:=ivt_dic.Length()
 	key_id := ivt_dic.Put(content)

@@ -9,6 +9,7 @@ import (
 	"bufio"
 	"os"
 	"indexer"
+	//"github.com/huichen/sego"
 )
 
 
@@ -63,7 +64,7 @@ func main(){
 	fmt.Printf("%v [INFO]  %v\n",time.Now().Format("2006-01-02 15:04:05"),info)
 */
 	
-/*	
+	
 	Documents := make([]Document,0)
 	f,_:=os.Open("./test.dat")
 	defer f.Close()
@@ -83,15 +84,15 @@ func main(){
 		
 	}
 	
-	
-	
+	segment:= utils.NewSegmenter("./data/dictionary.txt")
+	builder := &utils.IndexBuilder{segment}
 	
 	ivt_idx:=utils.NewInvertIdx(utils.TYPE_TEXT,"测试索引") 
 	ivt_dic:=utils.NewStringIdxDic(1000)
 	
 	for _,v := range Documents{
 		fmt.Printf("ID : [%v]  [ %v ] \n",v.Id,v.Content)
-		utils.BuildTextIndex(v.Id,v.Content,utils.RULE_EN,ivt_idx,ivt_dic)
+		builder.BuildTextIndex(v.Id,v.Content,ivt_idx,ivt_dic)
 	}
 	
 	
@@ -123,8 +124,8 @@ func main(){
 	ti :=indexer.NewTextIndex("text_indexTest",&idx,&dic)
 	
 	
-	aa,_ := ti.FindTerm("aa")
-	fmt.Printf("aa : %v \n",aa)
+	aa,_ := ti.FindTerm("我们")
+	fmt.Printf("我们 : %v \n",aa)
 	
 	bb,_ :=ti.FindTerm("and")
 	fmt.Printf("and : %v \n",bb)
@@ -132,7 +133,7 @@ func main(){
 	cc,_ :=ti.FindTerm("anD")
 	fmt.Printf("anD : %v \n",cc)
 	
-*/	
+	
 	//indexer.FindTerm("aa")
 	
 /*	
@@ -186,6 +187,8 @@ func main(){
 	fmt.Printf("46334 : %v \n",cc)
 	
 */
+
+/*
 	type StrDocument struct {
 	DocID		int64 `json:"docid"`
 	Value		string `json:"value"`
@@ -240,8 +243,23 @@ func main(){
 	fmt.Printf("%v\n",docids)
 	docids,_=pr.FilterValue(docids,"24",true)
 	fmt.Printf("%v\n",docids)
+	*/
 	
 	
+	
+	/*
+	var segmenter sego.Segmenter
+    segmenter.LoadDictionary("./data/dictionary.txt")
+
+    // 分词
+    text := []byte("this is  a the website 12341123 吴英昊")
+    segments := segmenter.Segment(text)
+
+    // 处理分词结果
+    // 支持普通模式和搜索模式两种分词，见代码中SegmentsToString函数的注释。
+    fmt.Println(sego.SegmentsToSlice(segments, true)) 
+	
+	*/
 	
 	
 }
