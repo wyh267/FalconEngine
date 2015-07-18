@@ -133,7 +133,7 @@ func (this *DBBuilder)Buiding () error {
 	email_idx:=utils.NewInvertIdx(utils.TYPE_TEXT,"email") 
 	email_dic:=utils.NewStringIdxDic(10000)
 	
-	addr_idx:=utils.NewInvertIdx(utils.TYPE_TEXT,"addr") 
+	addr_idx:=utils.NewInvertIdx(utils.TYPE_TEXT,"address") 
 	addr_dic:=utils.NewStringIdxDic(10000)
 	
 	segment:= utils.NewSegmenter("./data/dictionary.txt")
@@ -156,18 +156,18 @@ func (this *DBBuilder)Buiding () error {
 		cid_pfl.PutProfile(v.DocId,v.Cid)
 	}
 	
-	utils.WriteToJson(id_idx,"./id_idx.json")
-	utils.WriteToJson(id_dic,"./id_dic.json")
-	utils.WriteToJson(id_pfl,"./id_pfl.json")
-	utils.WriteToJson(cid_idx,"./cid_idx.json")
-	utils.WriteToJson(cid_dic,"./cid_dic.json")
-	utils.WriteToJson(cid_pfl,"./cid_pfl.json")
-	utils.WriteToJson(name_idx,"./name_idx.json")
-	utils.WriteToJson(name_dic,"./name_dic.json")
-	utils.WriteToJson(email_idx,"./email_idx.json")
-	utils.WriteToJson(email_dic,"./email_dic.json")
-	utils.WriteToJson(addr_idx,"./addr_idx.json")
-	utils.WriteToJson(addr_dic,"./addr_dic.json")
+	utils.WriteToJson(id_idx,"./index/id_idx.json")
+	utils.WriteToJson(id_dic,"./index/id_dic.json")
+	utils.WriteToJson(id_pfl,"./index/id_pfl.json")
+	utils.WriteToJson(cid_idx,"./index/cid_idx.json")
+	utils.WriteToJson(cid_dic,"./index/cid_dic.json")
+	utils.WriteToJson(cid_pfl,"./index/cid_pfl.json")
+	utils.WriteToJson(name_idx,"./index/name_idx.json")
+	utils.WriteToJson(name_dic,"./index/name_dic.json")
+	utils.WriteToJson(email_idx,"./index/email_idx.json")
+	utils.WriteToJson(email_dic,"./index/email_dic.json")
+	utils.WriteToJson(addr_idx,"./index/address_idx.json")
+	utils.WriteToJson(addr_dic,"./index/address_dic.json")
 
 	
 	return nil
