@@ -40,6 +40,13 @@ func NewIndexSet (logger *log4jzl.Log4jzl) *IndexSet {
 }
 
 
+func NewIndexSetWithSegment (logger *log4jzl.Log4jzl,segment *utils.Segmenter) *IndexSet {
+	this := &IndexSet{Segmenter:segment,IvtIndex:make(map[string]IndexInterface),Logger:logger,PflIndex:make(map[string]ProfileInterface)}
+	return this
+}
+
+
+
 func (this *IndexSet) PutIndex(name string,index IndexInterface) error {
 	
 	this.IvtIndex[name] = index 
@@ -138,13 +145,8 @@ func (this *IndexSet) InitIndexSet(fields map[string]string) error {
 					return err
 				}
 				this.PutProfile(k,&pfl)
-				
 			}
-			
 		}
-		
-		
-		
 	}
 	return nil
 }

@@ -120,12 +120,12 @@ func (this *DBBuilder)Buiding () error {
 	
 	id_idx:=utils.NewInvertIdx(utils.TYPE_NUM,"id") 
 	id_dic:=utils.NewNumberIdxDic(10000)
-	id_pfl:=indexer.NewNumberProfile("id",2)
+	id_pfl:=indexer.NewNumberProfile("id")
 	
 	
 	cid_idx:=utils.NewInvertIdx(utils.TYPE_NUM,"cid") 
 	cid_dic:=utils.NewNumberIdxDic(10000)
-	cid_pfl:=indexer.NewNumberProfile("cid",2)
+	cid_pfl:=indexer.NewNumberProfile("cid")
 	
 	name_idx:=utils.NewInvertIdx(utils.TYPE_TEXT,"name") 
 	name_dic:=utils.NewStringIdxDic(10000)

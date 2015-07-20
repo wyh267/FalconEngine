@@ -21,8 +21,8 @@ type NumberProfile struct{
 }
 
 
-func NewNumberProfile(name string,ptype int64) *NumberProfile{
-	profile := &Profile{name,ptype,1}
+func NewNumberProfile(name string) *NumberProfile{
+	profile := &Profile{name,2,1}
 	this := &NumberProfile{profile,make([]int64,1)}
 	return this
 }

@@ -24,8 +24,8 @@ type TextProfile struct{
 }
 
 
-func NewTextProfile(name string,ptype int64) *TextProfile{
-	profile := &Profile{name,ptype,1}
+func NewTextProfile(name string) *TextProfile{
+	profile := &Profile{name,1,1}
 	this := &TextProfile{profile,make([]string,1)}
 	return this
 }
