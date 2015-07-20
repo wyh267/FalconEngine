@@ -293,6 +293,35 @@ func (this *IndexSet) SearchField(query interface{},field string) ([]utils.DocId
 
 
 
+
+
+
+type FilterRule struct{
+	Field		string
+	IsForward	bool
+	Value		interface{}
+}
+
+func (this *IndexSet) FilterByRules(doc_ids []utils.DocIdInfo,rules []FilterRule) ([]utils.DocIdInfo,error){
+	
+	var res []utils.DocIdInfo
+	res = doc_ids
+	for _,rule:=range rules{
+		_,ok := this.PflIndex[rule.Field]
+		if !ok {
+			continue
+		}
+		
+		res,_=	this.PflIndex[rule.Field].Filter(res,rule.Value,rule.IsForward)
+	}
+	return res,nil
+	
+	
+}
+
+
+
+
 /*****************************************************************************
 *  function name : SearchByRule
 *  params : map[string]interface{}

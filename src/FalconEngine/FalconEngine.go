@@ -85,8 +85,13 @@ func main(){
 	//res,_ := index_set.SearchField("吴英昊","name")
 	ruls := make(map[string]interface{})
 	ruls["query"] = "吴英昊"
-	ruls["cid"] = int64(146)
+	
+	fruls := make([]indexer.FilterRule,0)
+	fruls = append(fruls,indexer.FilterRule{"cid",true,int64(146)})
+	
+	//ruls["cid"] = int64(146)
 	res,_ := index_set.SearchByRule(ruls)
+	res,_ = index_set.FilterByRules(res,fruls)
 	//res,_ := index_set.Search("wuyinghao")
 	fmt.Printf("RES : %v ",res)
 /*	

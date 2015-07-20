@@ -114,9 +114,13 @@ func (this *NumberProfile)Find(doc_id int64) (interface{},error) {
 
 func (this *NumberProfile)Filter(doc_ids []u.DocIdInfo,value interface{},is_forward bool) ([]u.DocIdInfo,error) {
 	
+	if doc_ids == nil {
+		return nil,nil
+	}
+	
 	value_num,ok:=value.(int64)
 	if !ok {
-		return nil,errors.New("Wrong type..")
+		return doc_ids,nil
 	}
 	
 	return this.FilterValue(doc_ids,value_num,is_forward)

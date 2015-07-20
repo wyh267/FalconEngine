@@ -117,9 +117,13 @@ func (this *TextProfile)Find(doc_id int64) (interface{},error) {
 
 func (this *TextProfile)Filter(doc_ids []u.DocIdInfo,value interface{},is_forward bool) ([]u.DocIdInfo,error) {
 	
+	if doc_ids == nil {
+		return nil,nil
+	}
+	
 	value_str,ok:=value.(string)
 	if !ok {
-		return nil,errors.New("Wrong type..")
+		return doc_ids,nil
 	}
 	
 	return this.FilterValue(doc_ids,value_str,is_forward)
