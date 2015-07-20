@@ -24,7 +24,7 @@ type NumberIndex struct{
 
 
 func NewNumberIndex(name string,ivt *u.InvertIdx,dic *u.NumberIdxDic) *NumberIndex{
-	index := &Index{name,ivt}
+	index := &Index{name,1,ivt}
 	this := &NumberIndex{index,dic}
 	return this
 	
@@ -61,4 +61,9 @@ func (this *NumberIndex) Display(){
 	this.dicIndex.Display()
 	this.ivtIndex.Display()
 	fmt.Printf("\n===============================================================\n")
+}
+
+
+func (this *NumberIndex) GetType() int64 {
+	return this.Type
 }

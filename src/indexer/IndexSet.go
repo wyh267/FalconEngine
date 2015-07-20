@@ -26,14 +26,15 @@ type IndexSet struct {
 	Logger            *log4jzl.Log4jzl
 	IvtIndex	map[string]IndexInterface
 	PflIndex	map[string]ProfileInterface
+	Segmenter	*utils.Segmenter
 	
 }
 
 
 
 func NewIndexSet (logger *log4jzl.Log4jzl) *IndexSet {
-	
-	this := &IndexSet{IvtIndex:make(map[string]IndexInterface),Logger:logger,PflIndex:make(map[string]ProfileInterface)}
+	segment:= utils.NewSegmenter("./data/dictionary.txt")
+	this := &IndexSet{Segmenter:segment,IvtIndex:make(map[string]IndexInterface),Logger:logger,PflIndex:make(map[string]ProfileInterface)}
 	return this
 
 }
@@ -162,4 +163,72 @@ func (this *IndexSet) Display() {
 	
 }
 
+
+
+func (this *IndexSet) SearchString(query string) ([]utils.DocIdInfo,error) {
+	
+	
+	//按照最大切分进行切词
+	terms := utils.RemoveDuplicatesAndEmpty(this.Segmenter.Segment(query,false))
+	
+	//首先按照字段检索
+	//交集结果
+	var res_list []utils.DocIdInfo
+	for key,_ := range this.IvtIndex {
+		if this.IvtIndex[key].GetType() != 0 {
+			continue
+		}
+			
+		for index,term := range terms {
+			l,ok := this.IvtIndex[key].Find(term)
+			if !ok {
+				break
+			}
+			this.Logger.Info("[Term : %v ] [Field: %v ] DocIDs : %v",term,key,l)
+			//求交集
+			if index==0{
+				res_list = l
+			}else{
+				res_list,ok = utils.Interaction(l,res_list)
+				if !ok{
+					break
+				}
+			}
+			
+		}
+		if len(res_list)>0{
+			return res_list,nil
+		}
+		
+	}
+	
+	return nil,nil
+	
+	
+	//如果数量不够，跨字段检索
+	
+}
+
+
+
+func (this *IndexSet) SearchNumber(query int64) ([]utils.DocIdInfo,error) {
+	
+	return nil,nil
+}
+
+
+func (this *IndexSet) Search(query interface{}) ([]utils.DocIdInfo,error) {
+	
+	query_str,ok := query.(string)
+	if ok {
+		return this.SearchString(query_str)
+	}
+	
+	query_num,ok := query.(int64)
+	if ok {
+		return this.SearchNumber(query_num)
+	}
+
+	return nil,errors.New("Type Error")
+}
 

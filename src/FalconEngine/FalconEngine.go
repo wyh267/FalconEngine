@@ -80,8 +80,9 @@ func main(){
 	index_set.InitIndexSet(fields)
 
 	fmt.Println("INDEX SET : " ,index_set)
-	index_set.Display()
-	
+	//index_set.Display()
+	res,_ := index_set.Search("吴英昊")
+	fmt.Printf("RES : %v ",res)
 /*	
 	BaseBuilder := builder.NewBuilder(configure,dbAdaptor,logger)
 	MyBuilder := builder.NewDBBuilder(BaseBuilder)

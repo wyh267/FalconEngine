@@ -24,7 +24,7 @@ type TextIndex struct{
 
 
 func NewTextIndex(name string,ivt *u.InvertIdx,dic *u.StringIdxDic) *TextIndex{
-	index := &Index{name,ivt}
+	index := &Index{name,0,ivt}
 	this := &TextIndex{index,dic}
 	return this
 	
@@ -57,4 +57,11 @@ func (this *TextIndex) Display(){
 	this.dicIndex.Display()
 	this.ivtIndex.Display()
 	fmt.Printf("\n===============================================================\n")
+}
+
+
+
+
+func (this *TextIndex) GetType() int64 {
+	return this.Type
 }

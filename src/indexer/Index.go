@@ -13,8 +13,11 @@ import(
 	u "utils"
 )
 
+
+
 type Index struct{
-	Name	string				`json:"name"`
+	Name		string				`json:"name"`
+	Type		int64
 	ivtIndex	*u.InvertIdx	`json:"ivtIndex"`
 }
 
@@ -22,4 +25,5 @@ type Index struct{
 type IndexInterface interface {
 	Find(term interface{}) ([]u.DocIdInfo,bool)
 	Display()
+	GetType() int64
 }
