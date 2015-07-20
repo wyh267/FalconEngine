@@ -76,6 +76,7 @@ func main(){
 	}
 	
 	
+	
 	index_set := indexer.NewIndexSet(logger)
 	index_set.InitIndexSet(fields)
 
@@ -87,14 +88,20 @@ func main(){
 	ruls["query"] = "吴英昊"
 	
 	fruls := make([]indexer.FilterRule,0)
-	fruls = append(fruls,indexer.FilterRule{"cid",true,int64(146)})
+	//fruls = append(fruls,indexer.FilterRule{"cid",true,int64(146)})
+	fruls = append(fruls,indexer.FilterRule{"last_modify_time",true,"2015-07-10 14:03:54"})
+	
+	
 	
 	//ruls["cid"] = int64(146)
 	res,_ := index_set.SearchByRule(ruls)
 	res,_ = index_set.FilterByRules(res,fruls)
 	//res,_ := index_set.Search("wuyinghao")
 	fmt.Printf("RES : %v ",res)
-/*	
+	
+
+	/*
+
 	BaseBuilder := builder.NewBuilder(configure,dbAdaptor,logger)
 	MyBuilder := builder.NewDBBuilder(BaseBuilder)
 	MyBuilder.StartBuildIndex()
@@ -105,8 +112,8 @@ func main(){
 	}
 	
 	fmt.Println("a:",a)
-*/	
-	
+
+	*/
 /*	
 	s:=utils.NewStaticHashTable(10)
 	fmt.Printf("%v [INFO]  %v\n",time.Now().Format("2006-01-02 15:04:05"),s.PutKeyForInt("abc"))

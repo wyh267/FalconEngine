@@ -3,11 +3,12 @@
 package builder
 
 import (
-	//"fmt"
+	"fmt"
 	"strings"
 	"errors"
 	"indexer"
 	"utils"
+	"strconv"
 )
 
 type FieldInfo struct {
@@ -15,6 +16,12 @@ type FieldInfo struct {
 	IsIvt	bool
 	IsPlf	bool
 	FType	string
+	Name	string
+	IvtIdx		*utils.InvertIdx
+	IvtStrDic	*utils.StringIdxDic
+	IvtNumDic	*utils.NumberIdxDic
+	PlfText		*indexer.TextProfile
+	PlfNumber	*indexer.NumberProfile			
 }
 
 
@@ -22,12 +29,12 @@ type FieldInfo struct {
 type DBBuilder struct{
 	*Builder
 	sql			string
-	Fields		map[string]FieldInfo
+	Fields		[]FieldInfo
 }
 
 
 func NewDBBuilder(b *Builder) *DBBuilder{
-	this := &DBBuilder{b,"",make(map[string]FieldInfo)}
+	this := &DBBuilder{b,"",make([]FieldInfo,0)}
 	return this
 }
 
@@ -76,8 +83,9 @@ func (this *DBBuilder) parseConfigure() error {
 		}
 		
 		fi.FType=l[3]
+		fi.Name = k
 		
-		this.Fields[k]=fi
+		this.Fields=append(this.Fields,fi)
 	}
 	
 	this.Logger.Info("SELF : %v",*this)
@@ -107,14 +115,176 @@ type DBDocument struct {
 	Address		string
 }
 
+
 func (this *DBBuilder)Buiding () error {
 	
-	rows, err := this.Dbadaptor.QueryFormat(this.sql)
+	var fields string
+	for index,v := range this.Fields{
+		//构造sql语句
+		fields = fields + "," + v.Name	
+		//构造索引数据指针
+		if v.IsIvt {
+			
+			if v.FType == "T"{
+				this.Fields[index].IvtIdx=utils.NewInvertIdx(utils.TYPE_TEXT,v.Name) 
+				this.Fields[index].IvtStrDic =  utils.NewStringIdxDic(10000)
+				
+				
+			}
+			
+			if v.FType == "N"{
+				this.Fields[index].IvtIdx=utils.NewInvertIdx(utils.TYPE_NUM,v.Name) 
+				this.Fields[index].IvtNumDic = utils.NewNumberIdxDic(10000)
+				
+			}
+		}
+		
+		
+		if v.IsPlf {
+			if v.FType == "T"{
+				this.Fields[index].PlfText = indexer.NewTextProfile(v.Name)
+			}
+			
+			if v.FType == "N"{
+				this.Fields[index].PlfNumber = indexer.NewNumberProfile(v.Name)
+			}
+			
+			
+		}
+		
+		
+	}
+	
+	sql := fmt.Sprintf(this.sql,fields[1:len(fields)])
+	fmt.Printf("SQL :: %v \n", sql)
+	
+	rows, err := this.Dbadaptor.QueryFormat(sql)
 	if err != nil {
 		this.Logger.Error(" %v",err)
 		return err
 	}
 	defer rows.Close()
+	var doc_id int64
+	doc_id=1
+	segment:= utils.NewSegmenter("./data/dictionary.txt")
+	builder := &utils.IndexBuilder{segment}
+	
+	
+	for rows.Next() {
+		//values := make([]interface{},len(this.Fields))
+		values := make([]interface{}, len(this.Fields))
+    	writeCols := make([]string, len(this.Fields))
+    	for i, _ := range writeCols {
+        	values[i] = &writeCols[i]
+   		 }
+		
+		err := rows.Scan(values...)
+		if err != nil {
+			this.Logger.Error("SQL ERROR : %v",err)
+			return err
+		}
+		
+		for index,v := range writeCols{
+			//v,_ := value.(string)
+			if this.Fields[index].IsIvt {
+				
+				if this.Fields[index].FType == "T" {
+					err:=builder.BuildTextIndex(doc_id,v,this.Fields[index].IvtIdx,this.Fields[index].IvtStrDic)
+					if err !=nil{
+						this.Logger.Error("ERROR : %v",err)
+					}
+				}
+				
+				if this.Fields[index].FType == "N" {
+					v_num, err := strconv.ParseInt(v, 0, 0)
+					if err != nil {
+						this.Logger.Error("ERROR : %v", err)
+					}
+
+					err=builder.BuildNumberIndex(doc_id,v_num,this.Fields[index].IvtIdx,this.Fields[index].IvtNumDic)
+					if err !=nil{
+						this.Logger.Error("ERROR : %v",err)
+					}
+				}
+				
+				
+			}
+			
+			if this.Fields[index].IsPlf {
+				
+				if this.Fields[index].FType == "T" {
+				
+					err := this.Fields[index].PlfText.PutProfile(doc_id,v)
+					if err !=nil{
+						this.Logger.Error("ERROR : %v",err)
+					}
+				}
+				
+				if this.Fields[index].FType == "N" {
+					v_num, err := strconv.ParseInt(v, 0, 0)
+					if err != nil {
+						this.Logger.Error("ERROR : %v", err)
+					}
+					err = this.Fields[index].PlfNumber.PutProfile(doc_id,v_num)
+					if err !=nil{
+						this.Logger.Error("ERROR : %v",err)
+					}
+				}
+				
+				
+			}
+			
+			
+			
+		}
+		doc_id ++
+		this.Logger.Info("DOC_ID : %v  VALUE : %v",doc_id,writeCols)
+		
+	}
+	
+	
+	for index,fields := range this.Fields {
+		
+		if this.Fields[index].IsIvt {
+			
+				utils.WriteToJson(fields.IvtIdx,fmt.Sprintf("./index/%v_idx.json",fields.Name))	
+				if this.Fields[index].FType == "T" {
+					
+					utils.WriteToJson(fields.IvtStrDic,fmt.Sprintf("./index/%v_dic.json",fields.Name))
+					
+					
+				}
+				
+				if this.Fields[index].FType == "N" {
+					
+					utils.WriteToJson(fields.IvtNumDic,fmt.Sprintf("./index/%v_dic.json",fields.Name))
+				}
+				
+		}
+		
+		if this.Fields[index].IsPlf {
+				
+				if this.Fields[index].FType == "T" {
+					
+					utils.WriteToJson(fields.PlfText,fmt.Sprintf("./index/%v_pfl.json",fields.Name))
+					
+				}
+		
+				if this.Fields[index].FType == "N" {
+					
+					utils.WriteToJson(fields.PlfNumber,fmt.Sprintf("./index/%v_pfl.json",fields.Name))
+					
+				}
+				
+		}
+		
+	}
+	
+	
+	
+	
+	/*
+	
 	var i int64
 	i=1
 	
@@ -169,7 +339,7 @@ func (this *DBBuilder)Buiding () error {
 	utils.WriteToJson(addr_idx,"./index/address_idx.json")
 	utils.WriteToJson(addr_dic,"./index/address_dic.json")
 
-	
+	*/
 	return nil
 	
 	

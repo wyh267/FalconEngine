@@ -10,7 +10,7 @@
 package utils
 
 import (
-	//"strings"
+	"strings"
 	"errors"
 	//"fmt"
 )
@@ -37,6 +37,10 @@ func (this *IndexBuilder)BuildTextIndex(doc_id int64,content string,ivt_idx *Inv
 	
 	if ivt_idx.IdxType != TYPE_TEXT {
 		return errors.New("Wrong Type")
+	}
+	
+	if len(strings.TrimSpace(content))==0 {
+		return errors.New("nothing")
 	}
 	
 	/*

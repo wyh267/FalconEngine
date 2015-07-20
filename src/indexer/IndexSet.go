@@ -86,7 +86,7 @@ func (this *IndexSet) InitIndexSet(fields map[string]string) error {
 			this.Logger.Error("%v",errors.New("Wrong config file"))
 			return errors.New("Wrong configure for index")
 		}
-			
+		this.Logger.Info("========= Loading Index/Dictionary and Profile [ %v ] =========",k)
 		if l[1] == "1" {
 			idx_name := fmt.Sprintf("./index/%v_idx.json",k)
 			dic_name := fmt.Sprintf("./index/%v_dic.json",k)
@@ -97,10 +97,10 @@ func (this *IndexSet) InitIndexSet(fields map[string]string) error {
 			if err != nil {
 				return err
 			}
-			this.Logger.Info("Loading Index     [ %v ] ...",idx_name)
+			this.Logger.Info("Loading Index            [ %v ] ...",idx_name)
 			if l[3] == "T" {//text ivt
 				var dic utils.StringIdxDic
-				this.Logger.Info("Loading Index Dic [ %v ] type : Text ...",dic_name)
+				this.Logger.Info("Loading Index Dictionary [ %v ] type : Text ...",dic_name)
 				err = json.Unmarshal(bdic, &dic)
 				if err != nil {
 					return err
@@ -110,7 +110,7 @@ func (this *IndexSet) InitIndexSet(fields map[string]string) error {
 				
 			}else{//number ivt
 				var dic utils.NumberIdxDic
-				this.Logger.Info("Loading Index Dic [ %v ] type : Number...",dic_name)
+				this.Logger.Info("Loading Index Dictionary [ %v ] type : Number...",dic_name)
 				err = json.Unmarshal(bdic, &dic)
 				if err != nil {
 					return err
@@ -129,7 +129,7 @@ func (this *IndexSet) InitIndexSet(fields map[string]string) error {
 			
 			if l[3] == "T" {
 				var pfl TextProfile
-				this.Logger.Info("Loading Index Profile [ %v ] type : Text ...",pfl_name)
+				this.Logger.Info("Loading Index Profile    [ %v ] type : Text ...",pfl_name)
 				err := json.Unmarshal(bpfl, &pfl)
 				if err != nil {
 					return err
@@ -139,7 +139,7 @@ func (this *IndexSet) InitIndexSet(fields map[string]string) error {
 			}else{
 				
 				var pfl NumberProfile
-				this.Logger.Info("Loading Index Profile [ %v ] type : Number ...",pfl_name)
+				this.Logger.Info("Loading Index Profile    [ %v ] type : Number ...",pfl_name)
 				err := json.Unmarshal(bpfl, &pfl)
 				if err != nil {
 					return err
