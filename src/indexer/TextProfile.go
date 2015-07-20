@@ -39,6 +39,9 @@ func (this *TextProfile)Display(){
 	fmt.Printf(" ================================================= \n")
 }
 
+
+
+
 func (this *TextProfile)PutProfile(doc_id int64,value string) error {
 	if doc_id > this.Len || doc_id < 1{
 		return errors.New("docid is wrong")
@@ -93,3 +96,32 @@ func (this *TextProfile)FilterValue(doc_ids []u.DocIdInfo,value string,is_forwar
 
 
 
+
+
+func (this *TextProfile)Put(doc_id int64,value interface{}) error {
+	value_str,ok:=value.(string)
+	if !ok {
+		return errors.New("Wrong type..")
+	}
+	
+	return this.PutProfile(doc_id,value_str)
+	
+}
+
+
+func (this *TextProfile)Find(doc_id int64) (interface{},error) {
+	
+	return this.FindValue(doc_id)
+}
+
+
+func (this *TextProfile)Filter(doc_ids []u.DocIdInfo,value interface{},is_forward bool) ([]u.DocIdInfo,error) {
+	
+	value_str,ok:=value.(string)
+	if !ok {
+		return nil,errors.New("Wrong type..")
+	}
+	
+	return this.FilterValue(doc_ids,value_str,is_forward)
+		
+}

@@ -9,6 +9,11 @@
 
 package indexer
 
+
+import (
+	u "utils"
+)
+
 const (
 	PflNum	= iota
 	PflText
@@ -21,6 +26,14 @@ type Profile struct{
 	Len			int64
 }
 
+
+
+type ProfileInterface interface {
+	Put(doc_id int64,value interface{}) error 
+	Find(doc_id int64) (interface{},error)
+	Filter(doc_ids []u.DocIdInfo,value interface{},is_forward bool) ([]u.DocIdInfo,error) 
+	Display()
+}
 
 /*****************************************************************************
 *  function name : GetMaxDocId
@@ -47,4 +60,8 @@ func (this *Profile)GetMaxDocId() int64{
 func (this *Profile)GetName() string {
 	return this.Name
 }
+
+
+
+
 

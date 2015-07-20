@@ -13,6 +13,7 @@ package indexer
 import (
 	u "utils"
 	"strings"
+	"fmt"
 )
 
 
@@ -40,3 +41,20 @@ func (this *TextIndex)FindTerm(term string) ([]u.DocIdInfo,bool) {
 }
 
 
+func (this *TextIndex)Find(term interface{}) ([]u.DocIdInfo,bool) {
+	
+	term_str,ok:=term.(string)
+	if !ok {
+		return nil,false
+	}
+	
+	return this.FindTerm(term_str)	
+}
+
+
+func (this *TextIndex) Display(){
+	fmt.Printf("\n============================= %v =============================\n",this.Name)
+	this.dicIndex.Display()
+	this.ivtIndex.Display()
+	fmt.Printf("\n===============================================================\n")
+}

@@ -13,6 +13,7 @@ package indexer
 
 import (
 	u "utils"
+	"fmt"
 )
 
 
@@ -43,5 +44,21 @@ func (this *NumberIndex)FindNumber(term int64) ([]u.DocIdInfo,bool) {
 
 
 
+func (this *NumberIndex)Find(term interface{}) ([]u.DocIdInfo,bool) {
+	
+	term_num,ok:=term.(int64)
+	if !ok {
+		return nil,false
+	}
+	
+	return this.FindNumber(term_num)	
+}
 
 
+
+func (this *NumberIndex) Display(){
+	fmt.Printf("\n============================= %v =============================\n",this.Name)
+	this.dicIndex.Display()
+	this.ivtIndex.Display()
+	fmt.Printf("\n===============================================================\n")
+}

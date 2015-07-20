@@ -19,3 +19,7 @@ type Index struct{
 }
 
 
+type IndexInterface interface {
+	Find(term interface{}) ([]u.DocIdInfo,bool)
+	Display()
+}

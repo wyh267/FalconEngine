@@ -90,3 +90,35 @@ func (this *NumberProfile)FilterValue(doc_ids []u.DocIdInfo,value int64,is_forwa
 	 
 	 return res,nil
 }
+
+
+
+
+
+func (this *NumberProfile)Put(doc_id int64,value interface{}) error {
+	value_num,ok:=value.(int64)
+	if !ok {
+		return errors.New("Wrong type..")
+	}
+	
+	return this.PutProfile(doc_id,value_num)
+	
+}
+
+
+func (this *NumberProfile)Find(doc_id int64) (interface{},error) {
+	
+	return this.FindValue(doc_id)
+}
+
+
+func (this *NumberProfile)Filter(doc_ids []u.DocIdInfo,value interface{},is_forward bool) ([]u.DocIdInfo,error) {
+	
+	value_num,ok:=value.(int64)
+	if !ok {
+		return nil,errors.New("Wrong type..")
+	}
+	
+	return this.FilterValue(doc_ids,value_num,is_forward)
+		
+}

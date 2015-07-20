@@ -8,12 +8,14 @@ import (
 	//"encoding/json"
 	//"bufio"
 	//"os"
-	//"indexer"
+	//"errors"
+	"indexer"
+	//"strings"
 	"BaseFunctions"
 	"flag"
 	"fmt"
 	"github.com/outmana/log4jzl"
-	"builder"
+	//"builder"
 	//"github.com/huichen/sego"
 )
 
@@ -66,8 +68,21 @@ func main(){
 		return
 	}
 	defer dbAdaptor.Release()
+
+	fields,err := configure.GetTableFields()
+	if err != nil{
+		logger.Error("%v",err)
+		return 
+	}
 	
 	
+	index_set := indexer.NewIndexSet(logger)
+	index_set.InitIndexSet(fields)
+
+	fmt.Println("INDEX SET : " ,index_set)
+	index_set.Display()
+	
+/*	
 	BaseBuilder := builder.NewBuilder(configure,dbAdaptor,logger)
 	MyBuilder := builder.NewDBBuilder(BaseBuilder)
 	MyBuilder.StartBuildIndex()
@@ -78,7 +93,7 @@ func main(){
 	}
 	
 	fmt.Println("a:",a)
-	
+*/	
 	
 /*	
 	s:=utils.NewStaticHashTable(10)
