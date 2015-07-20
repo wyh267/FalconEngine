@@ -24,7 +24,7 @@ type NumberIndex struct{
 
 
 func NewNumberIndex(name string,ivt *u.InvertIdx,dic *u.NumberIdxDic) *NumberIndex{
-	index := &Index{name,1,ivt}
+	index := &Index{name,2,ivt}
 	this := &NumberIndex{index,dic}
 	return this
 	

@@ -165,59 +165,42 @@ func (this *IndexSet) Display() {
 
 
 
-func (this *IndexSet) SearchString(query string) ([]utils.DocIdInfo,error) {
+func (this *IndexSet) SearchString(query string) ([]utils.DocIdInfo,bool) {
 	
 	
 	//按照最大切分进行切词
-	terms := utils.RemoveDuplicatesAndEmpty(this.Segmenter.Segment(query,false))
+	//terms := utils.RemoveDuplicatesAndEmpty(this.Segmenter.Segment(query,false))
 	
 	//首先按照字段检索
-	//交集结果
-	var res_list []utils.DocIdInfo
 	for key,_ := range this.IvtIndex {
-		if this.IvtIndex[key].GetType() != 0 {
+		if this.IvtIndex[key].GetType() != 1 {
 			continue
 		}
-			
-		for index,term := range terms {
-			l,ok := this.IvtIndex[key].Find(term)
-			if !ok {
-				break
-			}
-			this.Logger.Info("[Term : %v ] [Field: %v ] DocIDs : %v",term,key,l)
-			//求交集
-			if index==0{
-				res_list = l
-			}else{
-				res_list,ok = utils.Interaction(l,res_list)
-				if !ok{
-					break
-				}
-			}
-			
-		}
-		if len(res_list)>0{
-			return res_list,nil
+		res_list,ok:=this.SearchFieldByString(query,key)
+		if ok {
+			return res_list,true
 		}
 		
 	}
 	
-	return nil,nil
+	//如果数量不够，跨字段检索 TODO
+	
+	return nil,false
 	
 	
-	//如果数量不够，跨字段检索
+	
 	
 }
 
 
 
-func (this *IndexSet) SearchNumber(query int64) ([]utils.DocIdInfo,error) {
+func (this *IndexSet) SearchNumber(query int64) ([]utils.DocIdInfo,bool) {
 	
-	return nil,nil
+	return nil,false
 }
 
 
-func (this *IndexSet) Search(query interface{}) ([]utils.DocIdInfo,error) {
+func (this *IndexSet) Search(query interface{}) ([]utils.DocIdInfo,bool) {
 	
 	query_str,ok := query.(string)
 	if ok {
@@ -229,6 +212,132 @@ func (this *IndexSet) Search(query interface{}) ([]utils.DocIdInfo,error) {
 		return this.SearchNumber(query_num)
 	}
 
-	return nil,errors.New("Type Error")
+	return nil,false
 }
+
+
+
+
+func (this *IndexSet) SearchFieldByString(query string,field string) ([]utils.DocIdInfo,bool){
+	
+	//按照最大切分进行切词
+	terms := utils.RemoveDuplicatesAndEmpty(this.Segmenter.Segment(query,false))
+	
+	//首先按照字段检索
+	//交集结果
+	var res_list []utils.DocIdInfo
+	_,ok := this.IvtIndex[field]
+	if !ok {
+		return nil,false
+	}
+				
+	for index,term := range terms {
+		l,ok := this.IvtIndex[field].Find(term)
+		if !ok {
+			break
+		}
+		this.Logger.Info("[Term : %v ] [Field: %v ] DocIDs : %v",term,field,l)
+		//求交集
+		if index==0{
+			res_list = l
+		}else{
+			res_list,ok = utils.Interaction(l,res_list)
+			if !ok{
+				break
+			}
+		}
+		
+	}
+	if len(res_list)>0{
+		return res_list,true
+	}
+	return nil,false
+}
+
+func (this *IndexSet) SearchFieldByNumber(query int64,field string) ([]utils.DocIdInfo,bool){
+	
+
+	_,ok := this.IvtIndex[field]
+	if !ok {
+		return nil,false
+	}
+
+	l,ok := this.IvtIndex[field].Find(query)
+	if !ok {
+		return nil,false
+	}
+	this.Logger.Info("[Number : %v ] [Field: %v ] DocIDs : %v",query,field,l)
+	
+	return l,true
+}
+
+//指定field搜索
+func (this *IndexSet) SearchField(query interface{},field string) ([]utils.DocIdInfo,bool){
+
+	
+	query_str,ok := query.(string)
+	if ok {
+		return this.SearchFieldByString(query_str,field)
+	}
+	
+	query_num,ok := query.(int64)
+	if ok {
+
+		return this.SearchFieldByNumber(query_num,field)
+	}
+
+	return nil,false
+	
+}
+
+
+
+
+/*****************************************************************************
+*  function name : SearchByRule
+*  params : map[string]interface{}
+*  return : []utils.DocIdInfo,bool
+*
+*  description : 搜索核心函数，根据输入的参数输出结果
+*		输入: rules 的 key 表示字段，如果前缀带有"-"表示正向过滤，带有"_"表示反向过滤，"~"表示范围过滤
+*			 key是"query"表全字段检索，否则表示指定关键词检索
+*
+*
+******************************************************************************/
+func (this *IndexSet) SearchByRule(rules map[string]interface{}) ([]utils.DocIdInfo,bool) {
+	
+	var res []utils.DocIdInfo
+	isFirst := true
+	for field,query := range rules{
+		var sub_res []utils.DocIdInfo
+		var ok bool
+		if field == "query"{
+			sub_res,ok = this.Search(query)
+		}else{
+			sub_res,ok = this.SearchField(query,field)
+		}
+		if !ok {
+			return nil,false
+		}
+		//this.Logger.Info(" SUBRES :: %v ",sub_res)
+		//this.Logger.Info(" RES :: %v ",res)
+		//this.Logger.Info("=============")
+		if isFirst {
+			res = sub_res
+			isFirst = false
+		}else{
+			res,ok = utils.Interaction(res,sub_res)
+			if !ok {
+				return nil,false
+			}
+		}
+		this.Logger.Info(" RES :: %v ",res)
+	}
+	
+	return res,false
+}
+
+
+
+
 

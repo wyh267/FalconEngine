@@ -24,7 +24,7 @@ type TextIndex struct{
 
 
 func NewTextIndex(name string,ivt *u.InvertIdx,dic *u.StringIdxDic) *TextIndex{
-	index := &Index{name,0,ivt}
+	index := &Index{name,1,ivt}
 	this := &TextIndex{index,dic}
 	return this
 	
