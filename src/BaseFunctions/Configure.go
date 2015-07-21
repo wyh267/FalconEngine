@@ -49,13 +49,36 @@ func (this *Configure) ParseConfigure(filename string) error {
 	if err != nil {
 		return err
 	}
-
+	this.loopConfigure("server", cfg)
 	this.loopConfigure("mysql", cfg)
 	this.loopConfigure("sql", cfg)
 	this.loopConfigure("table", cfg)
 	this.loopConfigure("redis", cfg)
 	return nil
 }
+
+//服务信息
+func (this *Configure) GetPort() (int, error) {
+
+	v, ok := this.ConfigureMap["server"].(map[string]string)
+	if ok == false {
+		return 9090, errors.New("No redis,use defualt")
+	}
+	
+	portstr, ok := v["port"]
+	if ok == false {
+		return 9090, errors.New("No Port set, use default")
+	}
+
+	port, err := strconv.Atoi(portstr)
+	if err != nil {
+		return 9090, err
+	}
+
+	return port, nil
+}
+
+
 
 func (this *Configure) GetRedisHost() (string, error) {
 

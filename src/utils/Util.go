@@ -2,6 +2,8 @@ package utils
 
 import (
 	"sort"
+	"time"
+	"fmt"
 )
 
 
@@ -121,3 +123,24 @@ func Interaction(a []DocIdInfo, b []DocIdInfo) ([]DocIdInfo, bool) {
 	}
 
 }
+
+
+
+
+
+
+
+func InitTime() (func(string) string ){
+	init_time := time.Now()
+	
+	return func(description string) string {
+		now := time.Now()
+		cost := fmt.Sprintf("[ %v ] cost:%v", description,now.Sub(init_time))
+		init_time = now
+		return cost
+		
+	}
+	
+}
+
+

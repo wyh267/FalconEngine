@@ -7,7 +7,7 @@ import (
 	//"time"
 	//"encoding/json"
 	//"bufio"
-	//"os"
+	"os"
 	//"errors"
 	"indexer"
 	//"strings"
@@ -16,6 +16,7 @@ import (
 	"flag"
 	"fmt"
 	"github.com/outmana/log4jzl"
+	"net/http"
 	//"github.com/huichen/sego"
 )
 
@@ -37,7 +38,7 @@ func main() {
 	var search string
 	var err error
 	flag.StringVar(&configFile, "conf", "search.conf", "configure file full path")
-	flag.StringVar(&search, "mode", "search", "start mode[search | build ]")
+	flag.StringVar(&search, "mode", "search", "start mode[ search | build ]")
 	flag.Parse()
 
 	//读取配置文件
@@ -48,7 +49,7 @@ func main() {
 	}
 
 	//启动日志系统
-	logger, err := log4jzl.New("ProxyServer")
+	logger, err := log4jzl.New("FalconEngine")
 	if err != nil {
 		fmt.Printf("[ERROR] Create logger Error: %v\n", err)
 		//return
@@ -71,6 +72,33 @@ func main() {
 	defer redisClient.Release()
 
 	if search == "search" {
+		
+		processor := &BaseFunctions.BaseProcessor{configure,logger,dbAdaptor,redisClient}
+		
+		fields, err := configure.GetTableFields()
+		if err != nil {
+			logger.Error("%v", err)
+			return
+		}
+		index_set := indexer.NewIndexSet(logger)
+		index_set.InitIndexSet(fields)
+		
+		
+		searcher :=  NewSearcher(processor,index_set) // &Searcher{processor}
+		router := &BaseFunctions.Router{configure,logger,map[string]BaseFunctions.FEProcessor{
+			"search":	searcher,
+		}}
+		
+		logger.Info("Server Start...")
+		port, _ := configure.GetPort()
+		addr := fmt.Sprintf(":%d", port)
+		err = http.ListenAndServe(addr, router)
+		if err != nil {
+			logger.Error("Server start fail: %v", err)
+			os.Exit(1)
+		}
+		
+		/*
 		fields, err := configure.GetTableFields()
 		if err != nil {
 			logger.Error("%v", err)
@@ -109,6 +137,7 @@ func main() {
 
 		res, _ = index_set.FilterByCustom(res, "last_modify_time", "2015-07-10 15:36:47", true, cf)
 		fmt.Printf("RES : %v ", res)
+		*/
 
 	} else if search == "build" {
 		BaseBuilder := builder.NewBuilder(configure, dbAdaptor, logger, redisClient)
