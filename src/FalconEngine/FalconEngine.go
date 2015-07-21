@@ -15,7 +15,7 @@ import (
 	"flag"
 	"fmt"
 	"github.com/outmana/log4jzl"
-	//"builder"
+	"builder"
 	//"github.com/huichen/sego"
 )
 
@@ -39,12 +39,12 @@ type NumDocument struct {
 func main(){
 	
 	fmt.Printf("init FalconEngine.....\n")
-	
-	var err error
-
 	//读取启动参数
 	var configFile string
+	var search	   string
+	var err error
 	flag.StringVar(&configFile, "conf", "search.conf", "configure file full path")
+	flag.StringVar(&search, "mode", "search", "start mode[search | build ]")
 	flag.Parse()
 
 	//读取配置文件
@@ -68,36 +68,44 @@ func main(){
 		return
 	}
 	defer dbAdaptor.Release()
-
-	fields,err := configure.GetTableFields()
-	if err != nil{
-		logger.Error("%v",err)
-		return 
+	
+	if search == "search"{
+		fields,err := configure.GetTableFields()
+		if err != nil{
+			logger.Error("%v",err)
+			return 
+		}
+		index_set := indexer.NewIndexSet(logger)
+		index_set.InitIndexSet(fields)
+	
+		fmt.Println("INDEX SET : " ,index_set)
+		//index_set.Display()
+		
+		//res,_ := index_set.SearchField("吴英昊","name")
+		ruls := make(map[string]interface{})
+		ruls["query"] = "吴英昊"
+		
+		fruls := make([]indexer.FilterRule,0)
+		//fruls = append(fruls,indexer.FilterRule{"cid",true,int64(146)})
+		fruls = append(fruls,indexer.FilterRule{"last_modify_time",true,"2015-07-10 14:03:54"})
+		
+		
+		
+		//ruls["cid"] = int64(146)
+		res,_ := index_set.SearchByRule(ruls)
+		res,_ = index_set.FilterByRules(res,fruls)
+		//res,_ := index_set.Search("wuyinghao")
+		fmt.Printf("RES : %v ",res)
+		
+	}else if search == "build" {
+		BaseBuilder := builder.NewBuilder(configure,dbAdaptor,logger)
+		MyBuilder := builder.NewDBBuilder(BaseBuilder)
+		MyBuilder.StartBuildIndex()
+	}else{
+		logger.Error("Wrong start mode...only support [ search | build ]")
 	}
-	
-	
-	
-	index_set := indexer.NewIndexSet(logger)
-	index_set.InitIndexSet(fields)
 
-	fmt.Println("INDEX SET : " ,index_set)
-	//index_set.Display()
 	
-	//res,_ := index_set.SearchField("吴英昊","name")
-	ruls := make(map[string]interface{})
-	ruls["query"] = "吴英昊"
-	
-	fruls := make([]indexer.FilterRule,0)
-	//fruls = append(fruls,indexer.FilterRule{"cid",true,int64(146)})
-	fruls = append(fruls,indexer.FilterRule{"last_modify_time",true,"2015-07-10 14:03:54"})
-	
-	
-	
-	//ruls["cid"] = int64(146)
-	res,_ := index_set.SearchByRule(ruls)
-	res,_ = index_set.FilterByRules(res,fruls)
-	//res,_ := index_set.Search("wuyinghao")
-	fmt.Printf("RES : %v ",res)
 	
 
 	/*

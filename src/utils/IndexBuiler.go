@@ -40,7 +40,7 @@ func (this *IndexBuilder)BuildTextIndex(doc_id int64,content string,ivt_idx *Inv
 	}
 	
 	if len(strings.TrimSpace(content))==0 {
-		return errors.New("nothing")
+		return nil //errors.New("nothing")
 	}
 	
 	/*

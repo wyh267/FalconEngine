@@ -88,7 +88,7 @@ func (this *DBBuilder) parseConfigure() error {
 		this.Fields=append(this.Fields,fi)
 	}
 	
-	this.Logger.Info("SELF : %v",*this)
+	//this.Logger.Info("SELF : %v",*this)
 	return nil
 	
 }
