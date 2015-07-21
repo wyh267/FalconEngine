@@ -20,6 +20,58 @@ func RemoveDuplicatesAndEmpty(a []string) (ret []string){
 
 
 
+func Merge(a []DocIdInfo , b []DocIdInfo) ([]DocIdInfo,bool){
+    lena := len(a)
+    lenb := len(b)
+    c := make([]DocIdInfo,0)
+
+    ia:=0
+    ib:=0
+    
+    if lena==0 && lenb==0{
+        return nil,false
+    }
+    
+     for ia<lena && ib<lenb {
+        
+        if a[ia].DocId == b[ib].DocId{
+            c=append(c,a[ia])
+            ia++
+            ib++
+        }
+        
+        if a[ia].DocId < b[ib].DocId{
+            c=append(c,a[ia])
+            ia ++
+        }else{
+            c=append(c,b[ib])
+            ib ++
+        }
+    }
+    
+    
+    if ia<lena{
+        for ;ia<lena;ia++ {
+            c=append(c,a[ia])
+        }
+        
+    }else{
+        for ;ib<lenb;ib++{
+            c=append(c,b[ib])
+        }
+    }
+    
+     if len(c) == 0 {
+        return nil,false
+    }else{
+        return c,true
+    } 
+    
+    
+}
+
+
+
 func Interaction(a []DocIdInfo , b []DocIdInfo) ([]DocIdInfo,bool){
     
     lena := len(a)
@@ -48,3 +100,5 @@ func Interaction(a []DocIdInfo , b []DocIdInfo) ([]DocIdInfo,bool){
     }
     
 }
+
+

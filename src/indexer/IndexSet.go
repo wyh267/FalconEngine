@@ -174,11 +174,13 @@ func (this *IndexSet) SearchString(query string) ([]utils.DocIdInfo,bool) {
 	//terms := utils.RemoveDuplicatesAndEmpty(this.Segmenter.Segment(query,false))
 	
 	//首先按照字段检索
+	var res_list []utils.DocIdInfo
+	var ok bool
 	for key,_ := range this.IvtIndex {
 		if this.IvtIndex[key].GetType() != 1 {
 			continue
 		}
-		res_list,ok:=this.SearchFieldByString(query,key)
+		res_list,ok=this.SearchFieldByString(query,key)
 		if ok {
 			return res_list,true
 		}
@@ -186,11 +188,54 @@ func (this *IndexSet) SearchString(query string) ([]utils.DocIdInfo,bool) {
 	}
 	
 	//如果数量不够，跨字段检索 TODO
+	var res_merge []utils.DocIdInfo
+	if len(res_list) == 0 {
+		terms := utils.RemoveDuplicatesAndEmpty(this.Segmenter.Segment(query,false))
+		this.Logger.Info("OUT TERMS :: %v ",terms)
+		for index,term := range terms{
+			l,ok:=this.SearchFieldsByTerm(term)
+			if !ok {
+				return nil,false
+			}
+			
+			if index==0{
+				res_merge = l
+			}else{
+				res_merge,ok=utils.Interaction(res_merge,l)
+				this.Logger.Info("Interaction Term:%v Docids: %v",term,res_merge)
+				if !ok {
+					return nil,false
+				}
+			}
+		}
+	}
+	 
 	
-	return nil,false
+	return res_merge,true
+	
+}
+
+
+func (this *IndexSet) SearchFieldsByTerm(term string) ([]utils.DocIdInfo,bool){
 	
 	
+	var res_list []utils.DocIdInfo
+	for key,_ := range this.IvtIndex {
+		if this.IvtIndex[key].GetType() != 1 {
+			continue
+		}
+		l,_ := this.IvtIndex[key].Find(term)
+		this.Logger.Info("Field:%v Term:%v Docids: %v",key,term,l)
+		
+		res_list,_ = utils.Merge(res_list,l)
+		this.Logger.Info("Merged Field:%v Term:%v Docids: %v",key,term,res_list)
+	}
 	
+	if len(res_list)==0{
+		return nil,false
+	}
+	
+	return res_list,true
 	
 }
 
@@ -224,7 +269,7 @@ func (this *IndexSet) SearchFieldByString(query string,field string) ([]utils.Do
 	
 	//按照最大切分进行切词
 	terms := utils.RemoveDuplicatesAndEmpty(this.Segmenter.Segment(query,false))
-	
+	this.Logger.Info("TERMS :: %v ",terms)
 	//首先按照字段检索
 	//交集结果
 	var res_list []utils.DocIdInfo
@@ -232,10 +277,11 @@ func (this *IndexSet) SearchFieldByString(query string,field string) ([]utils.Do
 	if !ok {
 		return nil,false
 	}
-				
+	isFound:=true
 	for index,term := range terms {
 		l,ok := this.IvtIndex[field].Find(term)
 		if !ok {
+			isFound = false
 			break
 		}
 		this.Logger.Info("[Term : %v ] [Field: %v ] DocIDs : %v",term,field,l)
@@ -245,12 +291,13 @@ func (this *IndexSet) SearchFieldByString(query string,field string) ([]utils.Do
 		}else{
 			res_list,ok = utils.Interaction(l,res_list)
 			if !ok{
+				isFound = false
 				break
 			}
 		}
 		
 	}
-	if len(res_list)>0{
+	if len(res_list)>0 && isFound == true{
 		return res_list,true
 	}
 	return nil,false

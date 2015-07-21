@@ -183,8 +183,9 @@ func (this *DBBuilder)Buiding () error {
 			this.Logger.Error("SQL ERROR : %v",err)
 			return err
 		}
-		
+		redis_map := make(map[string]string)
 		for index,v := range writeCols{
+			redis_map[this.Fields[index].Name] = v
 			//v,_ := value.(string)
 			if this.Fields[index].IsIvt {
 				
@@ -237,7 +238,10 @@ func (this *DBBuilder)Buiding () error {
 			
 			
 		}
+		
+		this.RedisCli.SetFields(doc_id,redis_map)
 		doc_id ++
+		
 		this.Logger.Info("DOC_ID : %v  VALUE : %v",doc_id,writeCols)
 		
 	}

@@ -22,12 +22,13 @@ type Builder struct{
 	Configure	*BaseFunctions.Configure
 	Dbadaptor   *BaseFunctions.DBAdaptor
 	Logger            *log4jzl.Log4jzl
+	RedisCli	*BaseFunctions.RedisClient
 }
 
 
 
-func NewBuilder(configure *BaseFunctions.Configure,dbadaptor *BaseFunctions.DBAdaptor,logger *log4jzl.Log4jzl) *Builder{
-	this := &Builder{configure,dbadaptor,logger}
+func NewBuilder(configure *BaseFunctions.Configure,dbadaptor *BaseFunctions.DBAdaptor,logger *log4jzl.Log4jzl,redis *BaseFunctions.RedisClient) *Builder{
+	this := &Builder{configure,dbadaptor,logger,redis}
 	return this
 }
 

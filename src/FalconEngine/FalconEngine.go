@@ -69,6 +69,16 @@ func main(){
 	}
 	defer dbAdaptor.Release()
 	
+	
+	//初始化ID生成器
+	redisClient, err := BaseFunctions.NewRedisClient(configure, logger)
+	if err != nil {
+		fmt.Printf("[ERROR] Create redisClient Error: %v\n", err)
+		return
+	}
+	defer redisClient.Release()
+	
+	
 	if search == "search"{
 		fields,err := configure.GetTableFields()
 		if err != nil{
@@ -83,11 +93,13 @@ func main(){
 		
 		//res,_ := index_set.SearchField("吴英昊","name")
 		ruls := make(map[string]interface{})
-		ruls["query"] = "吴英昊"
+		ruls["query"] = "吴英昊15810589078"
+		ruls["cid"] = int64(146)
+		//ruls["mobile_phone"] = "18511078600"
 		
 		fruls := make([]indexer.FilterRule,0)
 		//fruls = append(fruls,indexer.FilterRule{"cid",true,int64(146)})
-		fruls = append(fruls,indexer.FilterRule{"last_modify_time",true,"2015-07-10 14:03:54"})
+		fruls = append(fruls,indexer.FilterRule{"last_modify_time",true,"2015-07-10 15:36:47"})
 		
 		
 		
@@ -106,11 +118,11 @@ func main(){
 			return false
 		}
 		
-		res,_ = index_set.FilterByCustom(res,"last_modify_time","2015-07-10 14:03:54",true,cf)
+		res,_ = index_set.FilterByCustom(res,"last_modify_time","2015-07-10 15:36:47",true,cf)
 		fmt.Printf("RES : %v ",res)
 		
 	}else if search == "build" {
-		BaseBuilder := builder.NewBuilder(configure,dbAdaptor,logger)
+		BaseBuilder := builder.NewBuilder(configure,dbAdaptor,logger,redisClient)
 		MyBuilder := builder.NewDBBuilder(BaseBuilder)
 		MyBuilder.StartBuildIndex()
 	}else{
