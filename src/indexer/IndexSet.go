@@ -323,6 +323,16 @@ func (this *IndexSet) FilterByRules(doc_ids []utils.DocIdInfo,rules []FilterRule
 
 
 
+func (this *IndexSet) FilterByCustom(doc_ids []utils.DocIdInfo,field string,value interface{},r bool,cf func(v1,v2 interface{})(bool))([]utils.DocIdInfo,error){
+	
+	_,ok := this.PflIndex[field]
+	if !ok {
+		return doc_ids,errors.New("No field ")
+	}
+	return this.PflIndex[field].CustomFilter(doc_ids,value,r,cf)
+	
+}
+
 
 /*****************************************************************************
 *  function name : SearchByRule

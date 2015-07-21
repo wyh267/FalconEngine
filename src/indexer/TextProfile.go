@@ -129,3 +129,20 @@ func (this *TextProfile)Filter(doc_ids []u.DocIdInfo,value interface{},is_forwar
 	return this.FilterValue(doc_ids,value_str,is_forward)
 		
 }
+
+
+
+func (this *TextProfile)CustomFilter(doc_ids []u.DocIdInfo,value interface{},r bool,cf func(v1,v2 interface{})(bool)) ([]u.DocIdInfo,error) {
+	
+	res := make([]u.DocIdInfo,0,1000)
+	for i,_:=range doc_ids{
+			if cf(value,this.ProfileList[doc_ids[i].DocId])==r {
+				res = append(res,doc_ids[i])
+			}
+	}
+	
+	return res,nil
+	
+}
+
+

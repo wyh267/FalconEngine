@@ -124,5 +124,19 @@ func (this *NumberProfile)Filter(doc_ids []u.DocIdInfo,value interface{},is_forw
 	}
 	
 	return this.FilterValue(doc_ids,value_num,is_forward)
-		
+	
+}
+
+
+
+func (this *NumberProfile)CustomFilter(doc_ids []u.DocIdInfo,value interface{},r bool,cf func(v1,v2 interface{})(bool)) ([]u.DocIdInfo,error){
+	
+	res := make([]u.DocIdInfo,0,1000)
+	for i,_:=range doc_ids{
+			if cf(value,this.ProfileList[doc_ids[i].DocId])==r {
+				res = append(res,doc_ids[i])
+			}
+	}
+	
+	return res,nil
 }

@@ -33,6 +33,7 @@ type ProfileInterface interface {
 	Find(doc_id int64) (interface{},error)
 	Filter(doc_ids []u.DocIdInfo,value interface{},is_forward bool) ([]u.DocIdInfo,error) 
 	Display()
+	CustomFilter(doc_ids []u.DocIdInfo,value interface{},r bool,cf func(v1,v2 interface{})(bool)) ([]u.DocIdInfo,error)
 }
 
 /*****************************************************************************

@@ -93,8 +93,20 @@ func main(){
 		
 		//ruls["cid"] = int64(146)
 		res,_ := index_set.SearchByRule(ruls)
-		res,_ = index_set.FilterByRules(res,fruls)
+		//res,_ := index_set.CustomFilter
+		
+		//res,_ = index_set.FilterByRules(res,fruls)
 		//res,_ := index_set.Search("wuyinghao")
+		cf := func(v1,v2 interface{})(bool){
+			v11,_:=v1.(string)
+			v22,_:=v2.(string)
+			if v11 == v22 {
+				return true
+			}
+			return false
+		}
+		
+		res,_ = index_set.FilterByCustom(res,"last_modify_time","2015-07-10 14:03:54",true,cf)
 		fmt.Printf("RES : %v ",res)
 		
 	}else if search == "build" {
