@@ -9,58 +9,49 @@
 
 package indexer
 
-
 import (
-	u "utils"
-	"strings"
 	"fmt"
+	"strings"
+	u "utils"
 )
 
-
-type TextIndex struct{
+type TextIndex struct {
 	*Index
-	dicIndex	*u.StringIdxDic
+	dicIndex *u.StringIdxDic
 }
 
-
-func NewTextIndex(name string,ivt *u.InvertIdx,dic *u.StringIdxDic) *TextIndex{
-	index := &Index{name,1,ivt}
-	this := &TextIndex{index,dic}
+func NewTextIndex(name string, ivt *u.InvertIdx, dic *u.StringIdxDic) *TextIndex {
+	index := &Index{name, 1, ivt}
+	this := &TextIndex{index, dic}
 	return this
-	
+
 }
 
+func (this *TextIndex) FindTerm(term string) ([]u.DocIdInfo, bool) {
 
-func (this *TextIndex)FindTerm(term string) ([]u.DocIdInfo,bool) {
-	
 	term_id := this.dicIndex.Find(strings.ToLower(term))
 	if term_id == -1 {
-		return nil,false
+		return nil, false
 	}
 	return this.ivtIndex.GetInvertIndex(term_id)
 }
 
+func (this *TextIndex) Find(term interface{}) ([]u.DocIdInfo, bool) {
 
-func (this *TextIndex)Find(term interface{}) ([]u.DocIdInfo,bool) {
-	
-	term_str,ok:=term.(string)
+	term_str, ok := term.(string)
 	if !ok {
-		return nil,false
+		return nil, false
 	}
-	
-	return this.FindTerm(term_str)	
+
+	return this.FindTerm(term_str)
 }
 
-
-func (this *TextIndex) Display(){
-	fmt.Printf("\n============================= %v =============================\n",this.Name)
+func (this *TextIndex) Display() {
+	fmt.Printf("\n============================= %v =============================\n", this.Name)
 	this.dicIndex.Display()
 	this.ivtIndex.Display()
 	fmt.Printf("\n===============================================================\n")
 }
-
-
-
 
 func (this *TextIndex) GetType() int64 {
 	return this.Type

@@ -1,5 +1,3 @@
-
-
 package BaseFunctions
 
 import (
@@ -8,7 +6,6 @@ import (
 	"github.com/outmana/log4jzl"
 	"time"
 )
-
 
 type RedisClient struct {
 	conn   redis.Conn
@@ -21,7 +18,7 @@ func NewRedisClient(config *Configure, logger *log4jzl.Log4jzl) (*RedisClient, e
 	counter := &RedisClient{}
 	counter.config = config
 	counter.logger = logger
-	
+
 	counter.pool = &redis.Pool{
 		MaxIdle:     30,
 		IdleTimeout: 240 * time.Second,
@@ -49,28 +46,26 @@ func (this *RedisClient) Release() {
 	this.pool.Close()
 }
 
-
-func (this *RedisClient) SetFields(doc_id int64,fields map[string]string) error {
-	key := fmt.Sprintf("DOC_ID:%v",doc_id)
+func (this *RedisClient) SetFields(doc_id int64, fields map[string]string) error {
+	key := fmt.Sprintf("DOC_ID:%v", doc_id)
 	//var value string
 	var comm []interface{}
-	comm = append(comm,key)
-	for k,v:=range fields{
+	comm = append(comm, key)
+	for k, v := range fields {
 		//v:=fmt.Sprintf(" %v \"%v\"",k,v)
-		//value = value + v	
-		comm = append(comm,k)
-		comm = append(comm,v)	
+		//value = value + v
+		comm = append(comm, k)
+		comm = append(comm, v)
 	}
 	//comm := fmt.Sprintf("%v%v",key,value)
-	fmt.Printf("REDIS :: %v\n",comm)
+	fmt.Printf("REDIS :: %v\n", comm)
 	conn := this.pool.Get()
 	_, err := conn.Do("HMSET", comm...)
 	if err != nil {
-		this.logger.Error("REDIS ERROR : %v ",err)
+		this.logger.Error("REDIS ERROR : %v ", err)
 		return err
 	}
 
 	return nil
-	
-	
+
 }

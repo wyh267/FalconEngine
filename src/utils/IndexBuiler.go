@@ -1,62 +1,49 @@
-
 /*****************************************************************************
- *  file name : 
+ *  file name : IndexBuilder
  *  author : Wu Yinghao
  *  email  : wyh817@gmail.com
  *
- *  file description : 
+ *  file description : 生成倒排索引和正排索引的工具类，可考虑变成函数而不是一个类
  *
 ******************************************************************************/
 package utils
 
 import (
-	"strings"
 	"errors"
+	"strings"
 	//"fmt"
 )
 
-
-
 type IndexBuilder struct {
-	Segmenter	*Segmenter
+	Segmenter *Segmenter
 }
-
-
 
 /*****************************************************************************
 *  function name : BuildTextIndex
-*  params : 
-*  return : 
+*  params :
+*  return :
 *
-*  description : 
+*  description :
 *
 ******************************************************************************/
-const RULE_EN	int64 = 1
-const RULE_CHN	int64 = 2
-func (this *IndexBuilder)BuildTextIndex(doc_id int64,content string,ivt_idx *InvertIdx,ivt_dic *StringIdxDic) error {
-	
+const RULE_EN int64 = 1
+const RULE_CHN int64 = 2
+
+func (this *IndexBuilder) BuildTextIndex(doc_id int64, content string, ivt_idx *InvertIdx, ivt_dic *StringIdxDic) error {
+
 	if ivt_idx.IdxType != TYPE_TEXT {
 		return errors.New("Wrong Type")
 	}
-	
-	if len(strings.TrimSpace(content))==0 {
+
+	if len(strings.TrimSpace(content)) == 0 {
 		return nil //errors.New("nothing")
 	}
-	
-	/*
-	var terms []string 
-	//英文直接按照空格切割
-	if rule == RULE_EN {
-		terms = RemoveDuplicatesAndEmpty(strings.Fields(strings.ToLower(content)))
-		if len(terms) == 0{
-			return errors.New("Empty content")
-		}
-	}
-	*/
-	terms := RemoveDuplicatesAndEmpty(this.Segmenter.Segment(content,true))
-	
-	for _,term := range terms {
-		len:=ivt_dic.Length()
+
+
+	terms := RemoveDuplicatesAndEmpty(this.Segmenter.Segment(content, true))
+
+	for _, term := range terms {
+		len := ivt_dic.Length()
 		key_id := ivt_dic.Put(term)
 		if key_id == -1 {
 			return errors.New("Bukets full")
@@ -64,24 +51,20 @@ func (this *IndexBuilder)BuildTextIndex(doc_id int64,content string,ivt_idx *Inv
 		//新增
 		if key_id > len {
 			invertList := NewInvertDocIdList(term)
-			invertList.DocIdList = append(invertList.DocIdList,DocIdInfo{doc_id,0})
-			ivt_idx.KeyInvertList = append(ivt_idx.KeyInvertList,*invertList)
+			invertList.DocIdList = append(invertList.DocIdList, DocIdInfo{doc_id, 0})
+			ivt_idx.KeyInvertList = append(ivt_idx.KeyInvertList, *invertList)
 			ivt_idx.IdxLen++
-		}else{//更新
-			ivt_idx.KeyInvertList[key_id].DocIdList= append(ivt_idx.KeyInvertList[key_id].DocIdList,DocIdInfo{doc_id,0})
+		} else { //更新
+			ivt_idx.KeyInvertList[key_id].DocIdList = append(ivt_idx.KeyInvertList[key_id].DocIdList, DocIdInfo{doc_id, 0})
 		}
-		
+
 	}
 	return nil
 }
 
+func (this *IndexBuilder) BuildNumberIndex(doc_id int64, content int64, ivt_idx *InvertIdx, ivt_dic *NumberIdxDic) error {
 
-
-
-
-func (this *IndexBuilder)BuildNumberIndex(doc_id int64,content int64,ivt_idx *InvertIdx,ivt_dic *NumberIdxDic) error {
-	
-	len:=ivt_dic.Length()
+	len := ivt_dic.Length()
 	key_id := ivt_dic.Put(content)
 	if key_id == -1 {
 		return errors.New("Bukets full")
@@ -89,13 +72,12 @@ func (this *IndexBuilder)BuildNumberIndex(doc_id int64,content int64,ivt_idx *In
 	//新增
 	if key_id > len {
 		invertList := NewInvertDocIdList(content)
-		invertList.DocIdList = append(invertList.DocIdList,DocIdInfo{doc_id,0})
-		ivt_idx.KeyInvertList = append(ivt_idx.KeyInvertList,*invertList)
+		invertList.DocIdList = append(invertList.DocIdList, DocIdInfo{doc_id, 0})
+		ivt_idx.KeyInvertList = append(ivt_idx.KeyInvertList, *invertList)
 		ivt_idx.IdxLen++
-	}else{//更新
-		ivt_idx.KeyInvertList[key_id].DocIdList= append(ivt_idx.KeyInvertList[key_id].DocIdList,DocIdInfo{doc_id,0})
+	} else { //更新
+		ivt_idx.KeyInvertList[key_id].DocIdList = append(ivt_idx.KeyInvertList[key_id].DocIdList, DocIdInfo{doc_id, 0})
 	}
-	
+
 	return nil
 }
-

@@ -7,62 +7,51 @@
  *
 ******************************************************************************/
 
-
 package indexer
 
-
 import (
-	u "utils"
 	"fmt"
+	u "utils"
 )
 
-
-type NumberIndex struct{
+type NumberIndex struct {
 	*Index
-	dicIndex	*u.NumberIdxDic
+	dicIndex *u.NumberIdxDic
 }
 
-
-func NewNumberIndex(name string,ivt *u.InvertIdx,dic *u.NumberIdxDic) *NumberIndex{
-	index := &Index{name,2,ivt}
-	this := &NumberIndex{index,dic}
+func NewNumberIndex(name string, ivt *u.InvertIdx, dic *u.NumberIdxDic) *NumberIndex {
+	index := &Index{name, 2, ivt}
+	this := &NumberIndex{index, dic}
 	return this
-	
+
 }
 
+func (this *NumberIndex) FindNumber(term int64) ([]u.DocIdInfo, bool) {
 
-func (this *NumberIndex)FindNumber(term int64) ([]u.DocIdInfo,bool) {
-	
-	term_id,_ := this.dicIndex.Find(term)
+	term_id, _ := this.dicIndex.Find(term)
 	if term_id == -1 {
-		return nil,false
+		return nil, false
 	}
 	return this.ivtIndex.GetInvertIndex(term_id)
-	
+
 }
 
+func (this *NumberIndex) Find(term interface{}) ([]u.DocIdInfo, bool) {
 
-
-
-func (this *NumberIndex)Find(term interface{}) ([]u.DocIdInfo,bool) {
-	
-	term_num,ok:=term.(int64)
+	term_num, ok := term.(int64)
 	if !ok {
-		return nil,false
+		return nil, false
 	}
-	
-	return this.FindNumber(term_num)	
+
+	return this.FindNumber(term_num)
 }
 
-
-
-func (this *NumberIndex) Display(){
-	fmt.Printf("\n============================= %v =============================\n",this.Name)
+func (this *NumberIndex) Display() {
+	fmt.Printf("\n============================= %v =============================\n", this.Name)
 	this.dicIndex.Display()
 	this.ivtIndex.Display()
 	fmt.Printf("\n===============================================================\n")
 }
-
 
 func (this *NumberIndex) GetType() int64 {
 	return this.Type

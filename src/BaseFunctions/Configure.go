@@ -25,17 +25,17 @@ func NewConfigure(filename string) (*Configure, error) {
 func (this *Configure) loopConfigure(sectionName string, cfg *config.Config) error {
 
 	if cfg.HasSection(sectionName) {
-		sec :=make(map[string]string)
+		sec := make(map[string]string)
 		section, err := cfg.SectionOptions(sectionName)
 		if err == nil {
 			for _, v := range section {
 				options, err := cfg.String(sectionName, v)
 				if err == nil {
-					
+
 					sec[v] = options
 				}
 			}
-			this.ConfigureMap[sectionName]=sec
+			this.ConfigureMap[sectionName] = sec
 			return nil
 		}
 		return errors.New("Parse Error")
@@ -50,7 +50,6 @@ func (this *Configure) ParseConfigure(filename string) error {
 		return err
 	}
 
-
 	this.loopConfigure("mysql", cfg)
 	this.loopConfigure("sql", cfg)
 	this.loopConfigure("table", cfg)
@@ -58,16 +57,13 @@ func (this *Configure) ParseConfigure(filename string) error {
 	return nil
 }
 
-
-
 func (this *Configure) GetRedisHost() (string, error) {
-	
-	v,ok := this.ConfigureMap["redis"].(map[string]string)
+
+	v, ok := this.ConfigureMap["redis"].(map[string]string)
 	if ok == false {
 		return "", errors.New("No redis,use defualt")
 	}
-	
-	
+
 	redishost, ok := v["redishost"]
 
 	if ok == false {
@@ -78,12 +74,12 @@ func (this *Configure) GetRedisHost() (string, error) {
 }
 
 func (this *Configure) GetRedisPort() (string, error) {
-	
-	v,ok := this.ConfigureMap["redis"].(map[string]string)
+
+	v, ok := this.ConfigureMap["redis"].(map[string]string)
 	if ok == false {
 		return "", errors.New("No redis,use defualt")
 	}
-	
+
 	redisport, ok := v["redisport"]
 
 	if ok == false {
@@ -93,26 +89,23 @@ func (this *Configure) GetRedisPort() (string, error) {
 	return redisport, nil
 }
 
+func (this *Configure) GetTableFields() (map[string]string, error) {
 
-
-func (this *Configure) GetTableFields() (map[string]string,error) {
-	
-	fields,ok := this.ConfigureMap["table"].(map[string]string)
+	fields, ok := this.ConfigureMap["table"].(map[string]string)
 	if ok == false {
 		return nil, errors.New("No SqlSentence,use defualt")
 	}
-	
-	return fields,nil
+
+	return fields, nil
 }
 
-
 func (this *Configure) GetSqlSentence() (string, error) {
-	v,ok := this.ConfigureMap["sql"].(map[string]string)
+	v, ok := this.ConfigureMap["sql"].(map[string]string)
 	if ok == false {
 		return "", errors.New("No SqlSentence,use defualt")
 	}
-	
-	SqlSentence, ok :=v["sqlsentence"]
+
+	SqlSentence, ok := v["sqlsentence"]
 
 	if ok == false {
 		return "", errors.New("No SqlSentence,use defualt")
@@ -121,15 +114,14 @@ func (this *Configure) GetSqlSentence() (string, error) {
 	return SqlSentence, nil
 }
 
-
 //数据库连接配置信息
 func (this *Configure) GetMysqlUserName() (string, error) {
 
-	v,ok := this.ConfigureMap["mysql"].(map[string]string)
+	v, ok := this.ConfigureMap["mysql"].(map[string]string)
 	if ok == false {
 		return "", errors.New("No,use defualt")
 	}
-	mysqlusername, ok :=v["mysqlusername"]
+	mysqlusername, ok := v["mysqlusername"]
 
 	if ok == false {
 		return "root", errors.New("No mysqlusername,use defualt")
@@ -139,7 +131,7 @@ func (this *Configure) GetMysqlUserName() (string, error) {
 }
 
 func (this *Configure) GetMysqlPassword() (string, error) {
-	v,ok := this.ConfigureMap["mysql"].(map[string]string)
+	v, ok := this.ConfigureMap["mysql"].(map[string]string)
 	if ok == false {
 		return "", errors.New("No,use defualt")
 	}
@@ -153,7 +145,7 @@ func (this *Configure) GetMysqlPassword() (string, error) {
 }
 
 func (this *Configure) GetMysqlHost() (string, error) {
-	v,ok := this.ConfigureMap["mysql"].(map[string]string)
+	v, ok := this.ConfigureMap["mysql"].(map[string]string)
 	if ok == false {
 		return "", errors.New("No,use defualt")
 	}
@@ -167,7 +159,7 @@ func (this *Configure) GetMysqlHost() (string, error) {
 }
 
 func (this *Configure) GetMysqlPort() (string, error) {
-	v,ok := this.ConfigureMap["mysql"].(map[string]string)
+	v, ok := this.ConfigureMap["mysql"].(map[string]string)
 	if ok == false {
 		return "", errors.New("No,use defualt")
 	}
@@ -181,7 +173,7 @@ func (this *Configure) GetMysqlPort() (string, error) {
 }
 
 func (this *Configure) GetMysqlDBname() (string, error) {
-	v,ok := this.ConfigureMap["mysql"].(map[string]string)
+	v, ok := this.ConfigureMap["mysql"].(map[string]string)
 	if ok == false {
 		return "", errors.New("No,use defualt")
 	}
@@ -195,7 +187,7 @@ func (this *Configure) GetMysqlDBname() (string, error) {
 }
 
 func (this *Configure) GetMysqlCharset() (string, error) {
-	v,ok := this.ConfigureMap["mysql"].(map[string]string)
+	v, ok := this.ConfigureMap["mysql"].(map[string]string)
 	if ok == false {
 		return "", errors.New("No,use defualt")
 	}
@@ -209,7 +201,7 @@ func (this *Configure) GetMysqlCharset() (string, error) {
 }
 
 func (this *Configure) GetMysqlMaxConns() (int, error) {
-	v,ok := this.ConfigureMap["mysql"].(map[string]string)
+	v, ok := this.ConfigureMap["mysql"].(map[string]string)
 	if ok == false {
 		return 0, errors.New("No,use defualt")
 	}
@@ -227,7 +219,7 @@ func (this *Configure) GetMysqlMaxConns() (int, error) {
 }
 
 func (this *Configure) GetMysqlMaxIdleConns() (int, error) {
-	v,ok := this.ConfigureMap["mysql"].(map[string]string)
+	v, ok := this.ConfigureMap["mysql"].(map[string]string)
 	if ok == false {
 		return 0, errors.New("No,use defualt")
 	}
