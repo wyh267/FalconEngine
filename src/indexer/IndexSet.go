@@ -102,6 +102,28 @@ func (this *IndexSet) Display() {
 
 }
 
+
+func (this *IndexSet) GetPflType(field string) int64 {
+	
+	plf,ok:=this.PflIndex[field]
+	if !ok{
+		return -1
+	}
+	
+	return plf.GetType()
+}
+
+
+func (this *IndexSet) GetIdxType(field string) int64 {
+	
+	ivt,ok:=this.IvtIndex[field]
+	if !ok{
+		return -1
+	}
+	
+	return ivt.GetType()
+}
+
 /*****************************************************************************
 *  function name : InitIndexSet
 *  params : 需要初始化的字段
@@ -181,7 +203,7 @@ func (this *IndexSet) InitIndexSet(fields map[string]string) error {
 }
 
 /*****************************************************************************
-*  function name : SearchByRule
+*  function name : SearchByRules
 *  params : map[string]interface{}
 *  return : []utils.DocIdInfo,bool
 *
@@ -191,38 +213,42 @@ func (this *IndexSet) InitIndexSet(fields map[string]string) error {
 *
 *
 ******************************************************************************/
-func (this *IndexSet) SearchByRule(rules map[string]interface{}) ([]utils.DocIdInfo, bool) {
+type SearchRule struct{
+	Field	string
+	Query	interface{}
+}
+
+func (this *IndexSet) SearchByRules(rules /*map[string]interface{}*/[]SearchRule) ([]utils.DocIdInfo, bool) {
 
 	var res []utils.DocIdInfo
-	isFirst := true
-	for field, query := range rules {
+	for index, rule := range rules {
 		var sub_res []utils.DocIdInfo
 		var ok bool
-		if field == "query" {
-			sub_res, ok = this.Search(query)
+		if rule.Field == "query" {
+			sub_res, ok = this.Search(rule.Query)
 		} else {
-			sub_res, ok = this.SearchField(query, field)
+			//this.Logger.Info(" Field : %v Query : %v",rule.Field, rule.Query)
+			sub_res, ok = this.SearchField(rule.Query, rule.Field)
 		}
 		if !ok {
 			return nil, false
 		}
-		if isFirst {
+		if index==0 {
 			res = sub_res
-			isFirst = false
 		} else {
 			res, ok = utils.Interaction(res, sub_res)
 			if !ok {
 				return nil, false
 			}
 		}
-		this.Logger.Info(" RES :: %v ", res)
+		//this.Logger.Info(" RES :: %v ", res)
 	}
 
 	//TODO 过滤操作
 
 	//TODO 自定义过滤
 
-	return res, false
+	return res, true
 }
 
 /*****************************************************************************
@@ -424,7 +450,7 @@ func (this *IndexSet) SearchFieldByString(query string, field string) ([]utils.D
 
 	//按照最大切分进行切词
 	terms := utils.RemoveDuplicatesAndEmpty(this.Segmenter.Segment(query, false))
-	this.Logger.Info("TERMS :: %v ", terms)
+	//this.Logger.Info("TERMS :: %v ", terms)
 	//首先按照字段检索
 	//交集结果
 	var res_list []utils.DocIdInfo
@@ -439,7 +465,7 @@ func (this *IndexSet) SearchFieldByString(query string, field string) ([]utils.D
 			isFound = false
 			break
 		}
-		this.Logger.Info("[Term : %v ] [Field: %v ] DocIDs : %v", term, field, l)
+		//this.Logger.Info("[Term : %v ] [Field: %v ] DocIDs : %v", term, field, l)
 		//求交集
 		if index == 0 {
 			res_list = l
@@ -477,7 +503,7 @@ func (this *IndexSet) SearchFieldByNumber(query int64, field string) ([]utils.Do
 	if !ok {
 		return nil, false
 	}
-	this.Logger.Info("[Number : %v ] [Field: %v ] DocIDs : %v", query, field, l)
+	//this.Logger.Info("[Number : %v ] [Field: %v ] DocIDs : %v", query, field, l)
 
 	return l, true
 }

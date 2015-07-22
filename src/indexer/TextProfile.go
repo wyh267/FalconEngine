@@ -124,3 +124,10 @@ func (this *TextProfile) CustomFilter(doc_ids []u.DocIdInfo, value interface{}, 
 	return res, nil
 
 }
+
+
+
+func (this *TextProfile) GetType() int64 {
+	return this.Type
+}
+
