@@ -35,6 +35,14 @@ func NewBuilderEngine(configure *BaseFunctions.Configure, dbadaptor *BaseFunctio
 
 
 func (this *BuilderEngine)BuidingAllIndex(){
+	
+	//全量更新
 	this.DBBuilder.StartBuildIndex()
+	
+	//启动增量更新
+	
 }
 
+func (this *BuilderEngine) StartIncUpdate(){
+	
+}

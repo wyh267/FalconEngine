@@ -594,7 +594,7 @@ func (this *IndexSet) UpdateRecord(info map[string]string,isProfileUpdate bool) 
 	Doc_id,has_key:=this.SearchField(pk,this.PrimaryKey)
 	if isProfileUpdate {
 		if !has_key{
-			this.Logger.Error("isProfileUpdate  %v",  err)
+			//this.Logger.Error("isProfileUpdate  %v",  err)
 			return errors.New("Update err...no doc_id to update")
 		}
 		for k,v := range info{
@@ -605,12 +605,12 @@ func (this *IndexSet) UpdateRecord(info map[string]string,isProfileUpdate bool) 
 		//如果doc_id存在，删除之前的doc_id
 		if has_key{
 			this.BitMap.SetBit(uint64(Doc_id[0].DocId),1)
-			this.Logger.Error("has_key,Update is now allow  %v",  err)
+
 		}
 		//新增一个doc_id
 		doc_id := this.MaxDocId + 1	
 		for k,v := range info {
-			this.Logger.Info("K : %v  === V : %v === Doc_ID : %v",k,v,doc_id)
+			//this.Logger.Info("K : %v  === V : %v === Doc_ID : %v",k,v,doc_id)
 			this.UpdateInvert(k,v,doc_id)
 			this.UpdateProfile(k,v,doc_id)
 		}

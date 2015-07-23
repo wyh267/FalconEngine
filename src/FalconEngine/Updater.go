@@ -21,11 +21,13 @@ import (
 type Updater struct{
 	*BaseFunctions.BaseProcessor
 	Indexer		*indexer.IndexSet
+	Data_chan chan map[string]string
 }
 
 
 func NewUpdater(processor *BaseFunctions.BaseProcessor,indexer *indexer.IndexSet) *Updater{
-	this:=&Updater{processor,indexer}
+	data_chan:=make(chan map[string]string,1000)
+	this:=&Updater{processor,indexer,data_chan}
 	return this
 }
 /*
@@ -54,7 +56,28 @@ func (this *Updater)Process(log_id string,body []byte,params map[string]string ,
 	info["sex"]="1"
 	info["mobile_phone"]="13232"
 	info["last_modify_time"]="2015-01-01 00:11:22"	
-	this.Indexer.UpdateRecord(info,false)
+	this.Data_chan <- info
+	//this.Indexer.UpdateRecord(info,false)
 	//this.Indexer.Display()
 	return nil
+}
+
+
+func (this *Updater)IncUpdating(){
+	
+	go this.updatingThread()
+	
+}
+
+
+func (this *Updater) updatingThread(){
+	for{
+ 		select{
+ 			case info:=<-this.Data_chan:
+			 	this.Logger.Info("Got data ... %v ",info)
+				this.Indexer.UpdateRecord(info,false)
+
+		}
+
+	}
 }

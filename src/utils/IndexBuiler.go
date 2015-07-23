@@ -11,7 +11,7 @@ package utils
 import (
 	"errors"
 	"strings"
-	"fmt"
+	//"fmt"
 )
 
 type IndexBuilder struct {
@@ -65,22 +65,22 @@ func (this *IndexBuilder) BuildTextIndex(doc_id int64, content string, ivt_idx *
 func (this *IndexBuilder) BuildNumberIndex(doc_id int64, content int64, ivt_idx *InvertIdx, ivt_dic *NumberIdxDic) error {
 
 	len := ivt_dic.Length()
-	fmt.Println("len ",len)
-	fmt.Printf("doc_id : %v  content : %v \n",doc_id,content)
+	//fmt.Println("len ",len)
+	//fmt.Printf("doc_id : %v  content : %v \n",doc_id,content)
 	key_id := ivt_dic.Put(content)
 	if key_id == -1 {
-		fmt.Println("Bukent full")
+		//fmt.Println("Bukent full")
 		return errors.New("Bukets full")
 	}
 	//新增
 	if key_id > len {
-		fmt.Println("Add Bukent full")
+		//fmt.Println("Add Bukent full")
 		invertList := NewInvertDocIdList(content)
 		invertList.DocIdList = append(invertList.DocIdList, DocIdInfo{doc_id, 0})
 		ivt_idx.KeyInvertList = append(ivt_idx.KeyInvertList, *invertList)
 		ivt_idx.IdxLen++
 	} else { //更新
-		fmt.Println("Update Bukent full")
+		//fmt.Println("Update Bukent full")
 		ivt_idx.KeyInvertList[key_id].DocIdList = append(ivt_idx.KeyInvertList[key_id].DocIdList, DocIdInfo{doc_id, 0})
 	}
 	//ivt_idx.Display()
