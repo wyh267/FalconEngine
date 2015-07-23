@@ -71,7 +71,7 @@ func (this *Searcher)Process(log_id string,body []byte,params map[string]string 
 	if int(end) > len(doc_ids){
 		end = int64(len(doc_ids)-1)
 	}
-	result["DATA"]=doc_ids[start:end]
+	result["DATA"]=this.Indexer.GetDetails(doc_ids[start:end])
 	result["PAGES"] = len(doc_ids)/int(ps) + 1
 	
 	return nil

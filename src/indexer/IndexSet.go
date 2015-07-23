@@ -507,3 +507,22 @@ func (this *IndexSet) SearchFieldByNumber(query int64, field string) ([]utils.Do
 
 	return l, true
 }
+
+
+
+func (this *IndexSet) GetDetails(doc_ids []utils.DocIdInfo) ([]int64){
+	
+	ids := make([]int64,len(doc_ids))
+	for i,doc_id := range doc_ids{
+		
+		tmp,_:=this.PflIndex["id"].Find(doc_id.DocId)
+		ids[i],_=tmp.(int64)
+		
+	}
+	
+	return ids 
+}
+
+
+
+

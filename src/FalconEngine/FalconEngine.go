@@ -67,8 +67,10 @@ func main() {
 		
 		
 		searcher :=  NewSearcher(processor,index_set) // &Searcher{processor}
+		updater := NewUpdater(processor,index_set)
 		router := &BaseFunctions.Router{configure,logger,map[string]BaseFunctions.FEProcessor{
 			"search":	searcher,
+			"update":	updater,
 		}}
 		
 		logger.Info("Server Start...")

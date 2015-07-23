@@ -73,7 +73,10 @@ func (this *Router) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 		
 		if stype == 2 { //数据更新
-			
+			err := this.Processors["update"].Process(log_id,body,RequestParams,result,functime)
+			if err !=nil{
+				goto END
+			}
 		}
 		
 		if stype == 3 { //监控，控制
@@ -112,20 +115,32 @@ func (this *Router) createJSON(result map[string]interface{}) (string, error) {
 //
 func (this *Router) ParseURL(url string) (int64,error) {
 	//确定是否是本服务能提供的控制类型
+
 	urlPattern:= "search\\?"//this.Configure.GetUrlPattern()
 	urlRegexp, err := regexp.Compile(urlPattern)
 	if err != nil {
 		return -1,err
 	}
 	matchs := urlRegexp.FindStringSubmatch(url)
-	if matchs == nil {
-		err = errors.New("Wrong Request URL")
-		return -1,err
-	}else{
+	if matchs != nil {
 		return 1,nil
 	}
-
-	return 1,nil
+	
+	
+	urlPattern= "update\\?"//this.Configure.GetUrlPattern()
+	urlRegexp, err = regexp.Compile(urlPattern)
+	if err != nil {
+		return -1,err
+	}
+	matchs = urlRegexp.FindStringSubmatch(url)
+	if matchs != nil {
+		return 2,nil
+	}
+	
+	
+	return -1,errors.New("err")
+	
+	
 }
 
 func MakeErrorResult(errcode int, errmsg string) string {
