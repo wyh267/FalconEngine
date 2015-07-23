@@ -56,3 +56,16 @@ func (this *NumberIndex) Display() {
 func (this *NumberIndex) GetType() int64 {
 	return this.Type
 }
+
+
+func (this *NumberIndex) GetIvtIndex() *u.InvertIdx {
+	return this.ivtIndex
+}
+
+
+func (this *NumberIndex)GetNumDic() *u.NumberIdxDic{
+	return this.dicIndex
+}
+func (this *NumberIndex)GetStrDic() *u.StringIdxDic{
+	return nil
+}

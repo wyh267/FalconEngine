@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"github.com/outmana/log4jzl"
 	"net/http"
+	"utils"
 )
 
 
@@ -56,13 +57,13 @@ func main() {
 	if search == "search" {
 		
 		processor := &BaseFunctions.BaseProcessor{configure,logger,dbAdaptor,redisClient}
-		
+		bitmap := utils.NewBitmap()
 		fields, err := configure.GetTableFields()
 		if err != nil {
 			logger.Error("%v", err)
 			return
 		}
-		index_set := indexer.NewIndexSet(logger)
+		index_set := indexer.NewIndexSet(bitmap,logger)
 		index_set.InitIndexSet(fields)
 		
 		

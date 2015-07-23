@@ -31,6 +31,7 @@ type ProfileInterface interface {
 	Filter(doc_ids []u.DocIdInfo, value interface{}, is_forward bool) ([]u.DocIdInfo, error)
 	Display()
 	GetType() int64
+	GetMaxDocId() int64
 	CustomFilter(doc_ids []u.DocIdInfo, value interface{}, r bool, cf func(v1, v2 interface{}) bool) ([]u.DocIdInfo, error)
 }
 

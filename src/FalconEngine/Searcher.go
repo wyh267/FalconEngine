@@ -43,7 +43,7 @@ func (this *Searcher)Process(log_id string,body []byte,params map[string]string 
 	this.Logger.Info("[LOG_ID:%v]Running Searcher ....Time: %v ",log_id,ftime("Process running"))
 	
 	//this.Indexer.Display()
-	srules,frules,ps,pg := this.ParseParams(log_id,params)
+	srules,frules,_,_ := this.ParseParams(log_id,params)
 	
 	this.Logger.Info("[LOG_ID:%v]Running Searcher %v %v....Time: %v ",log_id,srules,frules,ftime("parse params"))
 	
@@ -63,6 +63,7 @@ func (this *Searcher)Process(log_id string,body []byte,params map[string]string 
 	
 	
 	//分页
+	/*
 	start := (pg-1)*ps
 	end := pg*ps
 	if int(start) >= len(doc_ids){
@@ -71,8 +72,14 @@ func (this *Searcher)Process(log_id string,body []byte,params map[string]string 
 	if int(end) > len(doc_ids){
 		end = int64(len(doc_ids)-1)
 	}
-	result["DATA"]=this.Indexer.GetDetails(doc_ids[start:end])
-	result["PAGES"] = len(doc_ids)/int(ps) + 1
+	if start == 0 && end == 0{
+		result["DATA"]=this.Indexer.GetDetails(doc_ids)
+	}else{
+		result["DATA"]=this.Indexer.GetDetails(doc_ids[start:end])
+	}
+	*/
+	result["DATA"]=this.Indexer.GetDetails(doc_ids)
+	//result["PAGES"] = len(doc_ids)/int(ps) + 1
 	
 	return nil
 }

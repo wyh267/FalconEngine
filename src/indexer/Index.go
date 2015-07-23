@@ -23,4 +23,7 @@ type IndexInterface interface {
 	Find(term interface{}) ([]u.DocIdInfo, bool)
 	Display()
 	GetType() int64
+	GetIvtIndex() *u.InvertIdx
+	GetNumDic() *u.NumberIdxDic
+	GetStrDic() *u.StringIdxDic
 }
