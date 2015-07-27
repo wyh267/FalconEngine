@@ -40,9 +40,13 @@ func (this *BuilderEngine)BuidingAllIndex(){
 	this.DBBuilder.StartBuildIndex()
 	
 	//启动增量更新
-	
+	//go this.DBBuilder.ScanInc()
 }
 
-func (this *BuilderEngine) StartIncUpdate(){
+func (this *BuilderEngine) StartIncUpdate(Data_chan chan builder.UpdateInfo){
+	
+	this.DBBuilder.ParseConfigure()
+	
+	go this.DBBuilder.ScanInc(Data_chan)
 	
 }

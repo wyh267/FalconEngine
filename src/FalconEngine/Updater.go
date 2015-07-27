@@ -13,7 +13,8 @@ import (
 	"BaseFunctions"
 	"indexer"
 	//"fmt"
-
+	//"errors"
+	"builder"
 
 )
 
@@ -21,12 +22,12 @@ import (
 type Updater struct{
 	*BaseFunctions.BaseProcessor
 	Indexer		*indexer.IndexSet
-	Data_chan chan map[string]string
+	Data_chan 	chan builder.UpdateInfo
 }
 
 
-func NewUpdater(processor *BaseFunctions.BaseProcessor,indexer *indexer.IndexSet) *Updater{
-	data_chan:=make(chan map[string]string,1000)
+func NewUpdater(processor *BaseFunctions.BaseProcessor,indexer *indexer.IndexSet,data_chan chan builder.UpdateInfo) *Updater{
+	
 	this:=&Updater{processor,indexer,data_chan}
 	return this
 }
@@ -42,9 +43,14 @@ sex		=	0,1,1,N
 mobile_phone= 0,1,1,T
 last_modify_time = 0,1,1,T
 */
+
+
+
+
 func (this *Updater)Process(log_id string,body []byte,params map[string]string , result map[string]interface{},ftime func(string)string) error {
 	
 	this.Logger.Info("Update...")
+	var updateInfo builder.UpdateInfo
 	info := make(map[string]string)
 	info["id"]="154"
 	info["cid"]="146"
@@ -56,7 +62,18 @@ func (this *Updater)Process(log_id string,body []byte,params map[string]string ,
 	info["sex"]="1"
 	info["mobile_phone"]="13232"
 	info["last_modify_time"]="2015-01-01 00:11:22"	
-	this.Data_chan <- info
+	updateInfo.Info=info
+	updateInfo.IsProfile=false
+	updateInfo.ErrChan=make(chan error)
+	this.Data_chan <- updateInfo
+	
+	errinfo:= <-updateInfo.ErrChan
+	
+	if errinfo != nil {
+		this.Logger.Info("Update Fail.... %v ", errinfo)
+	}else{
+		this.Logger.Info("Update success....")
+	}
 	//this.Indexer.UpdateRecord(info,false)
 	//this.Indexer.Display()
 	return nil
@@ -71,11 +88,12 @@ func (this *Updater)IncUpdating(){
 
 
 func (this *Updater) updatingThread(){
+	this.Logger.Info("Start Inc Updating Recive Now ..... ")
 	for{
  		select{
  			case info:=<-this.Data_chan:
-			 	this.Logger.Info("Got data ... %v ",info)
-				this.Indexer.UpdateRecord(info,false)
+			 	//this.Logger.Info("Got data ... %v ",info)
+				info.ErrChan <- this.Indexer.UpdateRecord(info.Info,info.IsProfile)
 
 		}
 

@@ -125,9 +125,14 @@ func Interaction(a []DocIdInfo, b []DocIdInfo) ([]DocIdInfo, bool) {
 }
 
 
-
-
-
+/*
+func InitCount() (func(int64) CountInfo) {
+	var searchCount int64 = 0
+	var updateCount int64 = 0
+	var pvCount		int64 = 0
+	
+}
+*/
 
 
 func InitTime() (func(string) string ){

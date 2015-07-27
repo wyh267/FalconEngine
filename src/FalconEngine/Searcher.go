@@ -59,7 +59,7 @@ func (this *Searcher)Process(log_id string,body []byte,params map[string]string 
 	doc_ids,_ = this.Indexer.FilterByRules(doc_ids,frules)
 	
 	this.Logger.Info("[LOG_ID:%v]Running Searcher ....Time: %v ",log_id,ftime("fliter fields"))
-	this.Logger.Info("Result : %v",doc_ids)
+	//this.Logger.Info("Result : %v",doc_ids)
 	
 	
 	//分页
@@ -78,8 +78,23 @@ func (this *Searcher)Process(log_id string,body []byte,params map[string]string 
 		result["DATA"]=this.Indexer.GetDetails(doc_ids[start:end])
 	}
 	*/
-	result["DATA"]=this.Indexer.GetDetails(doc_ids)
+	ids,fields:=this.Indexer.GetDetails(doc_ids)
+	//this.Logger.Info("IDS : %v \n fields : %v \n",ids,fields)
+	var infos []map[string]string
+	for _,id := range ids {
+		info,err:=this.RedisCli.GetFields(id,fields)
+		if err != nil {
+			this.Logger.Error("%v",err)
+		}
+		infos=append(infos,info)
+	}
+	this.Logger.Info("[LOG_ID:%v]Running Searcher ....Time: %v ",log_id,ftime("Display Detail"))
+	result["DATA"]=infos
+	//
 	//result["PAGES"] = len(doc_ids)/int(ps) + 1
+	
+	
+	
 	
 	return nil
 }

@@ -41,6 +41,10 @@ type IndexFieldInfo struct {
 	Name      string
 }
 
+
+
+
+
 /*****************************************************************************
 *  function name : NewIndexSet
 *  params :
@@ -548,17 +552,25 @@ func (this *IndexSet) SearchFieldByNumber(query int64, field string) ([]utils.Do
 
 
 
-func (this *IndexSet) GetDetails(doc_ids []utils.DocIdInfo) ([]int64){
+func (this *IndexSet) GetDetails(doc_ids []utils.DocIdInfo) ([]int64,[]string){
 	
-	ids := make([]int64,len(doc_ids))
-	for i,doc_id := range doc_ids{
-		
+	ids := make([]int64,0)
+	for _,doc_id := range doc_ids{
+		if this.BitMap.GetBit(uint64(doc_id.DocId)) == 1 {
+			this.Logger.Info("Get Bit Map  %v",  doc_id.DocId)
+			continue
+		}
 		tmp,_:=this.PflIndex["id"].Find(doc_id.DocId)
-		ids[i],_=tmp.(int64)
-		
+		t,_:=tmp.(int64)
+		ids = append(ids,t)
 	}
 	
-	return ids 
+	fields := make([]string,0)
+	for k,_ :=range this.FieldInfo{
+		fields=append(fields,k)
+	}
+	
+	return ids,fields
 }
 
 
@@ -604,7 +616,11 @@ func (this *IndexSet) UpdateRecord(info map[string]string,isProfileUpdate bool) 
 	}else{//新增doc_id，全字段更新
 		//如果doc_id存在，删除之前的doc_id
 		if has_key{
-			this.BitMap.SetBit(uint64(Doc_id[0].DocId),1)
+			for index,_ := range Doc_id{
+				this.Logger.Info("Set Bit Map  %v",  Doc_id[index].DocId)
+				this.BitMap.SetBit(uint64(Doc_id[index].DocId),1)
+			}
+			
 
 		}
 		//新增一个doc_id

@@ -116,16 +116,26 @@ func (this *Router) createJSON(result map[string]interface{}) (string, error) {
 func (this *Router) ParseURL(url string) (int64,error) {
 	//确定是否是本服务能提供的控制类型
 
-	urlPattern:= "search\\?"//this.Configure.GetUrlPattern()
+	urlPattern:= "(search|update)\\?"//this.Configure.GetUrlPattern()
 	urlRegexp, err := regexp.Compile(urlPattern)
 	if err != nil {
 		return -1,err
 	}
 	matchs := urlRegexp.FindStringSubmatch(url)
-	if matchs != nil {
+	if matchs == nil {
+		return -1,errors.New("ERR")
+	}
+	resource := matchs[1]
+	if resource == "search"{
 		return 1,nil
 	}
+	if resource == "update"{
+		return 2,nil
+	}
 	
+	return -1,errors.New("Error")
+	
+/*	
 	
 	urlPattern= "update\\?"//this.Configure.GetUrlPattern()
 	urlRegexp, err = regexp.Compile(urlPattern)
@@ -140,7 +150,7 @@ func (this *Router) ParseURL(url string) (int64,error) {
 	
 	return -1,errors.New("err")
 	
-	
+	*/
 }
 
 func MakeErrorResult(errcode int, errmsg string) string {

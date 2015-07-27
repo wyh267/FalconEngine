@@ -9,6 +9,7 @@ import (
 	"github.com/outmana/log4jzl"
 	"net/http"
 	"utils"
+	"builder"
 )
 
 
@@ -68,12 +69,17 @@ func main() {
 		
 		
 		searcher :=  NewSearcher(processor,index_set) // &Searcher{processor}
-		updater := NewUpdater(processor,index_set)
+		data_chan:=make(chan builder.UpdateInfo,1000)
+		updater := NewUpdater(processor,index_set,data_chan)
 		updater.IncUpdating()
 		router := &BaseFunctions.Router{configure,logger,map[string]BaseFunctions.FEProcessor{
 			"search":	searcher,
 			"update":	updater,
 		}}
+		
+		
+		builder := NewBuilderEngine(configure, dbAdaptor, logger, redisClient)
+		builder.StartIncUpdate(data_chan)
 		
 		logger.Info("Server Start...")
 		port, _ := configure.GetPort()

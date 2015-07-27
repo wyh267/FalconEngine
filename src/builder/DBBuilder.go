@@ -7,6 +7,9 @@ import (
 	"strconv"
 	"strings"
 	"utils"
+	"time"
+
+	//"os"
 )
 
 type FieldInfo struct {
@@ -42,7 +45,7 @@ func NewDBBuilder(b *Builder) *DBBuilder {
 *  description : 解析配置文件，填充FieldInfo结构体数组
 *
 ******************************************************************************/
-func (this *DBBuilder) parseConfigure() error {
+func (this *DBBuilder) ParseConfigure() error {
 	this.Logger.Info("Parse Configure File ..... ")
 	var err error
 	this.sql, err = this.Configure.GetSqlSentence()
@@ -98,12 +101,112 @@ func (this *DBBuilder) StartBuildIndex() {
 
 	this.Logger.Info("Start Building Index ..... ")
 
-	this.parseConfigure()
+	this.ParseConfigure()
 
 	this.Buiding()
-
+	//for {
+	
+		
+	//}
 	//fmt.Println("Start Building Index",yy)
 }
+
+
+
+
+type UpdateInfo struct {
+	Info		map[string]string
+	IsProfile	bool
+	ErrChan		chan error
+}
+
+func (this *DBBuilder) ScanInc(Data_chan chan UpdateInfo) error {
+	
+	this.Logger.Info("Start Inc Updating Now ..... ")
+	
+	curr_time:= time.Now().Format("2006-01-02 15:04:05")
+	var fields string
+	for _, v := range this.Fields {
+		//构造sql语句
+		fields = fields + "," + v.Name
+	}
+
+	for {
+	sql := fmt.Sprintf(" SELECT %v FROM jzl_contacts WHERE ( is_delete=0 OR is_delete is null ) AND last_modify_time> \"%v\" ORDER BY last_modify_time ", fields[1:len(fields)],curr_time)
+	//fmt.Printf("SQL :: %v \n", sql)
+	rows, err := this.Dbadaptor.QueryFormat(sql)
+	if err != nil {
+		this.Logger.Error(" %v", err)
+		return err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		isUpdate := false
+		//values := make([]interface{},len(this.Fields))
+		values := make([]interface{}, len(this.Fields))
+		writeCols := make([]string, len(this.Fields))
+		for i, _ := range writeCols {
+			values[i] = &writeCols[i]
+		}
+
+		err := rows.Scan(values...)
+		if err != nil {
+			this.Logger.Error("SQL ERROR : %v", err)
+			return err
+		}
+		new_values := make(map[string]string)
+		for index, v := range writeCols {
+			new_values[this.Fields[index].Name] = v
+			
+		}
+		//this.Logger.Info("New : %v ",new_values)
+		fieldlist:=make([]string,0)
+		for k,_ := range new_values{
+			fieldlist=append(fieldlist,k)
+		}
+		
+		redis_map,err:=this.RedisCli.GetFields(new_values["id"],fieldlist)
+		if err != nil {
+			this.Logger.Info("Old continue : %v  ERR : %v ",redis_map,err)
+			continue
+		}
+		this.Logger.Info("Old : %v  ERR : %v ",redis_map,err)
+		for k,v := range redis_map{
+			vv,ok := new_values[k]
+			if !ok{
+				break
+			}
+			//this.Logger.Info("K : %v ==== V : %v === VV : %v",k,v,vv)
+			if (v != vv) && k != "last_modify_time" {
+				isUpdate = true
+				curr_time = new_values["last_modify_time"]
+				break
+			}
+		}
+		
+		if isUpdate{
+			this.Logger.Info("Must Update ,Old : %v ",redis_map)
+			this.Logger.Info("Must Update ,New : %v ",new_values)
+			this.RedisCli.SetFields(0, new_values)
+			upinfo := UpdateInfo{new_values,false,make(chan error)}
+			Data_chan <- upinfo
+			errinfo:= <-upinfo.ErrChan
+			if errinfo != nil {
+				this.Logger.Info("Update Fail.... %v ", errinfo)
+			}else{
+				this.Logger.Info("Update success....")
+			}
+		}
+		
+	}
+	time.Sleep(5000 * time.Millisecond)
+	}
+	
+	
+	
+	return nil
+}
+
 
 
 
@@ -230,6 +333,12 @@ func (this *DBBuilder) Buiding() error {
 		}
 
 		this.RedisCli.SetFields(doc_id, redis_map)
+		
+		fieldlist:=make([]string,0)
+		for k,_ := range redis_map{
+			fieldlist=append(fieldlist,k)
+		}
+		
 		doc_id++
 
 		this.Logger.Info("DOC_ID : %v  VALUE : %v", doc_id, writeCols)
