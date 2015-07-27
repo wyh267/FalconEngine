@@ -1,10 +1,30 @@
 # 用GO语言实现一个简单的搜索引擎
 
-[Email联系我](wyh817@gmail.com)
-
 对搜索引擎感兴趣的可以去看看[这本书](http://www.amazon.cn/%E8%BF%99%E5%B0%B1%E6%98%AF%E6%90%9C%E7%B4%A2%E5%BC%95%E6%93%8E-%E6%A0%B8%E5%BF%83%E6%8A%80%E6%9C%AF%E8%AF%A6%E8%A7%A3-%E5%BC%A0%E4%BF%8A%E6%9E%97/dp/B006J9MSD8)，比较浅并且也比较完整的介绍了一个搜索引擎的全部机能。
 
 我的这个搜索引擎原始数据是MySql数据库的，大家可以根据需要进行二次开发，用来支持其他数据库或者本地文件，Detail文件是存储在Redis数据库中，同样这部分也可以根据自己的需要二次开发，使用本地文件或者其他数据库，倒排索引和正排索引本地存储的时候使用的json格式，比较耗磁盘，第一版暂时这样了吧，后续再做优化。
+
+## 使用方法
+### 依赖以下几个库
+- [github.com/outmana/log4jzl](github.com/outmana/log4jzl) log文件
+- [github.com/ewangplay/config](github.com/ewangplay/config) 配置文件解析
+- [github.com/go-sql-driver/mysql](github.com/go-sql-driver/mysql) mysql驱动
+- [github.com/garyburd/redigo/redis](github.com/garyburd/redigo/redis) Redis驱动
+- [github.com/huichen/sego](github.com/huichen/sego) 分词器，作者[主页](https://github.com/huichen)非常感谢他的分析器，他主页上也有个搜索引擎，没看具体实现，大家感兴趣可以去看看。
+
+### 编译
+- 直接运行`install.sh`
+
+### 运行
+- 从[github.com/huichen/sego](github.com/huichen/sego)获取分词的字典文件
+- 运行索引器，会将索引文件生成到index目录下
+
+> bin/FalconEngine -mode=build
+
+- 运行搜索器
+
+> bin/FalconEngine -mode=search
+
 
 ## 基本概念
 
