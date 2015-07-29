@@ -12,17 +12,17 @@
 
 ## 使用方法
 ### 依赖以下几个库
-- [github.com/outmana/log4jzl](github.com/outmana/log4jzl) log文件
-- [github.com/ewangplay/config](github.com/ewangplay/config) 配置文件解析
-- [github.com/go-sql-driver/mysql](github.com/go-sql-driver/mysql) mysql驱动
-- [github.com/garyburd/redigo/redis](github.com/garyburd/redigo/redis) Redis驱动
-- [github.com/huichen/sego](github.com/huichen/sego) 分词器，作者[主页](https://github.com/huichen)非常感谢他的分析器，他主页上也有个搜索引擎，没看具体实现，大家感兴趣可以去看看。
+- [github.com/outmana/log4jzl](https://github.com/outmana/log4jzl) log文件
+- [github.com/ewangplay/config](https://github.com/ewangplay/config) 配置文件解析
+- [github.com/go-sql-driver/mysql](https://github.com/go-sql-driver/mysql) mysql驱动
+- [github.com/garyburd/redigo/redis](https://github.com/garyburd/redigo/redis) Redis驱动
+- [github.com/huichen/sego](https://github.com/huichen/sego) 分词器，作者[主页](https://github.com/huichen)非常感谢他的分析器，他主页上也有个搜索引擎，没看具体实现，大家感兴趣可以去看看。
 
 ### 编译
 - 直接运行`install.sh`
 
 ### 运行
-- 从[github.com/huichen/sego](github.com/huichen/sego)获取分词的字典文件
+- 从[github.com/huichen/sego](https://github.com/huichen/sego)获取分词的字典文件
 - 运行索引器，会将索引文件生成到index目录下
 
 > bin/FalconEngine -mode=build
