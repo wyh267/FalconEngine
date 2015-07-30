@@ -54,8 +54,46 @@ func (this *Configure) ParseConfigure(filename string) error {
 	this.loopConfigure("sql", cfg)
 	this.loopConfigure("table", cfg)
 	this.loopConfigure("redis", cfg)
+	this.loopConfigure("inc", cfg)
 	return nil
 }
+
+
+
+func (this *Configure) GetIncSql()(string,error){
+	
+	v, ok := this.ConfigureMap["inc"].(map[string]string)
+	if ok == false {
+		return "SELECT %v FROM jzl_contacts WHERE ( is_delete=0 OR is_delete is null ) AND last_modify_time> \"%v\" ORDER BY last_modify_time", errors.New("inc,use defualt")
+	}
+	
+	incsql, ok := v["sqlsentence"]
+
+	if ok == false {
+		return "SELECT %v FROM jzl_contacts WHERE ( is_delete=0 OR is_delete is null ) AND last_modify_time> \"%v\" ORDER BY last_modify_time", errors.New("No redishost,use defualt")
+	}
+
+	return incsql, nil
+}
+
+
+func (this *Configure) GetIncField()(string,error){
+	v, ok := this.ConfigureMap["inc"].(map[string]string)
+	if ok == false {
+		return "last_modify_time", errors.New("inc,use defualt")
+	}
+	
+	incfield, ok := v["incfield"]
+
+	if ok == false {
+		return "last_modify_time", errors.New("No redishost,use defualt")
+	}
+
+	return incfield, nil
+	
+}
+
+
 
 //服务信息
 func (this *Configure) GetPort() (int, error) {

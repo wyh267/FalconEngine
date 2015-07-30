@@ -30,12 +30,14 @@ func WriteToJson(data interface{}, file_name string) error {
 
 	info_json, err := json.Marshal(data)
 	if err != nil {
+		//fmt.Printf("Marshal %v\n",file_name)
 		return err
 	}
 	//fmt.Printf("%v\n",info_json)
 	fout, err := os.Create(file_name)
 	defer fout.Close()
 	if err != nil {
+		//fmt.Printf("Create %v\n",file_name)
 		return err
 	}
 	fout.Write(info_json)

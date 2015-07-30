@@ -130,9 +130,11 @@ func (this *DBBuilder) ScanInc(Data_chan chan UpdateInfo) error {
 		//构造sql语句
 		fields = fields + "," + v.Name
 	}
-
+	
+	incSql,_ := this.Configure.GetIncSql()
+	incField,_:= this.Configure.GetIncField()
 	for {
-	sql := fmt.Sprintf(" SELECT %v FROM jzl_contacts WHERE ( is_delete=0 OR is_delete is null ) AND last_modify_time> \"%v\" ORDER BY last_modify_time ", fields[1:len(fields)],curr_time)
+	sql := fmt.Sprintf(incSql, fields[1:len(fields)],curr_time)
 	//fmt.Printf("SQL :: %v \n", sql)
 	rows, err := this.Dbadaptor.QueryFormat(sql)
 	if err != nil {
@@ -181,9 +183,9 @@ func (this *DBBuilder) ScanInc(Data_chan chan UpdateInfo) error {
 				break
 			}
 			//this.Logger.Info("K : %v ==== V : %v === VV : %v",k,v,vv)
-			if (v != vv) && k != "last_modify_time" {
+			if (v != vv) && k != incField {
 				isUpdate = true
-				curr_time = new_values["last_modify_time"]
+				curr_time = new_values[incField]
 				break
 			}
 		}
@@ -233,13 +235,13 @@ func (this *DBBuilder) Buiding() error {
 
 			if v.FType == "T" {
 				this.Fields[index].IvtIdx = utils.NewInvertIdx(utils.TYPE_TEXT, v.Name)
-				this.Fields[index].IvtStrDic = utils.NewStringIdxDic(10000)
+				this.Fields[index].IvtStrDic = utils.NewStringIdxDic(20021)
 
 			}
 
 			if v.FType == "N" {
 				this.Fields[index].IvtIdx = utils.NewInvertIdx(utils.TYPE_NUM, v.Name)
-				this.Fields[index].IvtNumDic = utils.NewNumberIdxDic(10000)
+				this.Fields[index].IvtNumDic = utils.NewNumberIdxDic(20021)
 
 			}
 		}
