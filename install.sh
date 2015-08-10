@@ -1,3 +1,3 @@
-#!/bin/sh
+#!/bin/zsh
 
 go install FalconEngine

@@ -8,6 +8,7 @@
 *.log*
 *.json*
 *.dat*
+*.sql*
 *jzlservice/
 .DS_Store
 nohup.out

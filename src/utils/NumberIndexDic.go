@@ -37,9 +37,9 @@ type NumberIdxDic struct {
 *
 ******************************************************************************/
 func NewNumberIdxDic(buket_type int64) *NumberIdxDic {
-	this := &NumberIdxDic{EntityCount: 1, Bukets: 20021}
-	this.Entity = make([]NumItemDic, 20021)
-	this.HashIndex = make([]int64, 20021)
+	this := &NumberIdxDic{EntityCount: 1, Bukets: 200021}
+	this.Entity = make([]NumItemDic, 200021)
+	this.HashIndex = make([]int64, 200021)
 	return this
 }
 

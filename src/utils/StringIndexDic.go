@@ -55,11 +55,13 @@ func (this *StringIdxDic) Display() {
 func (this *StringIdxDic) Put(key string) int64 {
 	//桶已经满了，不能添加
 	if this.EntityCount == this.Bukets {
+		//fmt.Printf("Full %v\n",this.EntityCount)
 		return -1
 	}
 	//已经添加过了，返回ID值
 	id := this.Find(key)
 	if id != -1 {
+		//fmt.Printf("Find Key %v --- > %v\n",key,id)
 		return id
 	}
 	hash := ELFHash(key, this.Bukets)

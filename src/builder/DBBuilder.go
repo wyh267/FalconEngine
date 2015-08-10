@@ -235,13 +235,13 @@ func (this *DBBuilder) Buiding() error {
 
 			if v.FType == "T" {
 				this.Fields[index].IvtIdx = utils.NewInvertIdx(utils.TYPE_TEXT, v.Name)
-				this.Fields[index].IvtStrDic = utils.NewStringIdxDic(20021)
+				this.Fields[index].IvtStrDic = utils.NewStringIdxDic(10000)
 
 			}
 
 			if v.FType == "N" {
 				this.Fields[index].IvtIdx = utils.NewInvertIdx(utils.TYPE_NUM, v.Name)
-				this.Fields[index].IvtNumDic = utils.NewNumberIdxDic(20021)
+				this.Fields[index].IvtNumDic = utils.NewNumberIdxDic(1)
 
 			}
 		}
