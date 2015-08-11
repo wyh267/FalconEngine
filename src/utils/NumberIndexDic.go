@@ -43,19 +43,19 @@ func NewNumberIdxDic(buket_type int64) *NumberIdxDic {
 		case 1:
 			bukets=5001
 		case 2:
-			bukets=5001
+			bukets=50001
 		case 3:
-			bukets=5001
+			bukets=50001
 		case 4:
-			bukets=5001
+			bukets=50001
 		default:
 			bukets=5001
 		
 	}
 	this := &NumberIdxDic{EntityCount: 1, Bukets: bukets}
 	this.Lens = bukets
-	this.Entity = make([]NumItemDic, this.Lens,100000)
-	this.HashIndex = make([]int64, this.Lens,100000)
+	this.Entity = make([]NumItemDic, this.Lens,1000000)
+	this.HashIndex = make([]int64, this.Lens,1000000)
 	return this
 }
 

@@ -1,11 +1,11 @@
 package main
 
 import (
-	"database/sql"
+	//"database/sql"
 	"fmt"
 	"strings"
 	"math/rand"
-	_ "github.com/go-sql-driver/mysql"
+	//_ "github.com/go-sql-driver/mysql"
 	"time"
 	"container/list"
 	
@@ -98,7 +98,7 @@ func main(){
 	
 	email_clients :=[5]int64{1,2,3,4,5}
 	//conn_str := fmt.Sprintf("jzl:jzl@tcp(10.254.33.30:3306)/jzl_DB?charset=utf8", user, password, host, port, dbname, charset)
-
+/*
 	db, err := sql.Open("mysql", "jzl:jzl@tcp(10.254.33.30:3306)/jzl_DB?charset=utf8")
 	if err != nil {
 		return 
@@ -112,13 +112,13 @@ func main(){
 	if err != nil {
 		return 
 	}
-	
+*/	
 	rand := rand.New(rand.NewSource(time.Now().UnixNano()))
-	contact_id:=60006
-	//fmt.Printf("INSERT INTO `jzl_dmp` (`cid`, `contact_id`, `name`,`sex`,`email`,`mobile_phone`, `address`, `score`,`email_view`,`email_click`,`email_sended`,`sms_sended`,`sms_click`,`from`,`email_click`,`last_modify_time`) VALUES\n")
-	for i:=0;i<500000;i++{
+	contact_id:=80006
+	//fmt.Printf("INSERT INTO `jzl_dmp` (`cid`, `contact_id`, `name`,`sex`,`email`,`mobile_phone`, `address`, `score`,`email_view`,`email_click`,`email_sended`,`sms_sended`,`sms_click`,`from_source`,`email_client`,`update_time`,`create_time`,`last_modify_time`) VALUES\n")
+	for i:=0;i<200000;i++{
 
-		sql:="INSERT INTO `jzl_dmp` (`cid`, `contact_id`, `name`,`sex`,`email`,`mobile_phone`, `address`, `score`,`email_view`,`email_click`,`email_sended`,`sms_sended`,`sms_click`,`from`,`email_client`,`update_time`,`create_time`,`last_modify_time`) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,NOW(),NOW(),NOW())"
+		sql:="INSERT INTO `jzl_dmp` (`cid`, `contact_id`, `name`,`sex`,`email`,`mobile_phone`, `address`, `score`,`email_view`,`email_click`,`email_sended`,`sms_sended`,`sms_click`,`from_source`,`email_client`,`update_time`,`create_time`,`last_modify_time`) VALUES ('%v','%v','%v','%v','%v','%v','%v','%v','%v','%v','%v','%v','%v','%v','%v',NOW(),NOW(),NOW());\n"
 		rname := rand.Intn(4999)
 		rsex :=rand.Intn(2)
 		rcid := rand.Intn(7)
@@ -137,7 +137,7 @@ func main(){
 		}
 		
 		
-		sms_num:=rand.Intn(30)//邮件数量
+		sms_num:=rand.Intn(100)//邮件数量
 		sms_status := [3]string{"","",""}
 		for num:=0;num<sms_num;num++{
 			task_id := rand.Intn(2000)
@@ -160,13 +160,13 @@ func main(){
 		//email2,_:=TransNumToString(int64(rand.Intn(900000000)))
 
 		//email := email1 + "@" + email2 + ".com"
-		fmt.Printf("('%v','%v','%v','%v','%v','%v','%v','%v','%v','%v','%v','%v','%v','%v','%v',NOW()),\n",cids[rcid],contact_id,namelist[rname],sexs[rsex],email,mobile_phone,addresslist[rand.Intn(822)],score,email_status[0],email_status[1],email_status[2],sms_status[0],sms_status[1],froms[rfrom],email_clients[rclient])
-		
-		_, err := db.Exec(sql,cids[rcid],contact_id,namelist[rname],sexs[rsex],email,mobile_phone,addresslist[rand.Intn(822)],score,email_status[0],email_status[1],email_status[2],sms_status[0],sms_status[1],froms[rfrom],email_clients[rclient])
-		if err != nil {
-			fmt.Printf("%v...\n",err)
-			return 
-		}
+		//fmt.Printf("('%v','%v','%v','%v','%v','%v','%v','%v','%v','%v','%v','%v','%v','%v','%v',NOW(),NOW(),NOW()),\n",cids[rcid],contact_id,namelist[rname],sexs[rsex],email,mobile_phone,addresslist[rand.Intn(822)],score,email_status[0],email_status[1],email_status[2],sms_status[0],sms_status[1],froms[rfrom],email_clients[rclient])
+		fmt.Printf(sql,cids[rcid],contact_id,namelist[rname],sexs[rsex],email,mobile_phone,addresslist[rand.Intn(822)],score,email_status[0],email_status[1],email_status[2],sms_status[0],sms_status[1],froms[rfrom],email_clients[rclient])
+		//_, err := db.Exec(sql,cids[rcid],contact_id,namelist[rname],sexs[rsex],email,mobile_phone,addresslist[rand.Intn(822)],score,email_status[0],email_status[1],email_status[2],sms_status[0],sms_status[1],froms[rfrom],email_clients[rclient])
+		//if err != nil {
+		//	fmt.Printf("%v...\n",err)
+		//	return 
+		//}
 		contact_id++
 		//fmt.Printf(" %v \n",float64(i)/10000*100)
 		

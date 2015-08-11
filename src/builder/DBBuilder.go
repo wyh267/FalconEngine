@@ -242,7 +242,7 @@ func (this *DBBuilder) Buiding() error {
 
 			if v.FType == "T" {
 				this.Fields[index].IvtIdx = utils.NewInvertIdx(utils.TYPE_TEXT, v.Name)
-				this.Fields[index].IvtStrDic = utils.NewStringIdxDic(501)
+				this.Fields[index].IvtStrDic = utils.NewStringIdxDic(5001)
 
 			}
 
@@ -358,7 +358,7 @@ func (this *DBBuilder) Buiding() error {
 		}
 		
 		doc_id++
-		if doc_id % 10000 == 0 {
+		if doc_id % 5000 == 0 {
 			this.Logger.Info("processing doc_id :  %v \n",doc_id)
 		}
 		//this.Logger.Info("DOC_ID : %v  VALUE : %v", doc_id, writeCols)
