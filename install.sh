@@ -1,3 +1,3 @@
 #!/bin/zsh
 
-go install FalconEngine
+go install -gcflags "-N -l" FalconEngine

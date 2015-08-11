@@ -176,6 +176,7 @@ func (this *Router) parseArgs(r *http.Request) (map[string]string, error) {
 
 	//每次都重新生成一个新的map，否则之前请求的参数会保留其中
 	res := make(map[string]string)
+	fmt.Printf("Form :: %v ",r.Form)
 	for k, v := range r.Form {
 		res[k] = v[0]
 	}

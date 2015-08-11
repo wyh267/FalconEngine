@@ -26,12 +26,14 @@ type StringIdxDic struct {
 	HashIndex   []int64
 	EntityCount int64
 	Bukets      int64
+	Lens		int64
 }
 
 func NewStringIdxDic(bukets int64) *StringIdxDic {
 	this := &StringIdxDic{EntityCount: 1, Bukets: bukets}
-	this.Entity = make([]StringItemDic, bukets)
-	this.HashIndex = make([]int64, bukets)
+	this.Lens = bukets
+	this.Entity = make([]StringItemDic, this.Lens,100000)
+	this.HashIndex = make([]int64, this.Lens,100000)
 	return this
 }
 
@@ -54,8 +56,14 @@ func (this *StringIdxDic) Display() {
 ******************************************************************************/
 func (this *StringIdxDic) Put(key string) int64 {
 	//桶已经满了，不能添加
-	if this.EntityCount == this.Bukets {
-		return -1
+	if this.EntityCount == this.Lens {
+		fmt.Printf("[StringIdxDic] Bukets Full...Append arrays [EntityCount : %v] [Lens : %v] \n",this.EntityCount,this.Lens)
+		e:=make([]StringItemDic, this.Bukets)
+		h:=make([]int64, this.Bukets)
+		this.Entity=append(this.Entity,e...)
+		this.HashIndex=append(this.HashIndex,h...)
+		this.Lens = this.Lens + this.Bukets
+		fmt.Printf("[StringIdxDic] Bukets Full...Append arrays [ New EntityCount : %v] [ New Lens : %v] \n",this.EntityCount,this.Lens)
 	}
 	//已经添加过了，返回ID值
 	id := this.Find(key)

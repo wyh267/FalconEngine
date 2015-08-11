@@ -140,7 +140,7 @@ func (this *Searcher) ParseParams(log_id string,params map[string]string) ([]ind
 		
 		
 		if k[0] != '-' && k[0] != '_' {
-			//this.Logger.Info(" string field K : %v ,V : %v",k,v)
+			this.Logger.Info(" string field K : %v ,V : %v",k,v)
 			stype := this.Indexer.GetIdxType(k)
 			if stype == -1 {
 				continue
@@ -160,9 +160,10 @@ func (this *Searcher) ParseParams(log_id string,params map[string]string) ([]ind
 		}
 		
 		if k[0] == '-'{
-			//this.Logger.Info(" filter1 field K : %v ,V : %v",k,v)
-			stype := this.Indexer.GetIdxType(k[1:])
+			this.Logger.Info(" filter1 field K : %v ,V : %v",k,v)
+			stype := this.Indexer.GetPflType(k[1:])
 			if stype == -1 {
+				this.Logger.Error("[LOG_ID:%v] %v %v", log_id, v,k[1:])
 				continue
 			}
 			if stype ==1 {
@@ -180,9 +181,10 @@ func (this *Searcher) ParseParams(log_id string,params map[string]string) ([]ind
 		}
 		
 		if k[0] == '_'{
-			//this.Logger.Info(" filter2 field K : %v ,V : %v",k,v)
-			stype := this.Indexer.GetIdxType(k[1:])
+			this.Logger.Info(" filter2 field K : %v ,V : %v",k,v)
+			stype := this.Indexer.GetPflType(k[1:])
 			if stype == -1 {
+				this.Logger.Error("[LOG_ID:%v] %v %v", log_id, v,k[1:])
 				continue
 			}
 			if stype ==1 {

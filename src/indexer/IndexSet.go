@@ -38,7 +38,9 @@ type IndexFieldInfo struct {
 	IsIvt     bool
 	IsPlf     bool
 	FType     string
+
 	Name      string
+		SType	  int64
 }
 
 
@@ -156,11 +158,11 @@ func (this *IndexSet) GetIdxType(field string) int64 {
 func (this *IndexSet) InitIndexSet(fields map[string]string) error {
 	for k, v := range fields {
 		l := strings.Split(v, ",")
-		if len(l) != 4 {
+		if len(l) != 5 {
 			this.Logger.Error("%v", errors.New("Wrong config file"))
 			return errors.New("Wrong configure for index")
 		}
-		this.FieldInfo[k]=&IndexFieldInfo{false,false,false,"N",k}
+		this.FieldInfo[k]=&IndexFieldInfo{false,false,false,"N",k,0}
 		if l[0] == "1"{
 			this.PrimaryKey=k
 			this.FieldInfo[k].IsPK=true
@@ -189,6 +191,13 @@ func (this *IndexSet) InitIndexSet(fields map[string]string) error {
 				}
 				index := NewTextIndex(k, &idx, &dic)
 				this.PutIndex(k, index)
+				
+				stype, err := strconv.ParseInt(l[4], 0, 0)
+				if err != nil {
+					return err
+				}
+				
+				this.FieldInfo[k].SType=stype
 
 			} else { //number ivt
 				var dic utils.NumberIdxDic
@@ -490,8 +499,21 @@ func (this *IndexSet) SearchNumber(query int64) ([]utils.DocIdInfo, bool) {
 ******************************************************************************/
 func (this *IndexSet) SearchFieldByString(query string, field string) ([]utils.DocIdInfo, bool) {
 
+
+
+	var terms []string
+	
+	switch this.FieldInfo[field].SType{
+		case 1:	//正常切词
+			terms = utils.RemoveDuplicatesAndEmpty(this.Segmenter.Segment(query, false))
+		case 2: //按单个字符进行切词
+			terms = utils.RemoveDuplicatesAndEmpty(strings.Split(query, ""))
+		case 3: //按规定的分隔符进行切词
+			terms = utils.RemoveDuplicatesAndEmpty(strings.Split(query, ","))
+	}
+
 	//按照最大切分进行切词
-	terms := utils.RemoveDuplicatesAndEmpty(this.Segmenter.Segment(query, false))
+	//terms := utils.RemoveDuplicatesAndEmpty(this.Segmenter.Segment(query, false))
 	//this.Logger.Info("TERMS :: %v ", terms)
 	//首先按照字段检索
 	//交集结果
@@ -653,7 +675,7 @@ func (this *IndexSet) UpdateInvert(k,v string,doc_id int64){
 	if field_info.IsIvt {
 
 		if field_info.FType == "T" {
-			err := this.IncBuilder.BuildTextIndex(doc_id, v, this.IvtIndex[k].GetIvtIndex(), this.IvtIndex[k].GetStrDic())
+			err := this.IncBuilder.BuildTextIndex(doc_id, v, this.IvtIndex[k].GetIvtIndex(), this.IvtIndex[k].GetStrDic(),field_info.SType)
 			if err != nil {
 				this.Logger.Error("ERROR : %v", err)
 			}

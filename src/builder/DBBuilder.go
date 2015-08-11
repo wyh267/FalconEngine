@@ -18,6 +18,7 @@ type FieldInfo struct {
 	IsPlf     bool
 	FType     string
 	Name      string
+	SType	  int64
 	IvtIdx    *utils.InvertIdx
 	IvtStrDic *utils.StringIdxDic
 	IvtNumDic *utils.NumberIdxDic
@@ -63,7 +64,7 @@ func (this *DBBuilder) ParseConfigure() error {
 	for k, v := range fields {
 
 		l := strings.Split(v, ",")
-		if len(l) != 4 {
+		if len(l) != 5 {
 			this.Logger.Error("%v", errors.New("Wrong config file"))
 			return errors.New("Wrong config file")
 		}
@@ -88,6 +89,12 @@ func (this *DBBuilder) ParseConfigure() error {
 
 		fi.FType = l[3]
 		fi.Name = k
+		stype, err := strconv.ParseInt(l[4], 0, 0)
+		if err != nil {
+			return err
+		}
+		
+		fi.SType=stype
 
 		this.Fields = append(this.Fields, fi)
 	}
@@ -235,13 +242,18 @@ func (this *DBBuilder) Buiding() error {
 
 			if v.FType == "T" {
 				this.Fields[index].IvtIdx = utils.NewInvertIdx(utils.TYPE_TEXT, v.Name)
-				this.Fields[index].IvtStrDic = utils.NewStringIdxDic(20021)
+				this.Fields[index].IvtStrDic = utils.NewStringIdxDic(501)
 
 			}
 
 			if v.FType == "N" {
 				this.Fields[index].IvtIdx = utils.NewInvertIdx(utils.TYPE_NUM, v.Name)
-				this.Fields[index].IvtNumDic = utils.NewNumberIdxDic(20021)
+				if v.IsPK {
+					this.Fields[index].IvtNumDic = utils.NewNumberIdxDic(1)
+				}else{
+					this.Fields[index].IvtNumDic = utils.NewNumberIdxDic(4)
+				}
+				
 
 			}
 		}
@@ -258,7 +270,7 @@ func (this *DBBuilder) Buiding() error {
 		}
 
 	}
-
+	fmt.Printf("%v\n",fields)
 	sql := fmt.Sprintf(this.sql, fields[1:len(fields)])
 	fmt.Printf("SQL :: %v \n", sql)
 
@@ -293,7 +305,7 @@ func (this *DBBuilder) Buiding() error {
 			if this.Fields[index].IsIvt {
 
 				if this.Fields[index].FType == "T" {
-					err := builder.BuildTextIndex(doc_id, v, this.Fields[index].IvtIdx, this.Fields[index].IvtStrDic)
+					err := builder.BuildTextIndex(doc_id, v, this.Fields[index].IvtIdx, this.Fields[index].IvtStrDic,this.Fields[index].SType)
 					if err != nil {
 						this.Logger.Error("ERROR : %v", err)
 					}
@@ -346,8 +358,10 @@ func (this *DBBuilder) Buiding() error {
 		}
 		
 		doc_id++
-
-		this.Logger.Info("DOC_ID : %v  VALUE : %v", doc_id, writeCols)
+		if doc_id % 10000 == 0 {
+			this.Logger.Info("processing doc_id :  %v \n",doc_id)
+		}
+		//this.Logger.Info("DOC_ID : %v  VALUE : %v", doc_id, writeCols)
 
 	}
 

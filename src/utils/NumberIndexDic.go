@@ -26,6 +26,7 @@ type NumberIdxDic struct {
 	HashIndex   []int64
 	EntityCount int64
 	Bukets      int64
+	Lens		int64
 }
 
 /*****************************************************************************
@@ -37,9 +38,24 @@ type NumberIdxDic struct {
 *
 ******************************************************************************/
 func NewNumberIdxDic(buket_type int64) *NumberIdxDic {
-	this := &NumberIdxDic{EntityCount: 1, Bukets: 20021}
-	this.Entity = make([]NumItemDic, 20021)
-	this.HashIndex = make([]int64, 20021)
+	var bukets int64
+	switch buket_type{
+		case 1:
+			bukets=5001
+		case 2:
+			bukets=5001
+		case 3:
+			bukets=5001
+		case 4:
+			bukets=5001
+		default:
+			bukets=5001
+		
+	}
+	this := &NumberIdxDic{EntityCount: 1, Bukets: bukets}
+	this.Lens = bukets
+	this.Entity = make([]NumItemDic, this.Lens,100000)
+	this.HashIndex = make([]int64, this.Lens,100000)
 	return this
 }
 
@@ -54,8 +70,14 @@ func (this *NumberIdxDic) Display() {
 
 func (this *NumberIdxDic) Put(key int64) int64 {
 	//桶已经满了，不能添加
-	if this.EntityCount == this.Bukets {
-		return -1
+	if this.EntityCount == this.Lens {
+		//fmt.Printf("Bukets Full...Append arrays [EntityCount : %v] [Lens : %v] \n",this.EntityCount,this.Lens)
+		e:=make([]NumItemDic, this.Bukets)
+		h:=make([]int64, this.Bukets)
+		this.Entity=append(this.Entity,e...)
+		this.HashIndex=append(this.HashIndex,h...)
+		this.Lens = this.Lens + this.Bukets
+		//fmt.Printf("Bukets Full...Append arrays [ New EntityCount : %v] [ New Lens : %v] \n",this.EntityCount,this.Lens)
 	}
 	//已经添加过了，返回ID值
 	id, hash := this.Find(key)
