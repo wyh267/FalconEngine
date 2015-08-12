@@ -288,7 +288,7 @@ func (this *IndexSet) SearchByRules(rules /*map[string]interface{}*/[]SearchRule
 	}
 
 	//BitMap过滤失效的doc_id
-	this.Logger.Info(" %v ",res)
+	//this.Logger.Info(" %v ",res)
 	r:=make([]utils.DocIdInfo,0)
 	for i,_:=range res{
 		//this.Logger.Info(" %v ",res[i].DocId)
