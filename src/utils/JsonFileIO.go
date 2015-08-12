@@ -18,6 +18,15 @@ import (
 	//"fmt"
 )
 
+
+func WriteToJsonWithChan(data interface{}, file_name string,wchan chan int) error {
+	
+	WriteToJson(data,file_name)
+	wchan<- 1
+	return nil
+}
+
+
 /*****************************************************************************
 *  function name : WriteToJson
 *  params : interface to tran json ,file_name
