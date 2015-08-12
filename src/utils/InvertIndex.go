@@ -18,7 +18,7 @@ import (
 //
 type DocIdInfo struct {
 	DocId  int64
-	Weight int64
+	//Weight int64
 }
 
 //

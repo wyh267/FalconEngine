@@ -62,11 +62,11 @@ func (this *IndexBuilder) BuildTextIndex(doc_id int64, content string, ivt_idx *
 		//新增
 		if key_id > len {
 			invertList := NewInvertDocIdList(term)
-			invertList.DocIdList = append(invertList.DocIdList, DocIdInfo{doc_id, 0})
+			invertList.DocIdList = append(invertList.DocIdList, DocIdInfo{DocId:doc_id})
 			ivt_idx.KeyInvertList = append(ivt_idx.KeyInvertList, *invertList)
 			ivt_idx.IdxLen++
 		} else { //更新
-			ivt_idx.KeyInvertList[key_id].DocIdList = append(ivt_idx.KeyInvertList[key_id].DocIdList, DocIdInfo{doc_id, 0})
+			ivt_idx.KeyInvertList[key_id].DocIdList = append(ivt_idx.KeyInvertList[key_id].DocIdList, DocIdInfo{DocId:doc_id})
 		}
 
 	}
@@ -87,12 +87,12 @@ func (this *IndexBuilder) BuildNumberIndex(doc_id int64, content int64, ivt_idx 
 	if key_id > len {
 		//fmt.Println("Add Bukent full")
 		invertList := NewInvertDocIdList(content)
-		invertList.DocIdList = append(invertList.DocIdList, DocIdInfo{doc_id, 0})
+		invertList.DocIdList = append(invertList.DocIdList, DocIdInfo{DocId:doc_id})
 		ivt_idx.KeyInvertList = append(ivt_idx.KeyInvertList, *invertList)
 		ivt_idx.IdxLen++
 	} else { //更新
 		//fmt.Println("Update Bukent full")
-		ivt_idx.KeyInvertList[key_id].DocIdList = append(ivt_idx.KeyInvertList[key_id].DocIdList, DocIdInfo{doc_id, 0})
+		ivt_idx.KeyInvertList[key_id].DocIdList = append(ivt_idx.KeyInvertList[key_id].DocIdList, DocIdInfo{DocId:doc_id})
 	}
 	//ivt_idx.Display()
 	//ivt_dic.Display()
