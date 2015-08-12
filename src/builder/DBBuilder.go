@@ -364,25 +364,28 @@ func (this *DBBuilder) Buiding() error {
 		//this.Logger.Info("DOC_ID : %v  VALUE : %v", doc_id, writeCols)
 
 	}
-	writeCount:=0  
-	var writeChan chan int
+	//writeCount:=0  
+	//var writeChan chan int
 	for index, fields := range this.Fields {
 
 		if this.Fields[index].IsIvt {
 
-			utils.WriteToJsonWithChan(fields.IvtIdx, fmt.Sprintf("./index/%v_idx.json", fields.Name),writeChan)
-			writeCount++
+			//utils.WriteToJsonWithChan(fields.IvtIdx, fmt.Sprintf("./index/%v_idx.json", fields.Name),writeChan)
+			utils.WriteToJson(fields.IvtIdx, fmt.Sprintf("./index/%v_idx.json", fields.Name))
+			//writeCount++
 			if this.Fields[index].FType == "T" {
 
-				utils.WriteToJsonWithChan(fields.IvtStrDic, fmt.Sprintf("./index/%v_dic.json", fields.Name),writeChan)
-				writeCount++
+				//utils.WriteToJsonWithChan(fields.IvtStrDic, fmt.Sprintf("./index/%v_dic.json", fields.Name),writeChan)
+				utils.WriteToJson(fields.IvtStrDic, fmt.Sprintf("./index/%v_dic.json", fields.Name))
+				//writeCount++
 
 			}
 
 			if this.Fields[index].FType == "N" {
 
-				utils.WriteToJsonWithChan(fields.IvtNumDic, fmt.Sprintf("./index/%v_dic.json", fields.Name),writeChan)
-				writeCount++
+				//utils.WriteToJsonWithChan(fields.IvtNumDic, fmt.Sprintf("./index/%v_dic.json", fields.Name),writeChan)
+				utils.WriteToJson(fields.IvtNumDic, fmt.Sprintf("./index/%v_dic.json", fields.Name))
+				//writeCount++
 			}
 
 		}
@@ -391,22 +394,24 @@ func (this *DBBuilder) Buiding() error {
 
 			if this.Fields[index].FType == "T" {
 
-				utils.WriteToJsonWithChan(fields.PlfText, fmt.Sprintf("./index/%v_pfl.json", fields.Name),writeChan)
-				writeCount++
+				//utils.WriteToJsonWithChan(fields.PlfText, fmt.Sprintf("./index/%v_pfl.json", fields.Name),writeChan)
+				utils.WriteToJson(fields.PlfText, fmt.Sprintf("./index/%v_pfl.json", fields.Name))
+				//writeCount++
 
 			}
 
 			if this.Fields[index].FType == "N" {
 
-				utils.WriteToJsonWithChan(fields.PlfNumber, fmt.Sprintf("./index/%v_pfl.json", fields.Name),writeChan)
-				writeCount++
+				//utils.WriteToJsonWithChan(fields.PlfNumber, fmt.Sprintf("./index/%v_pfl.json", fields.Name),writeChan)
+				utils.WriteToJson(fields.PlfNumber, fmt.Sprintf("./index/%v_pfl.json", fields.Name))
+				//writeCount++
 
 			}
 
 		}
 
 	}
-	
+/*	
 	fmt.Printf("writeCount : %v \n ",writeCount)
 	for {
 		select{
@@ -419,7 +424,7 @@ func (this *DBBuilder) Buiding() error {
 				}
 		}
 	}
-
+*/
 	return nil
 
 }
