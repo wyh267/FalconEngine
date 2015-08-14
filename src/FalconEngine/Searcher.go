@@ -69,7 +69,7 @@ func (this *Searcher)Process(log_id string,body []byte,params map[string]string 
 		total_doc_ids,_ = utils.Merge(total_doc_ids,doc_ids) 
 		//this.Logger.Info("[LOG_ID:%v]Running Searcher ....total_doc_ids::: %v ",log_id,total_doc_ids)
 	}
-	this.Logger.Info("[LOG_ID:%v]Running Searcher ....RES::: %v ",log_id,total_doc_ids)
+	//this.Logger.Info("[LOG_ID:%v]Running Searcher ....RES::: %v ",log_id,total_doc_ids)
 	var tmp_doc_ids  []utils.DocIdInfo
 	if len(total_doc_ids) > 20{
 		tmp_doc_ids = total_doc_ids[:15]
