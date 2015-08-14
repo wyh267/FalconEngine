@@ -44,7 +44,7 @@ func Merge(a []DocIdInfo, b []DocIdInfo) ([]DocIdInfo, bool) {
 
 	ia := 0
 	ib := 0
-
+	//fmt.Printf("Lena : %v ======== Lenb : %v \n",lena,lenb)
 	if lena == 0 && lenb == 0 {
 		return nil, false
 	}
@@ -55,9 +55,11 @@ func Merge(a []DocIdInfo, b []DocIdInfo) ([]DocIdInfo, bool) {
 			c = append(c, a[ia])
 			ia++
 			ib++
+			continue
 		}
 
 		if a[ia].DocId < b[ib].DocId {
+		//	fmt.Printf("ia : %v ======== ib : %v \n",ia,ib)
 			c = append(c, a[ia])
 			ia++
 		} else {

@@ -116,9 +116,9 @@ func main(){
 	rand := rand.New(rand.NewSource(time.Now().UnixNano()))
 	contact_id:=80006
 	//fmt.Printf("INSERT INTO `jzl_dmp` (`cid`, `contact_id`, `name`,`sex`,`email`,`mobile_phone`, `address`, `score`,`email_view`,`email_click`,`email_sended`,`sms_sended`,`sms_click`,`from_source`,`email_client`,`update_time`,`create_time`,`last_modify_time`) VALUES\n")
-	for i:=0;i<200000;i++{
+	for i:=0;i<20;i++{
 
-		sql:="INSERT INTO `jzl_dmp` (`cid`, `contact_id`, `name`,`sex`,`email`,`mobile_phone`, `address`, `score`,`email_view`,`email_click`,`email_sended`,`sms_sended`,`sms_click`,`from_source`,`email_client`,`update_time`,`create_time`,`last_modify_time`) VALUES ('%v','%v','%v','%v','%v','%v','%v','%v','%v','%v','%v','%v','%v','%v','%v',NOW(),NOW(),NOW());\n"
+		sql:="INSERT INTO `jzl_dmp` (`cid`, `contact_id`, `name`,`sex`,`email`,`mobile_phone`, `address`, `score`,`email_view`,`email_click`,`email_sended`,`sms_sended`,`sms_click`,`from_source`,`email_client`,`age`,`birth`,`source`,`update_time`,`create_time`,`last_modify_time`) VALUES ('%v','%v','%v','%v','%v','%v','%v','%v','%v','%v','%v','%v','%v','%v','%v','%v','%v','%v',NOW(),NOW(),NOW());\n"
 		rname := rand.Intn(4999)
 		rsex :=rand.Intn(2)
 		rcid := rand.Intn(7)
@@ -150,6 +150,10 @@ func main(){
 		
 		rfrom:=rand.Intn(2800)
 		rclient:=rand.Intn(5)
+		
+		age:=rand.Intn(50)
+		birth:=fmt.Sprintf("%v-%02d-%02d",rand.Intn(45)+1970,rand.Intn(11)+1,rand.Intn(29)+1)
+		source:=rand.Intn(2)+1
 		//fmt.Printf("\n====================\ncid:%v , contact_id:%v , name:%v , sex:%v , email:%v , mobile_phone:%v , address:%v , score:%v , ",cids[rcid],contact_id,namelist[rname],sexs[rsex],email,mobile_phone,addresslist[rand.Intn(822)],score)
 		//fmt.Printf("email_view:%v , email_click:%v , email_sended:%v , sms_sended:%v , sms_click:%v , from:%v , email_client:%v \n===============\n",email_status[0],email_status[1],email_status[2],sms_status[0],sms_status[1],froms[rfrom],email_clients[rclient])
 		
@@ -161,7 +165,7 @@ func main(){
 
 		//email := email1 + "@" + email2 + ".com"
 		//fmt.Printf("('%v','%v','%v','%v','%v','%v','%v','%v','%v','%v','%v','%v','%v','%v','%v',NOW(),NOW(),NOW()),\n",cids[rcid],contact_id,namelist[rname],sexs[rsex],email,mobile_phone,addresslist[rand.Intn(822)],score,email_status[0],email_status[1],email_status[2],sms_status[0],sms_status[1],froms[rfrom],email_clients[rclient])
-		fmt.Printf(sql,cids[rcid],contact_id,namelist[rname],sexs[rsex],email,mobile_phone,addresslist[rand.Intn(822)],score,email_status[0],email_status[1],email_status[2],sms_status[0],sms_status[1],froms[rfrom],email_clients[rclient])
+		fmt.Printf(sql,cids[rcid],contact_id,namelist[rname],sexs[rsex],email,mobile_phone,addresslist[rand.Intn(822)],score,email_status[0],email_status[1],email_status[2],sms_status[0],sms_status[1],froms[rfrom],email_clients[rclient],age,birth,source)
 		//_, err := db.Exec(sql,cids[rcid],contact_id,namelist[rname],sexs[rsex],email,mobile_phone,addresslist[rand.Intn(822)],score,email_status[0],email_status[1],email_status[2],sms_status[0],sms_status[1],froms[rfrom],email_clients[rclient])
 		//if err != nil {
 		//	fmt.Printf("%v...\n",err)

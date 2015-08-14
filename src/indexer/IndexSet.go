@@ -346,15 +346,23 @@ func (this *IndexSet) SearchField(query interface{}, field string) ([]utils.DocI
 
 		return this.SearchFieldByNumber(query_num, field)
 	}
+	
+	
+	query_num_float, ok := query.(float64)
+	if ok {
+
+		return this.SearchFieldByNumber(int64(query_num_float), field)
+	}
 
 	return nil, false
 
 }
 
 type FilterRule struct {
-	Field     string
-	IsForward bool
-	Value     interface{}
+	Field     	string
+	IsForward 	bool
+	FiltType	int64
+	Value     	interface{}
 }
 
 /*****************************************************************************
@@ -375,7 +383,7 @@ func (this *IndexSet) FilterByRules(doc_ids []utils.DocIdInfo, rules []FilterRul
 			continue
 		}
 
-		res, _ = this.PflIndex[rule.Field].Filter(res, rule.Value, rule.IsForward)
+		res, _ = this.PflIndex[rule.Field].Filter(res, rule.Value, rule.IsForward,rule.FiltType)
 	}
 	return res, nil
 
