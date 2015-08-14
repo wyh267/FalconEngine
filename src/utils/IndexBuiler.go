@@ -48,6 +48,8 @@ func (this *IndexBuilder) BuildTextIndex(doc_id int64, content string, ivt_idx *
 			terms = RemoveDuplicatesAndEmpty(strings.Split(content, ""))
 		case 3: //按规定的分隔符进行切词
 			terms = RemoveDuplicatesAndEmpty(strings.Split(content, ";"))
+		case 4: //按规定的分隔符进行切词
+			terms = RemoveDuplicatesAndEmpty(strings.Split(content, "@"))
 	}
 
 
