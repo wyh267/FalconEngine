@@ -198,8 +198,8 @@ func (this *DBBuilder) ScanInc(Data_chan chan UpdateInfo) error {
 		}
 		
 		if isUpdate{
-			this.Logger.Info("Must Update ,Old : %v ",redis_map)
-			this.Logger.Info("Must Update ,New : %v ",new_values)
+			//this.Logger.Info("Must Update ,Old : %v ",redis_map)
+			//this.Logger.Info("Must Update ,New : %v ",new_values)
 			this.RedisCli.SetFields(0, new_values)
 			upinfo := UpdateInfo{new_values,false,make(chan error)}
 			Data_chan <- upinfo
@@ -207,7 +207,7 @@ func (this *DBBuilder) ScanInc(Data_chan chan UpdateInfo) error {
 			if errinfo != nil {
 				this.Logger.Info("Update Fail.... %v ", errinfo)
 			}else{
-				this.Logger.Info("Update success....")
+				this.Logger.Info("Update Success.... ")
 			}
 		}
 		

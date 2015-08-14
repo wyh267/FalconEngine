@@ -616,12 +616,12 @@ func (this *IndexSet) UpdateRecord(info map[string]string,isProfileUpdate bool) 
 	//检查是否有PrimaryKey字段，如果没有的话，不允许更新
 	_,hasPK:=info[this.PrimaryKey]
 	if !hasPK{
-		this.Logger.Error("No Primary Key,Update is now allow ")
-		return errors.New("No Primary Key,Update is now allow")
+		this.Logger.Error("No Primary Key,Update is not allow ")
+		return errors.New("No Primary Key,Update is not allow")
 	}
 	pk, err := strconv.ParseInt(info[this.PrimaryKey], 0, 0)
 	if err != nil {
-		this.Logger.Error("No Primary Key,Update is now allow  %v",  err)
+		this.Logger.Error("No Primary Key,Update is not allow  %v",  err)
 		return err
 	}
 	
