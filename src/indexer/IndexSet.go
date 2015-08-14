@@ -34,13 +34,12 @@ type IndexSet struct {
 
 
 type IndexFieldInfo struct {
-	IsPK      bool
-	IsIvt     bool
-	IsPlf     bool
-	FType     string
-
-	Name      string
-		SType	  int64
+	IsPK      bool		`json:"Is PK"`
+	IsIvt     bool		`json:"Is Invert"`
+	IsPlf     bool		`json:"Is Profile"`
+	FType     string	`json:"Field Type"`
+	Name      string	`json:"Field Name"`
+	SType	  int64		`json:"Search Type"`
 }
 
 
@@ -740,3 +739,32 @@ func (this *IndexSet) UpdateProfile(k,v string,doc_id int64) {
 	
 	
 }
+
+
+
+type IndexInfo struct{
+	
+	MaxDocId  int64 `json:"Max_DOCID"`
+	Fields	  []IndexFieldInfo	`json:"Fields Info"`
+	
+}
+
+
+func (this *IndexSet) GetIndexInfo(res map[string]interface{})  {
+	
+
+	var index_info IndexInfo
+	
+	index_info.MaxDocId=this.MaxDocId
+	
+	for _,v := range this.FieldInfo{
+		index_info.Fields = append(index_info.Fields,*v)
+	}
+	
+	res["IndexInfo"] = index_info	
+	
+	return 
+	
+}
+
+

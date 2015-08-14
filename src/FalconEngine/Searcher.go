@@ -43,13 +43,18 @@ const QUERY		string = "query"
 func (this *Searcher)Process(log_id string,body []byte,params map[string]string , result map[string]interface{},ftime func(string)string) error {
 	
 	
-	this.Logger.Info("[LOG_ID:%v]Running Searcher ....Time: %v ",log_id,ftime("Process running"))
+	_,has_ctl := params["_contrl"]
+	if has_ctl{
+		this.Indexer.GetIndexInfo(result)
+		return nil
+	}
 	
+	this.Logger.Info("[LOG_ID:%v]Running Searcher ....Time: %v ",log_id,ftime("Process running"))
 	searchRules,err :=this.ParseSearchInfo(log_id,params,body)
 	if err !=nil {
 		this.Logger.Error("[LOG_ID:%v]Running Searcher ..err : %v ..Time: %v ",log_id,err,ftime("search fields"))
 	}
-	//this.Indexer.Display()
+
 	//srules,frules,_,_ := this.ParseParams(log_id,params)
 	this.Logger.Info("[LOG_ID:%v]Running Searcher  %v....Time: %v ",log_id,searchRules,ftime("ParseSearchInfo"))
 	
