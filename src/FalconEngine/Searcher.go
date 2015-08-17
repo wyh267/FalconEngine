@@ -53,6 +53,11 @@ func (this *Searcher)Process(log_id string,body []byte,params map[string]string 
 	searchRules,err :=this.ParseSearchInfo(log_id,params,body)
 	if err !=nil {
 		this.Logger.Error("[LOG_ID:%v]Running Searcher ..err : %v ..Time: %v ",log_id,err,ftime("search fields"))
+		result["DATA"]="NO DATA"
+		result["COUNT"] = 0
+		result["HAS_RESULT"] = 0
+		result["ERR_MSG"] = err
+		
 	}
 
 	//srules,frules,_,_ := this.ParseParams(log_id,params)
@@ -61,23 +66,23 @@ func (this *Searcher)Process(log_id string,body []byte,params map[string]string 
 	total_doc_ids:=make([]utils.DocIdInfo,0)
 	for _,search_rule := range searchRules{
 		
-		doc_ids,ok:=this.Indexer.SearchByRules(search_rule.SR)
-		if !ok{
-			result["DATA"]="NO DATA"
+		doc_ids,_:=this.Indexer.SearchByRules(search_rule.SR)
+		//if !ok{
+		//	result["DATA"]="NO DATA"
 			//return nil
-		}	
+		//}	
 		this.Logger.Info("[LOG_ID:%v]Running Searcher ....Time: %v ",log_id,ftime("search fields"))
 		doc_ids,_ = this.Indexer.FilterByRules(doc_ids,search_rule.FR)
 		this.Logger.Info("[LOG_ID:%v]Running Searcher ....Time: %v ",log_id,ftime("fliter fields"))
-		//this.Logger.Info("[LOG_ID:%v]Running Searcher ....RES::: %v ",log_id,doc_ids)
-		//this.Logger.Info("[LOG_ID:%v]Running Searcher ....doc_ids::: %v ",log_id,doc_ids)
+
+
 		total_doc_ids,_ = utils.Merge(total_doc_ids,doc_ids) 
-		//this.Logger.Info("[LOG_ID:%v]Running Searcher ....total_doc_ids::: %v ",log_id,total_doc_ids)
+
 	}
-	//this.Logger.Info("[LOG_ID:%v]Running Searcher ....RES::: %v ",log_id,total_doc_ids)
+
 	var tmp_doc_ids  []utils.DocIdInfo
-	if len(total_doc_ids) > 20{
-		tmp_doc_ids = total_doc_ids[:15]
+	if len(total_doc_ids) > 10{
+		tmp_doc_ids = total_doc_ids[:10]
 	}else{
 		tmp_doc_ids = total_doc_ids
 	}
@@ -92,6 +97,12 @@ func (this *Searcher)Process(log_id string,body []byte,params map[string]string 
 	}
 	this.Logger.Info("[LOG_ID:%v]Running Searcher ....Time: %v ",log_id,ftime("Display Detail"))
 	result["DATA"]=infos
+	result["COUNT"] = len(total_doc_ids)
+	if len(total_doc_ids) == 0 {
+		result["HAS_RESULT"] = 0
+	}else{
+		result["HAS_RESULT"] = 1
+	}
 	/*
 	srules,frules,_,_ := this.ParseParams(log_id,params)
 
@@ -144,6 +155,7 @@ type ConditionData struct {
 
 type SearchInfo struct {
     Customer_id      int64       `json:"customer_id"`
+	Contact_id		 int64		 `json:"contact_id"`
     Id               int64       `json:"_id"`
     Creator_id       int64       `json:"creator_id"`
     Last_editor_id   int64       `json:"last_editor_id"`
@@ -183,6 +195,9 @@ func (this *Searcher) ParseSearchInfo(log_id string,params map[string]string,bod
 		SRs.SR = make([]indexer.SearchRule,0)
 		SRs.FR = make([]indexer.FilterRule,0)
 		SRs.SR = append(SRs.SR,indexer.SearchRule{Field:"cid",Query:searchInfo.Customer_id})
+		if searchInfo.Contact_id != 0 {
+			SRs.FR = append(SRs.FR,indexer.FilterRule{Field:"contact_id",Value:searchInfo.Contact_id,FiltType:indexer.FILT_TYPE_EQUAL,IsForward:true})
+		}
 		for ii,vv := range v {
 			this.Logger.Info("\t\t Condition[%v] : %v \n",ii,vv)
 			if vv.Key == "user_attrib" {
