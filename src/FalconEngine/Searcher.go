@@ -147,9 +147,14 @@ type Condition struct {
 	
 }
 
+type CommonStruct struct {
+	Childs	[]Condition	`json:"childs"`
+	Score	int64		`json:"score"`
+}
+
 type ConditionData struct {
 	
-	Data  [][]Condition  `json:"data"`
+	Data  []CommonStruct  `json:"data"`
 }
 
 
@@ -189,7 +194,8 @@ func (this *Searcher) ParseSearchInfo(log_id string,params map[string]string,bod
 	searchrules := make([]SearchRules,0)
 	
 	this.Logger.Info("SearchInfo : %v \n",searchInfo)
-	for i,v := range searchInfo.Conditions.Data{
+	for i,data := range searchInfo.Conditions.Data{
+		v:=data.Childs
 		this.Logger.Info("Conditions[%v] : %v \n",i,v)
 		var SRs SearchRules
 		SRs.SR = make([]indexer.SearchRule,0)
