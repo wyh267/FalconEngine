@@ -40,14 +40,7 @@ const GROUP_BY	string = "group_by"
 const QUERY		string = "query"
 
 
-func (this *Searcher)Process(log_id string,body []byte,params map[string]string , result map[string]interface{},ftime func(string)string) error {
-	
-	
-	_,has_ctl := params["_contrl"]
-	if has_ctl{
-		this.Indexer.GetIndexInfo(result)
-		return nil
-	}
+func (this *Searcher)SearchCount(log_id string,body []byte,params map[string]string , result map[string]interface{},ftime func(string)string) error {
 	
 	this.Logger.Info("[LOG_ID:%v]Running Searcher ....Time: %v ",log_id,ftime("Process running"))
 	searchRules,err :=this.ParseSearchInfo(log_id,params,body)
@@ -60,26 +53,18 @@ func (this *Searcher)Process(log_id string,body []byte,params map[string]string 
 		
 	}
 
-	//srules,frules,_,_ := this.ParseParams(log_id,params)
+
 	this.Logger.Info("[LOG_ID:%v]Running Searcher  %v....Time: %v ",log_id,searchRules,ftime("ParseSearchInfo"))
 	
 	total_doc_ids:=make([]utils.DocIdInfo,0)
 	for _,search_rule := range searchRules{
-		
 		doc_ids,_:=this.Indexer.SearchByRules(search_rule.SR)
-		//if !ok{
-		//	result["DATA"]="NO DATA"
-			//return nil
-		//}	
 		this.Logger.Info("[LOG_ID:%v]Running Searcher ....Time: %v ",log_id,ftime("search fields"))
 		doc_ids,_ = this.Indexer.FilterByRules(doc_ids,search_rule.FR)
 		this.Logger.Info("[LOG_ID:%v]Running Searcher ....Time: %v ",log_id,ftime("fliter fields"))
-
-
 		total_doc_ids,_ = utils.Merge(total_doc_ids,doc_ids) 
-
 	}
-
+	/*
 	var tmp_doc_ids  []utils.DocIdInfo
 	if len(total_doc_ids) > 10{
 		tmp_doc_ids = total_doc_ids[:10]
@@ -97,11 +82,39 @@ func (this *Searcher)Process(log_id string,body []byte,params map[string]string 
 	}
 	this.Logger.Info("[LOG_ID:%v]Running Searcher ....Time: %v ",log_id,ftime("Display Detail"))
 	result["DATA"]=infos
+	*/
 	result["COUNT"] = len(total_doc_ids)
 	if len(total_doc_ids) == 0 {
 		result["HAS_RESULT"] = 0
 	}else{
 		result["HAS_RESULT"] = 1
+	}
+	return nil
+	
+}
+
+
+func (this *Searcher)Process(log_id string,body []byte,params map[string]string , result map[string]interface{},ftime func(string)string) error {
+	
+	
+	_,has_ctl := params["_contrl"]
+	if has_ctl{
+		this.Indexer.GetIndexInfo(result)
+		return nil
+	}
+	
+	
+	_,has_count := params["_count"]
+	if has_count {
+		return this.SearchCount(log_id,body,params,result,ftime)
+	}
+	
+	_,has_group := params["_group"]
+	if has_group {
+		
+		
+		result["DATA"] = "OK"
+		return nil
 	}
 	/*
 	srules,frules,_,_ := this.ParseParams(log_id,params)
@@ -502,6 +515,25 @@ func (this *Searcher) ParseParams(log_id string,params map[string]string) ([]ind
 }
 
 
+
+type GroupContact struct{
+	GroupId		int64
+	ContactId   int64
+	Cid 		int64
+}
+
+
+func (this *Searcher)InsertToGroup(GC chan GroupContact){
+	
+	for {
+		select{
+			case gc:=<-GC :
+				this.Logger.Info("Insert ... CID : %v , CONTACTID : %v , GROUPID : %v \n",gc.Cid,gc.ContactId,gc.GroupId)
+		}
+	}
+	
+	
+}
 
 
 
