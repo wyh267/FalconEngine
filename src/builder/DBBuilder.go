@@ -133,9 +133,11 @@ func (this *DBBuilder) ScanInc(Data_chan chan UpdateInfo) error {
 	
 	curr_time:= time.Now().Format("2006-01-02 15:04:05")
 	var fields string
+	isIvert := make(map[string]bool) 
 	for _, v := range this.Fields {
 		//构造sql语句
 		fields = fields + "," + v.Name
+		isIvert[v.Name] = v.IsIvt
 	}
 	
 	incSql,_ := this.Configure.GetIncSql()
@@ -151,6 +153,7 @@ func (this *DBBuilder) ScanInc(Data_chan chan UpdateInfo) error {
 	defer rows.Close()
 	for rows.Next() {
 		isUpdate := false
+		isProfile := true
 		//values := make([]interface{},len(this.Fields))
 		values := make([]interface{}, len(this.Fields))
 		writeCols := make([]string, len(this.Fields))
@@ -189,11 +192,14 @@ func (this *DBBuilder) ScanInc(Data_chan chan UpdateInfo) error {
 			if !ok{
 				break
 			}
+			
 			//this.Logger.Info("K : %v ==== V : %v === VV : %v",k,v,vv)
 			if (v != vv) && k != incField {
 				isUpdate = true
 				curr_time = new_values[incField]
-				break
+				if isIvert[k] {
+					isProfile = false
+				}
 			}
 		}
 		
@@ -201,7 +207,7 @@ func (this *DBBuilder) ScanInc(Data_chan chan UpdateInfo) error {
 			//this.Logger.Info("Must Update ,Old : %v ",redis_map)
 			//this.Logger.Info("Must Update ,New : %v ",new_values)
 			this.RedisCli.SetFields(0, new_values)
-			upinfo := UpdateInfo{new_values,false,make(chan error)}
+			upinfo := UpdateInfo{new_values,isProfile,make(chan error)}
 			Data_chan <- upinfo
 			errinfo:= <-upinfo.ErrChan
 			if errinfo != nil {

@@ -143,7 +143,44 @@ func (this *Searcher)GroupContact(log_id string,body []byte,params map[string]st
 }
 
 
+func (this *Searcher)SimpleSearch(log_id string,body []byte,params map[string]string , result map[string]interface{},ftime func(string)string) error {
+	srules,frules,_,_ := this.ParseParams(log_id,params)
 
+	total_doc_ids,ok:=this.Indexer.SearchByRules(srules)
+	if !ok{
+		result["DATA"]="NO DATA"
+		return nil
+	}	
+	this.Logger.Info("[LOG_ID:%v]Running Searcher ....Time: %v ",log_id,ftime("search fields"))
+	total_doc_ids,_ = this.Indexer.FilterByRules(total_doc_ids,frules)
+	this.Logger.Info("[LOG_ID:%v]Running Searcher ....Time: %v ",log_id,ftime("fliter fields"))
+	
+	
+
+	var tmp_doc_ids  []utils.DocIdInfo
+	if len(total_doc_ids) > 10{
+		tmp_doc_ids = total_doc_ids[:10]
+	}else{
+		tmp_doc_ids = total_doc_ids
+	}
+	ids,fields:=this.Indexer.GetDetails(tmp_doc_ids)
+	var infos []map[string]string
+	for _,id := range ids {
+		info,err:=this.RedisCli.GetFields(id,fields)
+		if err != nil {
+			this.Logger.Error("%v",err)
+		}
+		infos=append(infos,info)
+	}
+	this.Logger.Info("[LOG_ID:%v]Running Searcher ....Time: %v ",log_id,ftime("Display Detail"))
+	result["DATA"]=infos
+	return nil
+	//
+	//result["PAGES"] = len(doc_ids)/int(ps) + 1
+
+	//result["DATA"]=doc_ids
+
+}
 
 
 func (this *Searcher)Process(log_id string,body []byte,params map[string]string , result map[string]interface{},ftime func(string)string) error {
@@ -168,39 +205,15 @@ func (this *Searcher)Process(log_id string,body []byte,params map[string]string 
 		result["DATA"] = "OK"
 		return nil
 	}
+	
+	//_,has_search := params["~search"]
+	//if has_search {
+	return this.SimpleSearch(log_id,body,params,result,ftime)
+	//}
 	/*
-	srules,frules,_,_ := this.ParseParams(log_id,params)
-
-	doc_ids,ok:=this.Indexer.SearchByRules(srules)
-	if !ok{
-		result["DATA"]="NO DATA"
-		return nil
-	}	
-	this.Logger.Info("[LOG_ID:%v]Running Searcher ....Time: %v ",log_id,ftime("search fields"))
-	doc_ids,_ = this.Indexer.FilterByRules(doc_ids,frules)
-	this.Logger.Info("[LOG_ID:%v]Running Searcher ....Time: %v ",log_id,ftime("fliter fields"))
 	
-	
-
-	ids,fields:=this.Indexer.GetDetails(doc_ids)
-	var infos []map[string]string
-	for _,id := range ids {
-		info,err:=this.RedisCli.GetFields(id,fields)
-		if err != nil {
-			this.Logger.Error("%v",err)
-		}
-		infos=append(infos,info)
-	}
-	this.Logger.Info("[LOG_ID:%v]Running Searcher ....Time: %v ",log_id,ftime("Display Detail"))
-	result["DATA"]=infos
-	//
-	//result["PAGES"] = len(doc_ids)/int(ps) + 1
-
-	//result["DATA"]=doc_ids
 	*/
 	
-	
-	return nil
 }
 
 
@@ -527,14 +540,14 @@ func (this *Searcher) ParseParams(log_id string,params map[string]string) ([]ind
 				continue
 			}
 			if stype ==1 {
-				frules=append(frules,indexer.FilterRule{k[1:],true,1,v})
+				frules=append(frules,indexer.FilterRule{k[1:],true,3,v})
 			}else{
 				v_n, err := strconv.ParseInt(v, 0, 0)
 				if err != nil {
 					this.Logger.Error("[LOG_ID:%v] %v %v", log_id, v,err)
 					continue
 				}
-				frules=append(frules,indexer.FilterRule{k[1:],true,1,v_n})
+				frules=append(frules,indexer.FilterRule{k[1:],true,3,v_n})
 			}
 			
 			continue
@@ -548,14 +561,14 @@ func (this *Searcher) ParseParams(log_id string,params map[string]string) ([]ind
 				continue
 			}
 			if stype ==1 {
-				frules=append(frules,indexer.FilterRule{k[1:],false,1,v})
+				frules=append(frules,indexer.FilterRule{k[1:],false,4,v})
 			}else{
 				v_n, err := strconv.ParseInt(v, 0, 0)
 				if err != nil {
 					this.Logger.Error("[LOG_ID:%v] %v %v", log_id, v_n,err)
 					continue
 				}
-				frules=append(frules,indexer.FilterRule{k[1:],false,1,v_n})
+				frules=append(frules,indexer.FilterRule{k[1:],false,4,v_n})
 			}
 			continue
 		}
