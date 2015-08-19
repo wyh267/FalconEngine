@@ -43,7 +43,7 @@ const QUERY		string = "query"
 func (this *Searcher)SearchCount(log_id string,body []byte,params map[string]string , result map[string]interface{},ftime func(string)string) error {
 	
 	this.Logger.Info("[LOG_ID:%v]Running Searcher ....Time: %v ",log_id,ftime("Process running"))
-	searchRules,err :=this.ParseSearchInfo(log_id,params,body)
+	searchRules,_,err :=this.ParseSearchInfo(log_id,params,body)
 	if err !=nil {
 		this.Logger.Error("[LOG_ID:%v]Running Searcher ..err : %v ..Time: %v ",log_id,err,ftime("search fields"))
 		result["DATA"]="NO DATA"
@@ -94,6 +94,58 @@ func (this *Searcher)SearchCount(log_id string,body []byte,params map[string]str
 }
 
 
+func (this *Searcher)GroupContact(log_id string,body []byte,params map[string]string , result map[string]interface{},ftime func(string)string) error {
+	this.Logger.Info("[LOG_ID:%v]Running GroupContact ....Time: %v ",log_id,ftime("Process running"))
+	searchRules,si,err :=this.ParseSearchInfo(log_id,params,body)
+	if err !=nil || si.Id==0 {
+		this.Logger.Error("[LOG_ID:%v]Running GroupContact ..err : %v ..Time: %v ",log_id,err,ftime("search fields"))
+		result["DATA"]="NO DATA"
+		result["COUNT"] = 0
+		result["HAS_RESULT"] = 0
+		result["ERR_MSG"] = err
+		
+	}
+
+
+	this.Logger.Info("[LOG_ID:%v]Running GroupContact  %v....Time: %v ",log_id,searchRules,ftime("ParseSearchInfo"))
+	
+	total_doc_ids:=make([]utils.DocIdInfo,0)
+	for _,search_rule := range searchRules{
+		doc_ids,_:=this.Indexer.SearchByRules(search_rule.SR)
+		this.Logger.Info("[LOG_ID:%v]Running GroupContact ....Time: %v ",log_id,ftime("search fields"))
+		doc_ids,_ = this.Indexer.FilterByRules(doc_ids,search_rule.FR)
+		this.Logger.Info("[LOG_ID:%v]Running GroupContact ....Time: %v ",log_id,ftime("fliter fields"))
+		total_doc_ids,_ = utils.Merge(total_doc_ids,doc_ids) 
+	}
+	
+	fields := make([]string,0)
+	fields = append(fields,"contact_id")
+	fields = append(fields,"cid")
+	//this.Logger.Info("doc_ids : %v ",total_doc_ids)
+	for _,doc_id :=range total_doc_ids{
+		id,_ := this.Indexer.GetId(doc_id)
+		//this.Logger.Info("Fields : %v",fields)
+		info,err:=this.RedisCli.GetFields(id,fields)
+		if err != nil {
+			this.Logger.Error("%v",err)
+		}
+		//this.Logger.Info("DOC INFO ::  %v ",info)
+		const ADDCONTACTSTOGROUP_SQL string = "REPLACE INTO jzl_groups_contacts (cid,creator_id,last_editor_id,group_id,contact_id,create_time,last_modify_time,is_delete) VALUES (?,?,?,?,?,NOW(),NOW(),0)"
+		err = this.DbAdaptor.ExecFormat(ADDCONTACTSTOGROUP_SQL, info["cid"], si.Editor_id, si.Editor_id, si.Id, info["contact_id"])
+		if err != nil {
+			this.Logger.Error("[LOG_ID:%v]  %v", log_id, err)
+			return err
+		}
+	}
+	
+	return nil
+	
+}
+
+
+
+
+
 func (this *Searcher)Process(log_id string,body []byte,params map[string]string , result map[string]interface{},ftime func(string)string) error {
 	
 	
@@ -112,7 +164,7 @@ func (this *Searcher)Process(log_id string,body []byte,params map[string]string 
 	_,has_group := params["_group"]
 	if has_group {
 		
-		
+		go this.GroupContact(log_id,body,params,result,ftime)
 		result["DATA"] = "OK"
 		return nil
 	}
@@ -193,14 +245,14 @@ type SearchRules struct {
 }
 
 
-func (this *Searcher) ParseSearchInfo(log_id string,params map[string]string,body []byte) ([]SearchRules,error) {// ([]indexer.SearchRule,[]indexer.FilterRule,int64,int64){
+func (this *Searcher) ParseSearchInfo(log_id string,params map[string]string,body []byte) ([]SearchRules,SearchInfo,error) {// ([]indexer.SearchRule,[]indexer.FilterRule,int64,int64){
 
 	var searchInfo SearchInfo
 
 	err := json.Unmarshal(body, &searchInfo)
 	if err != nil {
 		this.Logger.Error("[LOG_ID:%v]  %v", log_id, err)
-		return nil,err
+		return nil,searchInfo,err
 	}
 
 
@@ -405,7 +457,7 @@ func (this *Searcher) ParseSearchInfo(log_id string,params map[string]string,bod
 		searchrules = append(searchrules,SRs)
 	}
 
-	return searchrules,nil
+	return searchrules,searchInfo,nil
 	
 }
 

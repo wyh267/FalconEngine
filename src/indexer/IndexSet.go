@@ -580,6 +580,20 @@ func (this *IndexSet) SearchFieldByNumber(query int64, field string) ([]utils.Do
 }
 
 
+func (this *IndexSet) GetId(doc_id utils.DocIdInfo) (int64,[]string){
+	tmp,_:=this.PflIndex["id"].Find(doc_id.DocId)
+	
+	t,_:=tmp.(int64)
+	//fmt.Printf("tmp : %v   t : %v \n",tmp,t)
+	
+	fields := make([]string,0)
+	for k,_ :=range this.FieldInfo{
+		fields=append(fields,k)
+	}
+	
+	return t,fields
+}
+
 
 func (this *IndexSet) GetDetails(doc_ids []utils.DocIdInfo) ([]int64,[]string){
 	
