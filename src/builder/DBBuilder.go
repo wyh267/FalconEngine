@@ -180,8 +180,9 @@ func (this *DBBuilder) ScanInc(Data_chan chan UpdateInfo) error {
 		redis_map,err:=this.RedisCli.GetFields(new_values["id"],fieldlist)
 		if err != nil {
 			if err.Error() == "redigo: nil returned"{
-				this.Logger.Info("Old continue : %v  ERR : %v ",redis_map,err.Error())
+				//this.Logger.Info("Old continue : %v  ERR : %v ",redis_map,err.Error())
 				isUpdate=true
+				isProfile = false
 			}else{
 				continue
 			}
@@ -204,8 +205,8 @@ func (this *DBBuilder) ScanInc(Data_chan chan UpdateInfo) error {
 		}
 		
 		if isUpdate{
-			//this.Logger.Info("Must Update ,Old : %v ",redis_map)
-			//this.Logger.Info("Must Update ,New : %v ",new_values)
+			this.Logger.Info("Must Update ,Old : %v ",redis_map)
+			this.Logger.Info("Must Update ,New : %v ",new_values)
 			this.RedisCli.SetFields(0, new_values)
 			upinfo := UpdateInfo{new_values,isProfile,make(chan error)}
 			Data_chan <- upinfo

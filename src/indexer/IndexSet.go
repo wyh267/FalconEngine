@@ -705,6 +705,7 @@ func (this *IndexSet) UpdateInvert(k,v string,doc_id int64){
 		if field_info.FType == "N" {
 			v_num, err := strconv.ParseInt(v, 0, 0)
 			if err != nil {
+				v_num=0
 				this.Logger.Error("ERROR : %v", err)
 			}
 
@@ -734,18 +735,19 @@ func (this *IndexSet) UpdateProfile(k,v string,doc_id int64) {
 
 			err := this.PflIndex[k].Put(doc_id, v)
 			if err != nil {
-				this.Logger.Error("ERROR : %v", err)
+				this.Logger.Error("ERROR : %v  Key : %v", err,k)
 			}
 		}
 
 		if field_info.FType == "N" {
 			v_num, err := strconv.ParseInt(v, 0, 0)
 			if err != nil {
-				this.Logger.Error("ERROR : %v", err)
+				v_num=0
+				this.Logger.Error("ERROR : %v  Key : %v", err,k)
 			}
 			err = this.PflIndex[k].Put(doc_id, v_num)
 			if err != nil {
-				this.Logger.Error("ERROR : %v", err)
+				this.Logger.Error("ERROR : %v Key : %v ", err,k)
 			}
 		}
 	}
