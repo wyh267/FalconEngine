@@ -322,7 +322,7 @@ func (this *DBBuilder) Buiding() error {
 					v_num, err := strconv.ParseInt(v, 0, 0)
 					if err != nil {
 						v_num=0
-						this.Logger.Warning("Warning : name : [%v] , value: [%v] , error : [%v]", this.Fields[index].Name,v,err)
+						this.Logger.Warn("Warning : name : [%v] , value: [%v] , error : [%v]", this.Fields[index].Name,v,err)
 					}
 
 					err = builder.BuildNumberIndex(doc_id, v_num, this.Fields[index].IvtIdx, this.Fields[index].IvtNumDic)
@@ -347,7 +347,7 @@ func (this *DBBuilder) Buiding() error {
 					v_num, err := strconv.ParseInt(v, 0, 0)
 					if err != nil {
 						v_num=0
-						this.Logger.Warning("Warning : name : %v , value: %v , error : %v", this.Fields[index].Name,v,err)
+						this.Logger.Warn("Warning : name : %v , value: %v , error : %v", this.Fields[index].Name,v,err)
 					}
 					err = this.Fields[index].PlfNumber.PutProfile(doc_id, v_num)
 					if err != nil {
