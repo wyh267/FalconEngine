@@ -12,12 +12,13 @@ package main
 import (
 	"BaseFunctions"
 	"encoding/json"
+	"errors"
+	"fmt"
+	//"github.com/Shopify/sarma"
 	"indexer"
 	"net/url"
 	"strconv"
 	"utils"
-	"errors"
-	"fmt"
 )
 
 type Searcher struct {
@@ -38,10 +39,10 @@ const QUERY string = "query"
 
 func (this *Searcher) SearchCount(log_id string, body []byte, params map[string]string, result map[string]interface{}, ftime func(string) string) error {
 
-	this.Logger.Info("[LOG_ID:%v]Running Searcher ....Time: %v ", log_id, ftime("Process running"))
+	this.Logger.Info("[LOG_ID:%v] Begin to Counting....Time: %v ", log_id, ftime("SearchCount"))
 	searchRules, _, err := this.ParseSearchInfo(log_id, params, body)
 	if err != nil {
-		this.Logger.Error("[LOG_ID:%v]Running Searcher ..err : %v ..Time: %v ", log_id, err, ftime("search fields"))
+		this.Logger.Error("[LOG_ID:%v] Counting error : %v ..Time: %v ", log_id, err, ftime("search fields"))
 		result["DATA"] = "NO DATA"
 		result["COUNT"] = 0
 		result["HAS_RESULT"] = 0
@@ -49,14 +50,14 @@ func (this *Searcher) SearchCount(log_id string, body []byte, params map[string]
 
 	}
 
-	this.Logger.Info("[LOG_ID:%v]Running Searcher  %v....Time: %v ", log_id, searchRules, ftime("ParseSearchInfo"))
+	//this.Logger.Info("[LOG_ID:%v]Running Searcher  %v....Time: %v ", log_id, searchRules, ftime("ParseSearchInfo"))
 
 	total_doc_ids := make([]utils.DocIdInfo, 0)
 	for _, search_rule := range searchRules {
 		doc_ids, _ := this.Indexer.SearchByRules(search_rule.SR)
-		this.Logger.Info("[LOG_ID:%v]Running Searcher ....Time: %v ", log_id, ftime("search fields"))
+		//this.Logger.Info("[LOG_ID:%v]Running Searcher ....Time: %v ", log_id, ftime("search fields"))
 		doc_ids, _ = this.Indexer.FilterByRules(doc_ids, search_rule.FR)
-		this.Logger.Info("[LOG_ID:%v]Running Searcher ....Time: %v ", log_id, ftime("fliter fields"))
+		//this.Logger.Info("[LOG_ID:%v]Running Searcher ....Time: %v ", log_id, ftime("fliter fields"))
 		total_doc_ids, _ = utils.Merge(total_doc_ids, doc_ids)
 	}
 	result["COUNT"] = len(total_doc_ids)
@@ -65,62 +66,61 @@ func (this *Searcher) SearchCount(log_id string, body []byte, params map[string]
 	} else {
 		result["HAS_RESULT"] = 1
 	}
+
+	this.Logger.Info("[LOG_ID:%v] End Counting....Time: %v \n\n", log_id, ftime("SearchCount"))
+
 	return nil
 
 }
 
-
-
-
-
 func (this *Searcher) ComputeScore(log_id string, body []byte, params map[string]string, result map[string]interface{}, ftime func(string) string) error {
 
-	this.Logger.Info("[LOG_ID:%v]Running ComputeScore ....Time: %v ", log_id, ftime("Process running"))
-	cid,err := strconv.ParseInt(params["cid"], 0, 0)
-	if err!= nil{
-		this.Logger.Error("No CID.... Error : %v",err)
+	this.Logger.Info("[LOG_ID:%v] Begin to ComputeScore ....Time: %v ", log_id, ftime("ComputeScore"))
+	cid, err := strconv.ParseInt(params["cid"], 0, 0)
+	if err != nil {
+		this.Logger.Error("No CID.... Error : %v", err)
 		return err
 	}
-	searchRule := make([]indexer.SearchRule,0)
-	searchRule = append(searchRule,indexer.SearchRule{Field:"cid",Query:cid})
+	searchRule := make([]indexer.SearchRule, 0)
+	searchRule = append(searchRule, indexer.SearchRule{Field: "cid", Query: cid})
 	doc_ids, ok := this.Indexer.SearchByRules(searchRule)
 	if !ok {
 		return errors.New("No Data")
 	}
-	
+
 	const COMPUTINGSCORE_SQL string = "UPDATE jzl_user_score SET status=?,last_modify_time=NOW() WHERE cid=?"
 	err = this.DbAdaptor.ExecFormat(COMPUTINGSCORE_SQL, 1, cid)
 	if err != nil {
-		this.Logger.Error("[LOG_ID:%v]  %v", log_id, err)
+		this.Logger.Error("[LOG_ID:%v] ComputeScore error :  %v", log_id, err)
 		return err
 	}
-	
-	for _,doc_id := range doc_ids{
+
+	for _, doc_id := range doc_ids {
 		id, fields := this.Indexer.GetId(doc_id)
 		info, err := this.RedisCli.GetFields(id, fields)
 		if err != nil {
 			this.Logger.Error("%v", err)
 			continue
 		}
-		score,err:=utils.ComputScore(body,info)
-		if err!=nil{
+		score, err := utils.ComputScore(body, info)
+		if err != nil {
 			this.Logger.Error("%v", err)
 			continue
 		}
-		info["score"]=fmt.Sprintf("%v",score)
+		info["score"] = fmt.Sprintf("%v", score)
 		//写入正排文件中
 		/*
-		upinfo := builder.UpdateInfo{info,true,make(chan error)}
-		Data_chan <- upinfo
-		errinfo:= <-upinfo.ErrChan
-		if errinfo != nil {
-			this.Logger.Info("Update Fail.... %v ", errinfo)
-		}else{
-			this.Logger.Info("Update Success.... ")
-		}
-			
-		//写入redis中
-		//this.RedisCli.SetFields(0, info)
+			upinfo := builder.UpdateInfo{info,true,make(chan error)}
+			Data_chan <- upinfo
+			errinfo:= <-upinfo.ErrChan
+			if errinfo != nil {
+				this.Logger.Info("Update Fail.... %v ", errinfo)
+			}else{
+				this.Logger.Info("Update Success.... ")
+			}
+
+			//写入redis中
+			//this.RedisCli.SetFields(0, info)
 		*/
 		//写入数据库中
 		const UPDATESCORE_SQL string = "UPDATE jzl_dmp SET score=?,last_modify_time=NOW() WHERE cid=? AND contact_id=?"
@@ -130,26 +130,38 @@ func (this *Searcher) ComputeScore(log_id string, body []byte, params map[string
 			return err
 		}
 		
+
+	}
+
+
+	//读取redis数据
+	group_infos,err := this.RemoteRedisCli.GetGroupInfos(cid)
+	if err != nil {
+		this.Logger.Error("[LOG_ID:%v] ComputeScore GroupContact Error : %v", log_id, err)
+		return err
 	}
 	
+	for _,group_info := range group_infos {
+		err := this.GroupContact(log_id,[]byte(group_info),params,result,ftime)
+		if err != nil {
+			this.Logger.Error("[LOG_ID:%v] ComputeScore GroupContact Error : %v", log_id, err)
+		}
+	}
+
 	err = this.DbAdaptor.ExecFormat(COMPUTINGSCORE_SQL, 0, cid)
 	if err != nil {
 		this.Logger.Error("[LOG_ID:%v]  %v", log_id, err)
 		return err
 	}
-	
+	this.Logger.Info("[LOG_ID:%v] End ComputeScore ....Time: %v \n\n", log_id, ftime("ComputeScore"))
 	return nil
 }
 
-
-
-
-
 func (this *Searcher) GroupContact(log_id string, body []byte, params map[string]string, result map[string]interface{}, ftime func(string) string) error {
-	this.Logger.Info("[LOG_ID:%v]Running GroupContact ....Time: %v ", log_id, ftime("Process running"))
+	this.Logger.Info("[LOG_ID:%v] Begin to Grouping ....Time: %v ", log_id, ftime("GroupContact"))
 	searchRules, si, err := this.ParseSearchInfo(log_id, params, body)
 	if err != nil || si.Id == 0 {
-		this.Logger.Error("[LOG_ID:%v]Running GroupContact ..err : %v ..Time: %v ", log_id, err, ftime("search fields"))
+		this.Logger.Error("[LOG_ID:%v] GroupContact error : %v ..Time: %v ", log_id, err, ftime("search fields"))
 		result["DATA"] = "NO DATA"
 		result["COUNT"] = 0
 		result["HAS_RESULT"] = 0
@@ -157,14 +169,14 @@ func (this *Searcher) GroupContact(log_id string, body []byte, params map[string
 
 	}
 
-	this.Logger.Info("[LOG_ID:%v]Running GroupContact  %v....Time: %v ", log_id, searchRules, ftime("ParseSearchInfo"))
+	//this.Logger.Info("[LOG_ID:%v]Running GroupContact  %v....Time: %v ", log_id, searchRules, ftime("ParseSearchInfo"))
 
 	total_doc_ids := make([]utils.DocIdInfo, 0)
 	for _, search_rule := range searchRules {
 		doc_ids, _ := this.Indexer.SearchByRules(search_rule.SR)
-		this.Logger.Info("[LOG_ID:%v]Running GroupContact ....Time: %v ", log_id, ftime("search fields"))
+		//this.Logger.Info("[LOG_ID:%v]Running GroupContact ....Time: %v ", log_id, ftime("search fields"))
 		doc_ids, _ = this.Indexer.FilterByRules(doc_ids, search_rule.FR)
-		this.Logger.Info("[LOG_ID:%v]Running GroupContact ....Time: %v ", log_id, ftime("fliter fields"))
+		//this.Logger.Info("[LOG_ID:%v]Running GroupContact ....Time: %v ", log_id, ftime("fliter fields"))
 		total_doc_ids, _ = utils.Merge(total_doc_ids, doc_ids)
 	}
 
@@ -187,7 +199,7 @@ func (this *Searcher) GroupContact(log_id string, body []byte, params map[string
 			return err
 		}
 	}
-
+	this.Logger.Info("[LOG_ID:%v] End Grouping ....Time: %v \n\n", log_id, ftime("GroupContact"))
 	return nil
 
 }
@@ -200,9 +212,9 @@ func (this *Searcher) SimpleSearch(log_id string, body []byte, params map[string
 		result["DATA"] = "NO DATA"
 		return nil
 	}
-	this.Logger.Info("[LOG_ID:%v]Running Searcher ....Time: %v ", log_id, ftime("search fields"))
+	//this.Logger.Info("[LOG_ID:%v]Running Searcher ....Time: %v ", log_id, ftime("search fields"))
 	total_doc_ids, _ = this.Indexer.FilterByRules(total_doc_ids, frules)
-	this.Logger.Info("[LOG_ID:%v]Running Searcher ....Time: %v ", log_id, ftime("fliter fields"))
+	//this.Logger.Info("[LOG_ID:%v]Running Searcher ....Time: %v ", log_id, ftime("fliter fields"))
 
 	var tmp_doc_ids []utils.DocIdInfo
 	if len(total_doc_ids) > 10 {
@@ -219,7 +231,7 @@ func (this *Searcher) SimpleSearch(log_id string, body []byte, params map[string
 		}
 		infos = append(infos, info)
 	}
-	this.Logger.Info("[LOG_ID:%v]Running Searcher ....Time: %v ", log_id, ftime("Display Detail"))
+	this.Logger.Info("[LOG_ID:%v]Running Simple Searcher ....Time: %v \n\n", log_id, ftime("Display Detail"))
 	result["DATA"] = infos
 	return nil
 	//
@@ -249,8 +261,8 @@ func (this *Searcher) Process(log_id string, body []byte, params map[string]stri
 		result["DATA"] = "OK"
 		return nil
 	}
-	
-	_,has_compute := params["_compute"]
+
+	_, has_compute := params["_compute"]
 	if has_compute {
 		go this.ComputeScore(log_id, body, params, result, ftime)
 		result["DATA"] = "OK"

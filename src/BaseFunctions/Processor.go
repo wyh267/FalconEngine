@@ -9,7 +9,7 @@ type BaseProcessor struct {
 	Logger            *log4jzl.Log4jzl
 	DbAdaptor         *DBAdaptor
 	RedisCli          *RedisClient
-	
+	RemoteRedisCli	  *RedisClient
 }
 
 

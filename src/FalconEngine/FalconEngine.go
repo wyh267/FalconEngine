@@ -51,7 +51,7 @@ func main() {
 	}
 	defer dbAdaptor.Release()
 
-	//初始化ID生成器
+	//初始化本地redis
 	redisClient, err := BaseFunctions.NewRedisClient(configure, logger)
 	if err != nil {
 		fmt.Printf("[ERROR] Create redisClient Error: %v\n", err)
@@ -59,9 +59,17 @@ func main() {
 	}
 	defer redisClient.Release()
 
+	//初始化远程redis
+	remoteRedisClient, err := BaseFunctions.NewRemoteRedisClient(configure, logger)
+	if err != nil {
+		fmt.Printf("[ERROR] Create redisClient Error: %v\n", err)
+		return
+	}
+	defer remoteRedisClient.Release()
+
 	if search == "search" {
 		
-		processor := &BaseFunctions.BaseProcessor{configure,logger,dbAdaptor,redisClient}
+		processor := &BaseFunctions.BaseProcessor{configure,logger,dbAdaptor,redisClient,remoteRedisClient}
 		bitmap := utils.NewBitmap()
 		fields, err := configure.GetTableFields()
 		if err != nil {
