@@ -732,7 +732,12 @@ func (this *IndexSet) UpdateProfile(k,v string,doc_id int64) {
 	if field_info.IsPlf {
 
 		if field_info.FType == "T" {
-
+			//添加日期类型的更新，仅精确到天 add by wuyinghao 2015-08-21
+			if field_info.SType == 5 {
+				vl:=strings.Split(v," ")
+				v=vl[0]
+			}
+			
 			err := this.PflIndex[k].Put(doc_id, v)
 			if err != nil {
 				this.Logger.Error("ERROR : %v  Key : %v", err,k)

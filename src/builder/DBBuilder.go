@@ -336,7 +336,11 @@ func (this *DBBuilder) Buiding() error {
 			if this.Fields[index].IsPlf {
 
 				if this.Fields[index].FType == "T" {
-
+					//添加日期类型的更新，仅精确到天 add by wuyinghao 2015-08-21
+					if this.Fields[index].SType == 5 {
+						vl:=strings.Split(v," ")
+						v=vl[0]
+					}
 					err := this.Fields[index].PlfText.PutProfile(doc_id, v)
 					if err != nil {
 						this.Logger.Error("ERROR : %v", err)
