@@ -55,6 +55,7 @@ func Merge(a []DocIdInfo, b []DocIdInfo) ([]DocIdInfo, bool) {
 			c = append(c, a[ia])
 			ia++
 			ib++
+			continue
 		}
 
 		if a[ia].DocId < b[ib].DocId {

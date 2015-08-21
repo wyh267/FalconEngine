@@ -18,6 +18,7 @@ type FieldInfo struct {
 	IsPlf     bool
 	FType     string
 	Name      string
+	SType	  int64
 	IvtIdx    *utils.InvertIdx
 	IvtStrDic *utils.StringIdxDic
 	IvtNumDic *utils.NumberIdxDic
@@ -63,7 +64,7 @@ func (this *DBBuilder) ParseConfigure() error {
 	for k, v := range fields {
 
 		l := strings.Split(v, ",")
-		if len(l) != 4 {
+		if len(l) != 5 {
 			this.Logger.Error("%v", errors.New("Wrong config file"))
 			return errors.New("Wrong config file")
 		}
@@ -88,6 +89,12 @@ func (this *DBBuilder) ParseConfigure() error {
 
 		fi.FType = l[3]
 		fi.Name = k
+		stype, err := strconv.ParseInt(l[4], 0, 0)
+		if err != nil {
+			return err
+		}
+		
+		fi.SType=stype
 
 		this.Fields = append(this.Fields, fi)
 	}
@@ -126,9 +133,11 @@ func (this *DBBuilder) ScanInc(Data_chan chan UpdateInfo) error {
 	
 	curr_time:= time.Now().Format("2006-01-02 15:04:05")
 	var fields string
+	isIvert := make(map[string]bool) 
 	for _, v := range this.Fields {
 		//构造sql语句
 		fields = fields + "," + v.Name
+		isIvert[v.Name] = v.IsIvt
 	}
 	
 	incSql,_ := this.Configure.GetIncSql()
@@ -144,6 +153,7 @@ func (this *DBBuilder) ScanInc(Data_chan chan UpdateInfo) error {
 	defer rows.Close()
 	for rows.Next() {
 		isUpdate := false
+		isProfile := true
 		//values := make([]interface{},len(this.Fields))
 		values := make([]interface{}, len(this.Fields))
 		writeCols := make([]string, len(this.Fields))
@@ -170,8 +180,9 @@ func (this *DBBuilder) ScanInc(Data_chan chan UpdateInfo) error {
 		redis_map,err:=this.RedisCli.GetFields(new_values["id"],fieldlist)
 		if err != nil {
 			if err.Error() == "redigo: nil returned"{
-				this.Logger.Info("Old continue : %v  ERR : %v ",redis_map,err.Error())
+				//this.Logger.Info("Old continue : %v  ERR : %v ",redis_map,err.Error())
 				isUpdate=true
+				isProfile = false
 			}else{
 				continue
 			}
@@ -182,11 +193,14 @@ func (this *DBBuilder) ScanInc(Data_chan chan UpdateInfo) error {
 			if !ok{
 				break
 			}
+			
 			//this.Logger.Info("K : %v ==== V : %v === VV : %v",k,v,vv)
 			if (v != vv) && k != incField {
 				isUpdate = true
 				curr_time = new_values[incField]
-				break
+				if isIvert[k] {
+					isProfile = false
+				}
 			}
 		}
 		
@@ -194,13 +208,13 @@ func (this *DBBuilder) ScanInc(Data_chan chan UpdateInfo) error {
 			this.Logger.Info("Must Update ,Old : %v ",redis_map)
 			this.Logger.Info("Must Update ,New : %v ",new_values)
 			this.RedisCli.SetFields(0, new_values)
-			upinfo := UpdateInfo{new_values,false,make(chan error)}
+			upinfo := UpdateInfo{new_values,isProfile,make(chan error)}
 			Data_chan <- upinfo
 			errinfo:= <-upinfo.ErrChan
 			if errinfo != nil {
 				this.Logger.Info("Update Fail.... %v ", errinfo)
 			}else{
-				this.Logger.Info("Update success....")
+				this.Logger.Info("Update Success.... ")
 			}
 		}
 		
@@ -235,13 +249,18 @@ func (this *DBBuilder) Buiding() error {
 
 			if v.FType == "T" {
 				this.Fields[index].IvtIdx = utils.NewInvertIdx(utils.TYPE_TEXT, v.Name)
-				this.Fields[index].IvtStrDic = utils.NewStringIdxDic(10000)
+				this.Fields[index].IvtStrDic = utils.NewStringIdxDic(5001)
 
 			}
 
 			if v.FType == "N" {
 				this.Fields[index].IvtIdx = utils.NewInvertIdx(utils.TYPE_NUM, v.Name)
-				this.Fields[index].IvtNumDic = utils.NewNumberIdxDic(1)
+				if v.IsPK {
+					this.Fields[index].IvtNumDic = utils.NewNumberIdxDic(1)
+				}else{
+					this.Fields[index].IvtNumDic = utils.NewNumberIdxDic(4)
+				}
+				
 
 			}
 		}
@@ -258,7 +277,7 @@ func (this *DBBuilder) Buiding() error {
 		}
 
 	}
-
+	fmt.Printf("%v\n",fields)
 	sql := fmt.Sprintf(this.sql, fields[1:len(fields)])
 	fmt.Printf("SQL :: %v \n", sql)
 
@@ -293,7 +312,7 @@ func (this *DBBuilder) Buiding() error {
 			if this.Fields[index].IsIvt {
 
 				if this.Fields[index].FType == "T" {
-					err := builder.BuildTextIndex(doc_id, v, this.Fields[index].IvtIdx, this.Fields[index].IvtStrDic)
+					err := builder.BuildTextIndex(doc_id, v, this.Fields[index].IvtIdx, this.Fields[index].IvtStrDic,this.Fields[index].SType)
 					if err != nil {
 						this.Logger.Error("ERROR : %v", err)
 					}
@@ -302,7 +321,8 @@ func (this *DBBuilder) Buiding() error {
 				if this.Fields[index].FType == "N" {
 					v_num, err := strconv.ParseInt(v, 0, 0)
 					if err != nil {
-						this.Logger.Error("ERROR : %v", err)
+						v_num=0
+						this.Logger.Warn("Warning : name : [%v] , value: [%v] , error : [%v]", this.Fields[index].Name,v,err)
 					}
 
 					err = builder.BuildNumberIndex(doc_id, v_num, this.Fields[index].IvtIdx, this.Fields[index].IvtNumDic)
@@ -316,7 +336,11 @@ func (this *DBBuilder) Buiding() error {
 			if this.Fields[index].IsPlf {
 
 				if this.Fields[index].FType == "T" {
-
+					//添加日期类型的更新，仅精确到天 add by wuyinghao 2015-08-21
+					if this.Fields[index].SType == 5 {
+						vl:=strings.Split(v," ")
+						v=vl[0]
+					}
 					err := this.Fields[index].PlfText.PutProfile(doc_id, v)
 					if err != nil {
 						this.Logger.Error("ERROR : %v", err)
@@ -326,7 +350,8 @@ func (this *DBBuilder) Buiding() error {
 				if this.Fields[index].FType == "N" {
 					v_num, err := strconv.ParseInt(v, 0, 0)
 					if err != nil {
-						this.Logger.Error("ERROR : %v", err)
+						v_num=0
+						this.Logger.Warn("Warning : name : %v , value: %v , error : %v", this.Fields[index].Name,v,err)
 					}
 					err = this.Fields[index].PlfNumber.PutProfile(doc_id, v_num)
 					if err != nil {
@@ -346,25 +371,34 @@ func (this *DBBuilder) Buiding() error {
 		}
 		
 		doc_id++
-
-		this.Logger.Info("DOC_ID : %v  VALUE : %v", doc_id, writeCols)
+		if doc_id % 5000 == 0 {
+			this.Logger.Info("processing doc_id :  %v \n",doc_id)
+		}
+		//this.Logger.Info("DOC_ID : %v  VALUE : %v", doc_id, writeCols)
 
 	}
-
+	//writeCount:=0  
+	//var writeChan chan int
 	for index, fields := range this.Fields {
 
 		if this.Fields[index].IsIvt {
 
+			//utils.WriteToJsonWithChan(fields.IvtIdx, fmt.Sprintf("./index/%v_idx.json", fields.Name),writeChan)
 			utils.WriteToJson(fields.IvtIdx, fmt.Sprintf("./index/%v_idx.json", fields.Name))
+			//writeCount++
 			if this.Fields[index].FType == "T" {
 
+				//utils.WriteToJsonWithChan(fields.IvtStrDic, fmt.Sprintf("./index/%v_dic.json", fields.Name),writeChan)
 				utils.WriteToJson(fields.IvtStrDic, fmt.Sprintf("./index/%v_dic.json", fields.Name))
+				//writeCount++
 
 			}
 
 			if this.Fields[index].FType == "N" {
 
+				//utils.WriteToJsonWithChan(fields.IvtNumDic, fmt.Sprintf("./index/%v_dic.json", fields.Name),writeChan)
 				utils.WriteToJson(fields.IvtNumDic, fmt.Sprintf("./index/%v_dic.json", fields.Name))
+				//writeCount++
 			}
 
 		}
@@ -373,20 +407,37 @@ func (this *DBBuilder) Buiding() error {
 
 			if this.Fields[index].FType == "T" {
 
+				//utils.WriteToJsonWithChan(fields.PlfText, fmt.Sprintf("./index/%v_pfl.json", fields.Name),writeChan)
 				utils.WriteToJson(fields.PlfText, fmt.Sprintf("./index/%v_pfl.json", fields.Name))
+				//writeCount++
 
 			}
 
 			if this.Fields[index].FType == "N" {
 
+				//utils.WriteToJsonWithChan(fields.PlfNumber, fmt.Sprintf("./index/%v_pfl.json", fields.Name),writeChan)
 				utils.WriteToJson(fields.PlfNumber, fmt.Sprintf("./index/%v_pfl.json", fields.Name))
+				//writeCount++
 
 			}
 
 		}
 
 	}
-
+/*	
+	fmt.Printf("writeCount : %v \n ",writeCount)
+	for {
+		select{
+			case <-writeChan:
+				writeCount--
+				fmt.Printf("recive writeCount : %v \n ",writeCount)
+				if writeCount == 0 {
+					fmt.Printf("Finish building index...\n")
+					return nil
+				}
+		}
+	}
+*/
 	return nil
 
 }

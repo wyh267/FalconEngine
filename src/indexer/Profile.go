@@ -25,10 +25,19 @@ type Profile struct {
 	Len  int64
 }
 
+
+
+const FILT_TYPE_LESS  int64 = 1 
+const FILT_TYPE_ABOVE int64 = 2 
+const FILT_TYPE_EQUAL int64 = 3
+const FILT_TYPE_UNEQUAL int64= 4 
+
+
+
 type ProfileInterface interface {
 	Put(doc_id int64, value interface{}) error
 	Find(doc_id int64) (interface{}, error)
-	Filter(doc_ids []u.DocIdInfo, value interface{}, is_forward bool) ([]u.DocIdInfo, error)
+	Filter(doc_ids []u.DocIdInfo, value interface{}, is_forward bool,filt_type int64) ([]u.DocIdInfo, error)
 	Display()
 	GetType() int64
 	GetMaxDocId() int64

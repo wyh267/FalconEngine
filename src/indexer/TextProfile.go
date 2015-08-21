@@ -60,23 +60,40 @@ func (this *TextProfile) FindValue(doc_id int64) (string, error) {
 
 }
 
-func (this *TextProfile) FilterValue(doc_ids []u.DocIdInfo, value string, is_forward bool) ([]u.DocIdInfo, error) {
+func (this *TextProfile) FilterValue(doc_ids []u.DocIdInfo, value string, is_forward bool,filt_type int64) ([]u.DocIdInfo, error) {
 
 	res := make([]u.DocIdInfo, 0, 1000)
-	if is_forward == true {
-
-		for i, _ := range doc_ids {
-			if this.ProfileList[doc_ids[i].DocId] == value {
-				res = append(res, doc_ids[i])
+	switch filt_type {
+		case FILT_TYPE_LESS:
+			for i, _ := range doc_ids {
+				if this.ProfileList[doc_ids[i].DocId] < value {
+					res = append(res, doc_ids[i])
+				}
 			}
-		}
-
-	} else {
-		for i, _ := range doc_ids {
-			if this.ProfileList[doc_ids[i].DocId] != value {
-				res = append(res, doc_ids[i])
+		case FILT_TYPE_ABOVE:
+			for i, _ := range doc_ids {
+				if this.ProfileList[doc_ids[i].DocId] > value {
+					res = append(res, doc_ids[i])
+				}
 			}
-		}
+		case FILT_TYPE_EQUAL:
+			for i, _ := range doc_ids {
+				if this.ProfileList[doc_ids[i].DocId] == value {
+					res = append(res, doc_ids[i])
+				}
+			}
+		case FILT_TYPE_UNEQUAL:
+			for i, _ := range doc_ids {
+				if this.ProfileList[doc_ids[i].DocId] != value {
+					res = append(res, doc_ids[i])
+				}
+			}
+		default:
+			for i, _ := range doc_ids {
+				if this.ProfileList[doc_ids[i].DocId] == value {
+					res = append(res, doc_ids[i])
+				}
+			}
 	}
 
 	return res, nil
@@ -97,7 +114,7 @@ func (this *TextProfile) Find(doc_id int64) (interface{}, error) {
 	return this.FindValue(doc_id)
 }
 
-func (this *TextProfile) Filter(doc_ids []u.DocIdInfo, value interface{}, is_forward bool) ([]u.DocIdInfo, error) {
+func (this *TextProfile) Filter(doc_ids []u.DocIdInfo, value interface{}, is_forward bool,filt_type int64) ([]u.DocIdInfo, error) {
 
 	if doc_ids == nil {
 		return nil, nil
@@ -108,7 +125,7 @@ func (this *TextProfile) Filter(doc_ids []u.DocIdInfo, value interface{}, is_for
 		return doc_ids, nil
 	}
 
-	return this.FilterValue(doc_ids, value_str, is_forward)
+	return this.FilterValue(doc_ids, value_str, is_forward,filt_type)
 
 }
 

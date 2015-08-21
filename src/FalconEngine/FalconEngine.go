@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"utils"
 	"builder"
+	"runtime"
 )
 
 
@@ -20,11 +21,14 @@ func main() {
 	//读取启动参数
 	var configFile string
 	var search string
+	var cores int
 	var err error
 	flag.StringVar(&configFile, "conf", "search.conf", "configure file full path")
 	flag.StringVar(&search, "mode", "search", "start mode[ search | build ]")
+	flag.IntVar(&cores,"core",4,"cpu cores")
 	flag.Parse()
 
+	runtime.GOMAXPROCS(cores)
 	//读取配置文件
 	configure, err := BaseFunctions.NewConfigure(configFile)
 	if err != nil {

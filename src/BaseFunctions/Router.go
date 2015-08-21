@@ -116,14 +116,14 @@ func (this *Router) createJSON(result map[string]interface{}) (string, error) {
 func (this *Router) ParseURL(url string) (int64,error) {
 	//确定是否是本服务能提供的控制类型
 
-	urlPattern:= "(search|update)\\?"//this.Configure.GetUrlPattern()
+	urlPattern:= "(search|update|contrl)\\?"//this.Configure.GetUrlPattern()
 	urlRegexp, err := regexp.Compile(urlPattern)
 	if err != nil {
 		return -1,err
 	}
 	matchs := urlRegexp.FindStringSubmatch(url)
 	if matchs == nil {
-		return -1,errors.New("ERR")
+		return -1,errors.New("URL ERROR ")
 	}
 	resource := matchs[1]
 	if resource == "search"{
@@ -131,6 +131,9 @@ func (this *Router) ParseURL(url string) (int64,error) {
 	}
 	if resource == "update"{
 		return 2,nil
+	}
+	if resource == "update"{
+		return 3,nil
 	}
 	
 	return -1,errors.New("Error")
@@ -176,6 +179,7 @@ func (this *Router) parseArgs(r *http.Request) (map[string]string, error) {
 
 	//每次都重新生成一个新的map，否则之前请求的参数会保留其中
 	res := make(map[string]string)
+	fmt.Printf("Form :: %v ",r.Form)
 	for k, v := range r.Form {
 		res[k] = v[0]
 	}

@@ -34,11 +34,12 @@ type IndexSet struct {
 
 
 type IndexFieldInfo struct {
-	IsPK      bool
-	IsIvt     bool
-	IsPlf     bool
-	FType     string
-	Name      string
+	IsPK      bool		`json:"Is PK"`
+	IsIvt     bool		`json:"Is Invert"`
+	IsPlf     bool		`json:"Is Profile"`
+	FType     string	`json:"Field Type"`
+	Name      string	`json:"Field Name"`
+	SType	  int64		`json:"Search Type"`
 }
 
 
@@ -156,11 +157,11 @@ func (this *IndexSet) GetIdxType(field string) int64 {
 func (this *IndexSet) InitIndexSet(fields map[string]string) error {
 	for k, v := range fields {
 		l := strings.Split(v, ",")
-		if len(l) != 4 {
+		if len(l) != 5 {
 			this.Logger.Error("%v", errors.New("Wrong config file"))
 			return errors.New("Wrong configure for index")
 		}
-		this.FieldInfo[k]=&IndexFieldInfo{false,false,false,"N",k}
+		this.FieldInfo[k]=&IndexFieldInfo{false,false,false,"N",k,0}
 		if l[0] == "1"{
 			this.PrimaryKey=k
 			this.FieldInfo[k].IsPK=true
@@ -189,6 +190,13 @@ func (this *IndexSet) InitIndexSet(fields map[string]string) error {
 				}
 				index := NewTextIndex(k, &idx, &dic)
 				this.PutIndex(k, index)
+				
+				stype, err := strconv.ParseInt(l[4], 0, 0)
+				if err != nil {
+					return err
+				}
+				
+				this.FieldInfo[k].SType=stype
 
 			} else { //number ivt
 				var dic utils.NumberIdxDic
@@ -279,7 +287,7 @@ func (this *IndexSet) SearchByRules(rules /*map[string]interface{}*/[]SearchRule
 	}
 
 	//BitMap过滤失效的doc_id
-	this.Logger.Info(" %v ",res)
+	//this.Logger.Info(" %v ",res)
 	r:=make([]utils.DocIdInfo,0)
 	for i,_:=range res{
 		//this.Logger.Info(" %v ",res[i].DocId)
@@ -337,15 +345,23 @@ func (this *IndexSet) SearchField(query interface{}, field string) ([]utils.DocI
 
 		return this.SearchFieldByNumber(query_num, field)
 	}
+	
+	
+	query_num_float, ok := query.(float64)
+	if ok {
+
+		return this.SearchFieldByNumber(int64(query_num_float), field)
+	}
 
 	return nil, false
 
 }
 
 type FilterRule struct {
-	Field     string
-	IsForward bool
-	Value     interface{}
+	Field     	string
+	IsForward 	bool
+	FiltType	int64
+	Value     	interface{}
 }
 
 /*****************************************************************************
@@ -366,7 +382,7 @@ func (this *IndexSet) FilterByRules(doc_ids []utils.DocIdInfo, rules []FilterRul
 			continue
 		}
 
-		res, _ = this.PflIndex[rule.Field].Filter(res, rule.Value, rule.IsForward)
+		res, _ = this.PflIndex[rule.Field].Filter(res, rule.Value, rule.IsForward,rule.FiltType)
 	}
 	return res, nil
 
@@ -490,8 +506,21 @@ func (this *IndexSet) SearchNumber(query int64) ([]utils.DocIdInfo, bool) {
 ******************************************************************************/
 func (this *IndexSet) SearchFieldByString(query string, field string) ([]utils.DocIdInfo, bool) {
 
+
+
+	var terms []string
+	
+	switch this.FieldInfo[field].SType{
+		case 1:	//正常切词
+			terms = utils.RemoveDuplicatesAndEmpty(this.Segmenter.Segment(query, false))
+		case 2: //按单个字符进行切词
+			terms = utils.RemoveDuplicatesAndEmpty(strings.Split(query, ""))
+		case 3: //按规定的分隔符进行切词
+			terms = utils.RemoveDuplicatesAndEmpty(strings.Split(query, ","))
+	}
+
 	//按照最大切分进行切词
-	terms := utils.RemoveDuplicatesAndEmpty(this.Segmenter.Segment(query, false))
+	//terms := utils.RemoveDuplicatesAndEmpty(this.Segmenter.Segment(query, false))
 	//this.Logger.Info("TERMS :: %v ", terms)
 	//首先按照字段检索
 	//交集结果
@@ -551,6 +580,20 @@ func (this *IndexSet) SearchFieldByNumber(query int64, field string) ([]utils.Do
 }
 
 
+func (this *IndexSet) GetId(doc_id utils.DocIdInfo) (int64,[]string){
+	tmp,_:=this.PflIndex["id"].Find(doc_id.DocId)
+	
+	t,_:=tmp.(int64)
+	//fmt.Printf("tmp : %v   t : %v \n",tmp,t)
+	
+	fields := make([]string,0)
+	for k,_ :=range this.FieldInfo{
+		fields=append(fields,k)
+	}
+	
+	return t,fields
+}
+
 
 func (this *IndexSet) GetDetails(doc_ids []utils.DocIdInfo) ([]int64,[]string){
 	
@@ -587,12 +630,12 @@ func (this *IndexSet) UpdateRecord(info map[string]string,isProfileUpdate bool) 
 	//检查是否有PrimaryKey字段，如果没有的话，不允许更新
 	_,hasPK:=info[this.PrimaryKey]
 	if !hasPK{
-		this.Logger.Error("No Primary Key,Update is now allow ")
-		return errors.New("No Primary Key,Update is now allow")
+		this.Logger.Error("No Primary Key,Update is not allow ")
+		return errors.New("No Primary Key,Update is not allow")
 	}
 	pk, err := strconv.ParseInt(info[this.PrimaryKey], 0, 0)
 	if err != nil {
-		this.Logger.Error("No Primary Key,Update is now allow  %v",  err)
+		this.Logger.Error("No Primary Key,Update is not allow  %v",  err)
 		return err
 	}
 	
@@ -653,7 +696,7 @@ func (this *IndexSet) UpdateInvert(k,v string,doc_id int64){
 	if field_info.IsIvt {
 
 		if field_info.FType == "T" {
-			err := this.IncBuilder.BuildTextIndex(doc_id, v, this.IvtIndex[k].GetIvtIndex(), this.IvtIndex[k].GetStrDic())
+			err := this.IncBuilder.BuildTextIndex(doc_id, v, this.IvtIndex[k].GetIvtIndex(), this.IvtIndex[k].GetStrDic(),field_info.SType)
 			if err != nil {
 				this.Logger.Error("ERROR : %v", err)
 			}
@@ -662,6 +705,7 @@ func (this *IndexSet) UpdateInvert(k,v string,doc_id int64){
 		if field_info.FType == "N" {
 			v_num, err := strconv.ParseInt(v, 0, 0)
 			if err != nil {
+				v_num=0
 				this.Logger.Error("ERROR : %v", err)
 			}
 
@@ -688,21 +732,27 @@ func (this *IndexSet) UpdateProfile(k,v string,doc_id int64) {
 	if field_info.IsPlf {
 
 		if field_info.FType == "T" {
-
+			//添加日期类型的更新，仅精确到天 add by wuyinghao 2015-08-21
+			if field_info.SType == 5 {
+				vl:=strings.Split(v," ")
+				v=vl[0]
+			}
+			
 			err := this.PflIndex[k].Put(doc_id, v)
 			if err != nil {
-				this.Logger.Error("ERROR : %v", err)
+				this.Logger.Error("ERROR : %v  Key : %v", err,k)
 			}
 		}
 
 		if field_info.FType == "N" {
 			v_num, err := strconv.ParseInt(v, 0, 0)
 			if err != nil {
-				this.Logger.Error("ERROR : %v", err)
+				v_num=0
+				this.Logger.Error("ERROR : %v  Key : %v", err,k)
 			}
 			err = this.PflIndex[k].Put(doc_id, v_num)
 			if err != nil {
-				this.Logger.Error("ERROR : %v", err)
+				this.Logger.Error("ERROR : %v Key : %v ", err,k)
 			}
 		}
 	}
@@ -710,3 +760,32 @@ func (this *IndexSet) UpdateProfile(k,v string,doc_id int64) {
 	
 	
 }
+
+
+
+type IndexInfo struct{
+	
+	MaxDocId  int64 `json:"Max_DOCID"`
+	Fields	  []IndexFieldInfo	`json:"Fields Info"`
+	
+}
+
+
+func (this *IndexSet) GetIndexInfo(res map[string]interface{})  {
+	
+
+	var index_info IndexInfo
+	
+	index_info.MaxDocId=this.MaxDocId
+	
+	for _,v := range this.FieldInfo{
+		index_info.Fields = append(index_info.Fields,*v)
+	}
+	
+	res["IndexInfo"] = index_info	
+	
+	return 
+	
+}
+
+
