@@ -345,7 +345,7 @@ func (this *DBBuilder) Buiding() error {
 				if this.Fields[index].FType == "N" {
 					v_num, err := strconv.ParseInt(v, 0, 0)
 					if err != nil {
-						this.Logger.Error("ERROR : %v", err)
+						this.Logger.Error("ERROR : name : %v , value: %v , error : %v", this.Fields[index].Name,v,err)
 					}
 					err = this.Fields[index].PlfNumber.PutProfile(doc_id, v_num)
 					if err != nil {
