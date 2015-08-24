@@ -56,7 +56,7 @@ type IndexFieldInfo struct {
 ******************************************************************************/
 func NewIndexSet(bitmap *utils.Bitmap,logger *log4jzl.Log4jzl) *IndexSet {
 	segment := utils.NewSegmenter("./data/dictionary.txt")
-	builder := &utils.IndexBuilder{segment}
+	builder := &utils.IndexBuilder{Segmenter:segment,TempIndex:make(map[string][]utils.TmpIdx),TempIndexNum:make(map[string]int64)}
 	this := &IndexSet{BitMap:bitmap,IncBuilder:builder,FieldInfo:make(map[string]*IndexFieldInfo),MaxDocId:0,PrimaryKey:"PK",Segmenter: segment, IvtIndex: make(map[string]IndexInterface), Logger: logger, PflIndex: make(map[string]ProfileInterface)}
 	return this
 

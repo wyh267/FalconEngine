@@ -214,7 +214,7 @@ func (this *Searcher) SimpleSearch(log_id string, body []byte, params map[string
 	}
 	//this.Logger.Info("[LOG_ID:%v]Running Searcher ....Time: %v ", log_id, ftime("search fields"))
 	total_doc_ids, _ = this.Indexer.FilterByRules(total_doc_ids, frules)
-	//this.Logger.Info("[LOG_ID:%v]Running Searcher ....Time: %v ", log_id, ftime("fliter fields"))
+	this.Logger.Info("[LOG_ID:%v]Running Searcher ....Time: %v ", log_id, ftime("search fields"))
 
 	var tmp_doc_ids []utils.DocIdInfo
 	if len(total_doc_ids) > 10 {

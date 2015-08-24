@@ -11,6 +11,10 @@ package utils
 
 import (
 	"fmt"
+	"bytes"
+	"encoding/binary"
+	"os"
+	"syscall"
 )
 
 //
@@ -27,10 +31,13 @@ type DocIdInfo struct {
 type InvertDocIdList struct {
 	Key       interface{}
 	DocIdList []DocIdInfo
+	StartPos  int64
+	EndPos	  int64
+	IncDocIdList	[]DocIdInfo
 }
 
 func NewInvertDocIdList(key interface{}) *InvertDocIdList {
-	this := &InvertDocIdList{key, make([]DocIdInfo, 0)}
+	this := &InvertDocIdList{key, make([]DocIdInfo, 0),0,0,make([]DocIdInfo, 0)}
 	return this
 }
 
@@ -65,7 +72,7 @@ type InvertIdx struct {
 func NewInvertIdx(idx_type int64, name string) *InvertIdx {
 
 	list := make([]InvertDocIdList, 1)
-	list[0] = InvertDocIdList{"nil", make([]DocIdInfo, 0)}
+	list[0] = InvertDocIdList{"nil", make([]DocIdInfo, 0),0,0,make([]DocIdInfo, 0)}
 	this := &InvertIdx{IdxType: idx_type, IdxName: name, IdxLen: 0, KeyInvertList: list}
 	return this
 
@@ -77,6 +84,21 @@ func (this *InvertIdx) GetInvertIndex(index int64) ([]DocIdInfo, bool) {
 		return nil, false
 	}
 
+	//./index/%v_idx.idx
+	f,_ := os.Open(fmt.Sprintf("./index/%v_idx.idx",this.IdxName))
+	//fmt.Printf("Start : %v   Lens : %v   file_name : %v  \n",this.KeyInvertList[index].StartPos,this.KeyInvertList[index].EndPos*8,fmt.Sprintf("./index/%v_idx.idx",this.IdxName))
+	defer f.Close()
+	b,err := syscall.Mmap(int(f.Fd()),this.KeyInvertList[index].StartPos,int(this.KeyInvertList[index].EndPos*8),syscall.PROT_READ,syscall.MAP_PRIVATE)
+	if err != nil{
+		fmt.Printf("MAPPING ERROR  %v \n",err)
+		return nil,false
+	}
+	defer syscall.Munmap(b)
+	//fmt.Printf("%x\n",b)
+	reader := bytes.NewReader(b)
+	this.KeyInvertList[index].DocIdList = make([]DocIdInfo,this.KeyInvertList[index].EndPos)
+	binary.Read(reader,binary.LittleEndian,this.KeyInvertList[index].DocIdList)
+	//fmt.Printf("DOC_IDS : %v \n",this.KeyInvertList[index].DocIdList)
 	return this.KeyInvertList[index].DocIdList, true
 
 }

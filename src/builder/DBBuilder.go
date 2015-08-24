@@ -290,7 +290,7 @@ func (this *DBBuilder) Buiding() error {
 	var doc_id int64
 	doc_id = 1
 	segment := utils.NewSegmenter("./data/dictionary.txt")
-	builder := &utils.IndexBuilder{segment}
+	builder := &utils.IndexBuilder{Segmenter:segment,TempIndex:make(map[string][]utils.TmpIdx),TempIndexNum:make(map[string]int64)}
 
 	for rows.Next() {
 		//values := make([]interface{},len(this.Fields))
@@ -313,6 +313,7 @@ func (this *DBBuilder) Buiding() error {
 
 				if this.Fields[index].FType == "T" {
 					err := builder.BuildTextIndex(doc_id, v, this.Fields[index].IvtIdx, this.Fields[index].IvtStrDic,this.Fields[index].SType)
+					//err := builder.BuildTextIndexTemp(doc_id, v, this.Fields[index].IvtIdx, this.Fields[index].IvtStrDic,this.Fields[index].SType,this.Fields[index].Name)
 					if err != nil {
 						this.Logger.Error("ERROR : %v", err)
 					}
@@ -326,6 +327,7 @@ func (this *DBBuilder) Buiding() error {
 					}
 
 					err = builder.BuildNumberIndex(doc_id, v_num, this.Fields[index].IvtIdx, this.Fields[index].IvtNumDic)
+					//err = builder.BuildNumberIndexTemp(doc_id, v_num, this.Fields[index].IvtIdx, this.Fields[index].IvtNumDic,this.Fields[index].Name)
 					if err != nil {
 						this.Logger.Error("ERROR : %v", err)
 					}
@@ -377,6 +379,12 @@ func (this *DBBuilder) Buiding() error {
 		//this.Logger.Info("DOC_ID : %v  VALUE : %v", doc_id, writeCols)
 
 	}
+	
+	
+	//写入全部数据
+	//builder.WriteAllTempIndexToFile()
+	//builder.WriteIndexToFile()
+	
 	//writeCount:=0  
 	//var writeChan chan int
 	for index, fields := range this.Fields {
@@ -384,6 +392,8 @@ func (this *DBBuilder) Buiding() error {
 		if this.Fields[index].IsIvt {
 
 			//utils.WriteToJsonWithChan(fields.IvtIdx, fmt.Sprintf("./index/%v_idx.json", fields.Name),writeChan)
+			//utils.WriteToJson(fields.IvtIdx, fmt.Sprintf("./index/%v_idx.json", fields.Name))
+			utils.WriteToIndexFile(fields.IvtIdx, fmt.Sprintf("./index/%v_idx.idx", fields.Name))
 			utils.WriteToJson(fields.IvtIdx, fmt.Sprintf("./index/%v_idx.json", fields.Name))
 			//writeCount++
 			if this.Fields[index].FType == "T" {
