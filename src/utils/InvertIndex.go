@@ -107,7 +107,7 @@ func (this *InvertIdx) GetInvertIndex(index int64) ([]DocIdInfo, bool) {
 	this.KeyInvertList[index].DocIdList = make([]DocIdInfo,lens,lens+len(this.KeyInvertList[index].IncDocIdList))
 	binary.Read(reader,binary.LittleEndian,this.KeyInvertList[index].DocIdList)
 	this.KeyInvertList[index].DocIdList=append(this.KeyInvertList[index].DocIdList,this.KeyInvertList[index].IncDocIdList...)
-	fmt.Printf("DOC_IDS : %v \n",this.KeyInvertList[index].DocIdList)
+	//fmt.Printf("DOC_IDS : %v \n",this.KeyInvertList[index].DocIdList)
 	return this.KeyInvertList[index].DocIdList, true
 
 }
