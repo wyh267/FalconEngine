@@ -106,7 +106,7 @@ func (this *InvertIdx) GetInvertIndex(index int64) ([]DocIdInfo, bool) {
 	//page_offset:=int(this.KeyInvertList[index].StartPos) % 4096
 	//resultSize := int(page_offset+lens*8)
 
-	this.MmapBytes,err = syscall.Mmap(int(f.Fd()),0,fi.Size(),syscall.PROT_READ,syscall.MAP_PRIVATE)
+	this.MmapBytes,err = syscall.Mmap(int(f.Fd()),0,int(fi.Size()),syscall.PROT_READ,syscall.MAP_PRIVATE)
 
 	if err != nil{
 		fmt.Printf("MAPPING ERROR  %v \n",err)
