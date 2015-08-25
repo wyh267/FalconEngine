@@ -15,6 +15,7 @@ import (
 	"encoding/binary"
 	"os"
 	"syscall"
+	//"unsafe"
 )
 
 //
@@ -88,17 +89,25 @@ func (this *InvertIdx) GetInvertIndex(index int64) ([]DocIdInfo, bool) {
 	f,_ := os.Open(fmt.Sprintf("./index/%v_idx.idx",this.IdxName))
 	//fmt.Printf("Start : %v   Lens : %v   file_name : %v  \n",this.KeyInvertList[index].StartPos,this.KeyInvertList[index].EndPos*8,fmt.Sprintf("./index/%v_idx.idx",this.IdxName))
 	defer f.Close()
-	b,err := syscall.Mmap(int(f.Fd()),this.KeyInvertList[index].StartPos,int(this.KeyInvertList[index].EndPos*8),syscall.PROT_READ,syscall.MAP_PRIVATE)
+	lens := int(this.KeyInvertList[index].EndPos)
+	b,err := syscall.Mmap(int(f.Fd()),this.KeyInvertList[index].StartPos,lens*8,syscall.PROT_READ,syscall.MAP_PRIVATE)
 	if err != nil{
 		fmt.Printf("MAPPING ERROR  %v \n",err)
 		return nil,false
 	}
 	defer syscall.Munmap(b)
 	//fmt.Printf("%x\n",b)
+	//var doc_list *DocIdInfo
+	//this.KeyInvertList[index].DocIdList=(*DocIdInfo)b
+	//index_len:=int(this.KeyInvertList[index].EndPos)
+	//p:=(*[20]DocIdInfo)(unsafe.Pointer(&b))
+
+	//fmt.Printf("%v \n",p)
 	reader := bytes.NewReader(b)
-	this.KeyInvertList[index].DocIdList = make([]DocIdInfo,this.KeyInvertList[index].EndPos)
+	this.KeyInvertList[index].DocIdList = make([]DocIdInfo,lens,lens+len(this.KeyInvertList[index].IncDocIdList))
 	binary.Read(reader,binary.LittleEndian,this.KeyInvertList[index].DocIdList)
-	//fmt.Printf("DOC_IDS : %v \n",this.KeyInvertList[index].DocIdList)
+	this.KeyInvertList[index].DocIdList=append(this.KeyInvertList[index].DocIdList,this.KeyInvertList[index].IncDocIdList...)
+	fmt.Printf("DOC_IDS : %v \n",this.KeyInvertList[index].DocIdList)
 	return this.KeyInvertList[index].DocIdList, true
 
 }

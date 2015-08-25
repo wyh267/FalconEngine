@@ -56,7 +56,7 @@ type IndexBuilder struct {
 const RULE_EN int64 = 1
 const RULE_CHN int64 = 2
 
-func (this *IndexBuilder) BuildTextIndex(doc_id int64, content string, ivt_idx *InvertIdx, ivt_dic *StringIdxDic,split_type int64) error {
+func (this *IndexBuilder) BuildTextIndex(doc_id int64, content string, ivt_idx *InvertIdx, ivt_dic *StringIdxDic,split_type int64,is_inc bool) error {
 
 	if ivt_idx.IdxType != TYPE_TEXT {
 		return errors.New("Wrong Type")
@@ -89,14 +89,26 @@ func (this *IndexBuilder) BuildTextIndex(doc_id int64, content string, ivt_idx *
 			return errors.New("Text Bukets full")
 		}
 		//新增
-		if key_id > len {
-			invertList := NewInvertDocIdList(term)
-			invertList.DocIdList = append(invertList.DocIdList, DocIdInfo{DocId:doc_id})
-			ivt_idx.KeyInvertList = append(ivt_idx.KeyInvertList, *invertList)
-			ivt_idx.IdxLen++
-		} else { //更新
-			ivt_idx.KeyInvertList[key_id].DocIdList = append(ivt_idx.KeyInvertList[key_id].DocIdList, DocIdInfo{DocId:doc_id})
+		if is_inc == false {
+			if key_id > len {
+				invertList := NewInvertDocIdList(term)
+				invertList.DocIdList = append(invertList.DocIdList, DocIdInfo{DocId:doc_id})
+				ivt_idx.KeyInvertList = append(ivt_idx.KeyInvertList, *invertList)
+				ivt_idx.IdxLen++
+			} else { //更新
+				ivt_idx.KeyInvertList[key_id].DocIdList = append(ivt_idx.KeyInvertList[key_id].DocIdList, DocIdInfo{DocId:doc_id})
+			}
+		}else{
+			if key_id > len {
+				invertList := NewInvertDocIdList(term)
+				invertList.IncDocIdList = append(invertList.IncDocIdList, DocIdInfo{DocId:doc_id})
+				ivt_idx.KeyInvertList = append(ivt_idx.KeyInvertList, *invertList)
+				ivt_idx.IdxLen++
+			} else { //更新
+				ivt_idx.KeyInvertList[key_id].IncDocIdList = append(ivt_idx.KeyInvertList[key_id].IncDocIdList, DocIdInfo{DocId:doc_id})
+			}
 		}
+		
 		
 		//将key_id,doc_id写入临时内存中
 		
@@ -105,7 +117,7 @@ func (this *IndexBuilder) BuildTextIndex(doc_id int64, content string, ivt_idx *
 	return nil
 }
 
-func (this *IndexBuilder) BuildNumberIndex(doc_id int64, content int64, ivt_idx *InvertIdx, ivt_dic *NumberIdxDic) error {
+func (this *IndexBuilder) BuildNumberIndex(doc_id int64, content int64, ivt_idx *InvertIdx, ivt_dic *NumberIdxDic,is_inc bool) error {
 
 	len := ivt_dic.Length()
 	//fmt.Println("len ",len)
@@ -116,16 +128,29 @@ func (this *IndexBuilder) BuildNumberIndex(doc_id int64, content int64, ivt_idx 
 		return errors.New("Number Bukets full")
 	}
 	//新增
-	if key_id > len {
-		//fmt.Println("Add Bukent full")
-		invertList := NewInvertDocIdList(content)
-		invertList.DocIdList = append(invertList.DocIdList, DocIdInfo{DocId:doc_id})
-		ivt_idx.KeyInvertList = append(ivt_idx.KeyInvertList, *invertList)
-		ivt_idx.IdxLen++
-	} else { //更新
-		//fmt.Println("Update Bukent full")
-		ivt_idx.KeyInvertList[key_id].DocIdList = append(ivt_idx.KeyInvertList[key_id].DocIdList, DocIdInfo{DocId:doc_id})
-	}
+	if is_inc == false {
+		if key_id > len {
+			//fmt.Println("Add Bukent full")
+			invertList := NewInvertDocIdList(content)
+			invertList.DocIdList = append(invertList.DocIdList, DocIdInfo{DocId:doc_id})
+			ivt_idx.KeyInvertList = append(ivt_idx.KeyInvertList, *invertList)
+			ivt_idx.IdxLen++
+		} else { //更新
+			//fmt.Println("Update Bukent full")
+			ivt_idx.KeyInvertList[key_id].DocIdList = append(ivt_idx.KeyInvertList[key_id].DocIdList, DocIdInfo{DocId:doc_id})
+		}
+		
+	}else{
+			if key_id > len {
+				invertList := NewInvertDocIdList(content)
+				invertList.IncDocIdList = append(invertList.IncDocIdList, DocIdInfo{DocId:doc_id})
+				ivt_idx.KeyInvertList = append(ivt_idx.KeyInvertList, *invertList)
+				ivt_idx.IdxLen++
+			} else { //更新
+				ivt_idx.KeyInvertList[key_id].IncDocIdList = append(ivt_idx.KeyInvertList[key_id].IncDocIdList, DocIdInfo{DocId:doc_id})
+			}
+		}
+	
 	//ivt_idx.Display()
 	//ivt_dic.Display()
 	return nil

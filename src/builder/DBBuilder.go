@@ -312,7 +312,7 @@ func (this *DBBuilder) Buiding() error {
 			if this.Fields[index].IsIvt {
 
 				if this.Fields[index].FType == "T" {
-					err := builder.BuildTextIndex(doc_id, v, this.Fields[index].IvtIdx, this.Fields[index].IvtStrDic,this.Fields[index].SType)
+					err := builder.BuildTextIndex(doc_id, v, this.Fields[index].IvtIdx, this.Fields[index].IvtStrDic,this.Fields[index].SType,false)
 					//err := builder.BuildTextIndexTemp(doc_id, v, this.Fields[index].IvtIdx, this.Fields[index].IvtStrDic,this.Fields[index].SType,this.Fields[index].Name)
 					if err != nil {
 						this.Logger.Error("ERROR : %v", err)
@@ -326,7 +326,7 @@ func (this *DBBuilder) Buiding() error {
 						this.Logger.Warn("Warning : name : [%v] , value: [%v] , error : [%v]", this.Fields[index].Name,v,err)
 					}
 
-					err = builder.BuildNumberIndex(doc_id, v_num, this.Fields[index].IvtIdx, this.Fields[index].IvtNumDic)
+					err = builder.BuildNumberIndex(doc_id, v_num, this.Fields[index].IvtIdx, this.Fields[index].IvtNumDic,false)
 					//err = builder.BuildNumberIndexTemp(doc_id, v_num, this.Fields[index].IvtIdx, this.Fields[index].IvtNumDic,this.Fields[index].Name)
 					if err != nil {
 						this.Logger.Error("ERROR : %v", err)

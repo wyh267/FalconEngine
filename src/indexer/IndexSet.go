@@ -696,7 +696,7 @@ func (this *IndexSet) UpdateInvert(k,v string,doc_id int64){
 	if field_info.IsIvt {
 
 		if field_info.FType == "T" {
-			err := this.IncBuilder.BuildTextIndex(doc_id, v, this.IvtIndex[k].GetIvtIndex(), this.IvtIndex[k].GetStrDic(),field_info.SType)
+			err := this.IncBuilder.BuildTextIndex(doc_id, v, this.IvtIndex[k].GetIvtIndex(), this.IvtIndex[k].GetStrDic(),field_info.SType,true)
 			if err != nil {
 				this.Logger.Error("ERROR : %v", err)
 			}
@@ -709,7 +709,7 @@ func (this *IndexSet) UpdateInvert(k,v string,doc_id int64){
 				this.Logger.Error("ERROR : %v", err)
 			}
 
-			err = this.IncBuilder.BuildNumberIndex(doc_id, v_num, this.IvtIndex[k].GetIvtIndex(), this.IvtIndex[k].GetNumDic())
+			err = this.IncBuilder.BuildNumberIndex(doc_id, v_num, this.IvtIndex[k].GetIvtIndex(), this.IvtIndex[k].GetNumDic(),true)
 			if err != nil {
 				this.Logger.Error("ERROR : %v", err)
 			}
