@@ -87,7 +87,7 @@ func (this *InvertIdx) GetInvertIndex(index int64) ([]DocIdInfo, bool) {
 		return nil, false
 	}
 	functime := InitTime()
-
+	lens := int(this.KeyInvertList[index].EndPos)
 	//./index/%v_idx.
 	if this.IsMaped == false {
 		
@@ -96,7 +96,7 @@ func (this *InvertIdx) GetInvertIndex(index int64) ([]DocIdInfo, bool) {
 	f,_ := os.Open(fmt.Sprintf("./index/%v_idx.idx",this.IdxName))
 	//fmt.Printf("Start : %v   Lens : %v   file_name : %v  \n",this.KeyInvertList[index].StartPos,this.KeyInvertList[index].EndPos*8,fmt.Sprintf("./index/%v_idx.idx",this.IdxName))
 	defer f.Close()
-	lens := int(this.KeyInvertList[index].EndPos)
+	
 
 	fi, err := f.Stat()
 	if err != nil{
@@ -106,7 +106,7 @@ func (this *InvertIdx) GetInvertIndex(index int64) ([]DocIdInfo, bool) {
 	//page_offset:=int(this.KeyInvertList[index].StartPos) % 4096
 	//resultSize := int(page_offset+lens*8)
 
-	this.MmapBytes,err := syscall.Mmap(int(f.Fd()),0,fi.Size(),syscall.PROT_READ,syscall.MAP_PRIVATE)
+	this.MmapBytes,err = syscall.Mmap(int(f.Fd()),0,fi.Size(),syscall.PROT_READ,syscall.MAP_PRIVATE)
 
 	if err != nil{
 		fmt.Printf("MAPPING ERROR  %v \n",err)
