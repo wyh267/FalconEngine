@@ -50,7 +50,7 @@ func (this *Searcher) SearchCount(log_id string, body []byte, params map[string]
 
 	}
 
-	//this.Logger.Info("[LOG_ID:%v]Running Searcher  %v....Time: %v ", log_id, searchRules, ftime("ParseSearchInfo"))
+	this.Logger.Info("[LOG_ID:%v]Running Searcher  %v....Time: %v ", log_id, searchRules, ftime("ParseSearchInfo"))
 
 	total_doc_ids := make([]utils.DocIdInfo, 0)
 	for _, search_rule := range searchRules {
@@ -66,6 +66,30 @@ func (this *Searcher) SearchCount(log_id string, body []byte, params map[string]
 	} else {
 		result["HAS_RESULT"] = 1
 	}
+
+
+
+	var tmp_doc_ids []utils.DocIdInfo
+	if len(total_doc_ids) > 10 {
+		tmp_doc_ids = total_doc_ids[:10]
+	} else {
+		tmp_doc_ids = total_doc_ids
+	}
+	ids, fields := this.Indexer.GetDetails(tmp_doc_ids)
+	var infos []map[string]string
+	for _, id := range ids {
+		info, err := this.RedisCli.GetFields(id, fields)
+		if err != nil {
+			this.Logger.Error("%v", err)
+		}
+		infos = append(infos, info)
+	}
+
+	result["DATA"] = infos
+
+
+
+
 
 	this.Logger.Info("[LOG_ID:%v] End Counting....Time: %v \n\n", log_id, ftime("SearchCount"))
 
@@ -484,6 +508,22 @@ func (this *Searcher) ParseSearchInfo(log_id string, params map[string]string, b
 
 				if vv.Key == "email_client" { //TODO
 
+				}
+				
+				
+				if vv.Key == "buys" {
+					var FR indexer.FilterRule
+					FR.Field = vv.Key
+					FR.IsForward = true
+					if vv.Op == "less" {
+						FR.FiltType = indexer.FILT_TYPE_LESS_DATERANGE
+					} else {
+						FR.FiltType = indexer.FILT_TYPE_ABOVE_DATERANGE
+					}
+					FR.Value = vv.Value
+					SRs.FR = append(SRs.FR, FR)
+					continue
+					
 				}
 
 				if vv.Op == "include" { //其他检索，倒排索引

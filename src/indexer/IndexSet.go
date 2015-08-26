@@ -391,7 +391,7 @@ func (this *IndexSet) FilterByRules(doc_ids []utils.DocIdInfo, rules []FilterRul
 		if !ok {
 			continue
 		}
-
+		fmt.Printf("rule.Field : %v\n",rule.Field)
 		res, _ = this.PflIndex[rule.Field].Filter(res, rule.Value, rule.IsForward,rule.FiltType)
 	}
 	return res, nil

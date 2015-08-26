@@ -12,6 +12,8 @@ package indexer
 import (
 	"errors"
 	"fmt"
+	"strings"
+	"strconv"
 	u "utils"
 )
 
@@ -88,6 +90,46 @@ func (this *TextProfile) FilterValue(doc_ids []u.DocIdInfo, value string, is_for
 					res = append(res, doc_ids[i])
 				}
 			}
+			
+		case FILT_TYPE_LESS_DATERANGE:
+		fmt.Printf("FILT_TYPE_LESS_DATERANGE\n")
+			values:=strings.Split(value,",")
+			value_num,_:=strconv.ParseInt(values[0], 0, 0)
+			index_start,_:=strconv.ParseInt(values[1], 0, 0)
+			index_end,_:=strconv.ParseInt(values[2], 0, 0)
+			for i, _ := range doc_ids {
+				items:=strings.Split(this.ProfileList[doc_ids[i].DocId],",")
+				
+				var total int64=0
+				for pos:=int(index_start);pos<int(index_end);pos++{
+					data,_:=strconv.ParseInt(items[pos], 0, 0)
+					total+=data
+				}
+				if total < value_num  {
+					res = append(res, doc_ids[i])
+				}
+			
+			}
+		case FILT_TYPE_ABOVE_DATERANGE:
+			values:=strings.Split(value,",")
+			value_num,_:=strconv.ParseInt(values[0], 0, 0)
+			index_start,_:=strconv.ParseInt(values[1], 0, 0)
+			index_end,_:=strconv.ParseInt(values[2], 0, 0)
+			for i, _ := range doc_ids {
+				items:=strings.Split(this.ProfileList[doc_ids[i].DocId],",")
+				
+				var total int64=0
+				for pos:=int(index_start);pos<int(index_end);pos++{
+					data,_:=strconv.ParseInt(items[pos], 0, 0)
+					total+=data
+				}
+				if total > value_num  {
+					res = append(res, doc_ids[i])
+				}
+			}
+		
+		
+			
 		default:
 			for i, _ := range doc_ids {
 				if this.ProfileList[doc_ids[i].DocId] == value {
