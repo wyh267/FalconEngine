@@ -113,7 +113,7 @@ func (this *InvertIdx) GetInvertIndex(index int64) ([]DocIdInfo, bool) {
 		return nil,false
 	}
 	
-	defer syscall.Munmap(b)
+	defer syscall.Munmap(this.MmapBytes)
 	fmt.Printf("Cost Time : %v \n",functime("mmap"))
 	
 	//fmt.Printf("%x\n",b)
@@ -125,22 +125,29 @@ func (this *InvertIdx) GetInvertIndex(index int64) ([]DocIdInfo, bool) {
 	//fmt.Printf("%v \n",p)
 	//this.IsMaped=true
 	//}
-	reader := bytes.NewReader(this.MmapBytes[int(this.KeyInvertList[index].StartPos):int(this.KeyInvertList[index].StartPos)+lens*8])
+	StartPos:=int(this.KeyInvertList[index].StartPos)
+	reader := bytes.NewReader(this.MmapBytes[StartPos:StartPos+lens*8])
 	fmt.Printf("Cost Time : %v \n",functime("reader"))
 	this.KeyInvertList[index].DocIdList = make([]DocIdInfo,lens)
 	fmt.Printf("Cost Time : %v \n",functime("make"))
 	binary.Read(reader,binary.LittleEndian,this.KeyInvertList[index].DocIdList)
 	fmt.Printf("Cost Time : %v \n",functime("read map byte"))
-	this.KeyInvertList[index].DocIdList=append(this.KeyInvertList[index].DocIdList,this.KeyInvertList[index].IncDocIdList...)
 	
+	//fmt.Printf("DOC_IDS:%v\n",this.KeyInvertList[index].DocIdList)
+	fmt.Printf("Cost Time : %v \n",functime("append op"))
+	
+	//buf := make([]byte,8)
 	for i:=0;i<lens;i++{
-		this.KeyInvertList[index].DocIdList[i].DocId = int64(this.MmapBytes[:4])
+		start:=StartPos+i*8
+		end:=StartPos + (i+1)*8
+		this.KeyInvertList[index].DocIdList[i].DocId = int64(binary.LittleEndian.Uint64(this.MmapBytes[start:end]))
 	}
 	
+	fmt.Printf("Cost Time : %v \n",functime("MmapBytes op"))
+	this.KeyInvertList[index].DocIdList=append(this.KeyInvertList[index].DocIdList,this.KeyInvertList[index].IncDocIdList...)
+	//fmt.Printf("DOC_IDS:%v\n",this.KeyInvertList[index].DocIdList)
+	
 
-	
-	
-	fmt.Printf("Cost Time : %v \n",functime("append op"))
 	/*
 	testb := make([]byte,int(this.KeyInvertList[index].StartPos)+lens*8)
 	fmt.Printf("Cost Time : %v \n",functime("make testb"))
