@@ -293,6 +293,7 @@ func (this *IndexSet) SearchByRules(rules /*map[string]interface{}*/[]SearchRule
 
 	//BitMap过滤失效的doc_id
 	//this.Logger.Info(" %v ",res)
+	fmt.Printf("SearchByRules: %v \n",functime("Start Bitmap"))
 	r:=make([]utils.DocIdInfo,0)
 	for i,_:=range res{
 		//this.Logger.Info(" %v ",res[i].DocId)
@@ -300,6 +301,7 @@ func (this *IndexSet) SearchByRules(rules /*map[string]interface{}*/[]SearchRule
 			r = append(r,res[i])
 		}
 	}
+	fmt.Printf("SearchByRules: %v \n",functime("End Bitmap"))
 
 	//TODO 自定义过滤
 	fmt.Printf("SearchByRules: %v \n",functime("End SearchByRules"))
