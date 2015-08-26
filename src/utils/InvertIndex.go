@@ -11,7 +11,7 @@ package utils
 
 import (
 	"fmt"
-	"bytes"
+	//"bytes"
 	"encoding/binary"
 	"os"
 	"syscall"
@@ -106,14 +106,14 @@ func (this *InvertIdx) GetInvertIndex(index int64) ([]DocIdInfo, bool) {
 	//page_offset:=int(this.KeyInvertList[index].StartPos) % 4096
 	//resultSize := int(page_offset+lens*8)
 
-	this.MmapBytes,err = syscall.Mmap(int(f.Fd()),0,int(fi.Size()),syscall.PROT_READ,syscall.MAP_PRIVATE)
+	MmapBytes,err := syscall.Mmap(int(f.Fd()),0,int(fi.Size()),syscall.PROT_READ,syscall.MAP_PRIVATE)
 
 	if err != nil{
 		fmt.Printf("MAPPING ERROR  %v \n",err)
 		return nil,false
 	}
 	
-	defer syscall.Munmap(this.MmapBytes)
+	defer syscall.Munmap(MmapBytes)
 	fmt.Printf("Cost Time : %v \n",functime("mmap"))
 	
 	//fmt.Printf("%x\n",b)
@@ -126,25 +126,26 @@ func (this *InvertIdx) GetInvertIndex(index int64) ([]DocIdInfo, bool) {
 	//this.IsMaped=true
 	//}
 	StartPos:=int(this.KeyInvertList[index].StartPos)
-	reader := bytes.NewReader(this.MmapBytes[StartPos:StartPos+lens*8])
-	fmt.Printf("Cost Time : %v \n",functime("reader"))
+	//reader := bytes.NewReader(MmapBytes[StartPos:StartPos+lens*8])
+	//fmt.Printf("Cost Time : %v \n",functime("reader"))
 	this.KeyInvertList[index].DocIdList = make([]DocIdInfo,lens)
 	fmt.Printf("Cost Time : %v \n",functime("make"))
-	binary.Read(reader,binary.LittleEndian,this.KeyInvertList[index].DocIdList)
-	fmt.Printf("Cost Time : %v \n",functime("read map byte"))
+	//binary.Read(reader,binary.LittleEndian,this.KeyInvertList[index].DocIdList)
+	//fmt.Printf("Cost Time : %v \n",functime("read map byte"))
 	
 	//fmt.Printf("DOC_IDS:%v\n",this.KeyInvertList[index].DocIdList)
-	fmt.Printf("Cost Time : %v \n",functime("append op"))
+	
 	
 	//buf := make([]byte,8)
 	for i:=0;i<lens;i++{
 		start:=StartPos+i*8
 		end:=StartPos + (i+1)*8
-		this.KeyInvertList[index].DocIdList[i].DocId = int64(binary.LittleEndian.Uint64(this.MmapBytes[start:end]))
+		this.KeyInvertList[index].DocIdList[i].DocId = int64(binary.LittleEndian.Uint64(MmapBytes[start:end]))
 	}
 	
 	fmt.Printf("Cost Time : %v \n",functime("MmapBytes op"))
 	this.KeyInvertList[index].DocIdList=append(this.KeyInvertList[index].DocIdList,this.KeyInvertList[index].IncDocIdList...)
+	fmt.Printf("Cost Time : %v \n",functime("append op"))
 	//fmt.Printf("DOC_IDS:%v\n",this.KeyInvertList[index].DocIdList)
 	
 
