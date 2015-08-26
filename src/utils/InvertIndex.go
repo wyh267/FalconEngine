@@ -133,6 +133,12 @@ func (this *InvertIdx) GetInvertIndex(index int64) ([]DocIdInfo, bool) {
 	fmt.Printf("Cost Time : %v \n",functime("read map byte"))
 	this.KeyInvertList[index].DocIdList=append(this.KeyInvertList[index].DocIdList,this.KeyInvertList[index].IncDocIdList...)
 	fmt.Printf("Cost Time : %v \n",functime("append op"))
+	testb := make([]byte,int(this.KeyInvertList[index].StartPos)+lens*8)
+	fmt.Printf("Cost Time : %v \n",functime("make testb"))
+	reader := bytes.NewReader(testb)
+	fmt.Printf("Cost Time : %v \n",functime("reader testb"))
+	binary.Read(reader,binary.LittleEndian,this.KeyInvertList[index].DocIdList)
+	fmt.Printf("Cost Time : %v \n",functime("read test byte"))
 	//fmt.Printf("DOC_IDS : %v \n",this.KeyInvertList[index].DocIdList)
 	return this.KeyInvertList[index].DocIdList, true
 
