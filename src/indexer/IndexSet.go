@@ -261,7 +261,8 @@ type SearchRule struct{
 }
 
 func (this *IndexSet) SearchByRules(rules /*map[string]interface{}*/[]SearchRule) ([]utils.DocIdInfo, bool) {
-
+	functime := utils.InitTime()
+	fmt.Printf("SearchByRules: %v \n",functime("Start"))
 	var res []utils.DocIdInfo
 	for index, rule := range rules {
 		var sub_res []utils.DocIdInfo
@@ -270,7 +271,9 @@ func (this *IndexSet) SearchByRules(rules /*map[string]interface{}*/[]SearchRule
 			sub_res, ok = this.Search(rule.Query)
 		} else {
 			//this.Logger.Info(" Field : %v Query : %v",rule.Field, rule.Query)
+			fmt.Printf("SearchByRules: %v \n",functime("Start SearchField"))
 			sub_res, ok = this.SearchField(rule.Query, rule.Field)
+			fmt.Printf("SearchByRules: %v \n",functime("End SearchField"))
 		}
 		if !ok {
 			return nil, false
@@ -278,7 +281,9 @@ func (this *IndexSet) SearchByRules(rules /*map[string]interface{}*/[]SearchRule
 		if index==0 {
 			res = sub_res
 		} else {
+			fmt.Printf("SearchByRules: %v \n",functime("Start Interaction"))
 			res, ok = utils.Interaction(res, sub_res)
+			fmt.Printf("SearchByRules: %v \n",functime("End Interaction"))
 			if !ok {
 				return nil, false
 			}
@@ -297,7 +302,7 @@ func (this *IndexSet) SearchByRules(rules /*map[string]interface{}*/[]SearchRule
 	}
 
 	//TODO 自定义过滤
-
+	fmt.Printf("SearchByRules: %v \n",functime("End SearchByRules"))
 	return r, true
 }
 
@@ -564,7 +569,8 @@ func (this *IndexSet) SearchFieldByString(query string, field string) ([]utils.D
 *
 ******************************************************************************/
 func (this *IndexSet) SearchFieldByNumber(query int64, field string) ([]utils.DocIdInfo, bool) {
-
+	functime := utils.InitTime()
+	fmt.Printf("SearchFieldByNumber: %v \n",functime("Start"))
 	_, ok := this.IvtIndex[field]
 	if !ok {
 		return nil, false
@@ -575,7 +581,7 @@ func (this *IndexSet) SearchFieldByNumber(query int64, field string) ([]utils.Do
 		return nil, false
 	}
 	//this.Logger.Info("[Number : %v ] [Field: %v ] DocIDs : %v", query, field, l)
-
+	fmt.Printf("SearchFieldByNumber: %v \n",functime("Find"))
 	return l, true
 }
 
