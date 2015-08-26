@@ -89,13 +89,13 @@ func (this *InvertIdx) GetInvertIndex(index int64) ([]DocIdInfo, bool) {
 	functime := InitTime()
 	lens := int(this.KeyInvertList[index].EndPos)
 	//./index/%v_idx.
-	if this.IsMaped == false {
+	//if this.IsMaped == false {
 		
 	
 	fmt.Printf("Cost Time : %v \n",functime("Start"))
 	f,_ := os.Open(fmt.Sprintf("./index/%v_idx.idx",this.IdxName))
 	//fmt.Printf("Start : %v   Lens : %v   file_name : %v  \n",this.KeyInvertList[index].StartPos,this.KeyInvertList[index].EndPos*8,fmt.Sprintf("./index/%v_idx.idx",this.IdxName))
-	//defer f.Close()
+	defer f.Close()
 	
 
 	fi, err := f.Stat()
@@ -113,7 +113,7 @@ func (this *InvertIdx) GetInvertIndex(index int64) ([]DocIdInfo, bool) {
 		return nil,false
 	}
 	
-	//defer syscall.Munmap(b)
+	defer syscall.Munmap(b)
 	fmt.Printf("Cost Time : %v \n",functime("mmap"))
 	
 	//fmt.Printf("%x\n",b)
@@ -123,8 +123,8 @@ func (this *InvertIdx) GetInvertIndex(index int64) ([]DocIdInfo, bool) {
 	//p:=(*[20]DocIdInfo)(unsafe.Pointer(&b))
 
 	//fmt.Printf("%v \n",p)
-	this.IsMaped=true
-	}
+	//this.IsMaped=true
+	//}
 	reader := bytes.NewReader(this.MmapBytes[int(this.KeyInvertList[index].StartPos):int(this.KeyInvertList[index].StartPos)+lens*8])
 	fmt.Printf("Cost Time : %v \n",functime("reader"))
 	this.KeyInvertList[index].DocIdList = make([]DocIdInfo,lens)
@@ -132,6 +132,12 @@ func (this *InvertIdx) GetInvertIndex(index int64) ([]DocIdInfo, bool) {
 	binary.Read(reader,binary.LittleEndian,this.KeyInvertList[index].DocIdList)
 	fmt.Printf("Cost Time : %v \n",functime("read map byte"))
 	this.KeyInvertList[index].DocIdList=append(this.KeyInvertList[index].DocIdList,this.KeyInvertList[index].IncDocIdList...)
+	
+	for i:=0;i<lens;i++{
+		this.KeyInvertList[index].DocIdList[i].DocId = int64(this.MmapBytes[:4])
+	}
+	
+
 	
 	
 	fmt.Printf("Cost Time : %v \n",functime("append op"))
