@@ -294,18 +294,21 @@ func (this *IndexSet) SearchByRules(rules /*map[string]interface{}*/[]SearchRule
 	//BitMap过滤失效的doc_id
 	//this.Logger.Info(" %v ",res)
 	fmt.Printf("SearchByRules: %v \n",functime("Start Bitmap"))
-	r:=make([]utils.DocIdInfo,0)
+	r:=make([]utils.DocIdInfo,len(res))
+	r_index:=0
 	for i,_:=range res{
 		//this.Logger.Info(" %v ",res[i].DocId)
 		if this.BitMap.GetBit(uint64(res[i].DocId)) == 0 {
-			r = append(r,res[i])
+			r[r_index]=res[i]
+			r_index++
+			//r = append(r,res[i])
 		}
 	}
 	fmt.Printf("SearchByRules: %v \n",functime("End Bitmap"))
 
 	//TODO 自定义过滤
 	fmt.Printf("SearchByRules: %v \n",functime("End SearchByRules"))
-	return r, true
+	return r[:r_index], true
 }
 
 /*****************************************************************************
