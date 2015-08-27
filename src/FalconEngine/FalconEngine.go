@@ -90,7 +90,7 @@ func main() {
 		}}
 		
 		
-		builder := NewBuilderEngine(configure, dbAdaptor, logger, redisClient)
+		builder := NewBuilderEngine(configure, dbAdaptor, logger, redisClient,index_set)
 		builder.StartIncUpdate(data_chan)
 		
 		logger.Info("Server Start...")
@@ -105,7 +105,7 @@ func main() {
 
 	} else if search == "build" {
 		
-		builder := NewBuilderEngine(configure, dbAdaptor, logger, redisClient)
+		builder := NewBuilderEngine(configure, dbAdaptor, logger, redisClient,nil)
 		builder.BuidingAllIndex()
 	} else {
 		logger.Error("Wrong start mode...only support [ search | build ]")

@@ -92,7 +92,7 @@ func (this *InvertIdx) GetInvertIndex(index int64) ([]DocIdInfo, bool) {
 	//if this.IsMaped == false {
 		
 	
-	fmt.Printf("Cost Time : %v \n",functime("Start"))
+	//fmt.Printf("Cost Time : %v \n",functime("Start"))
 	f,_ := os.Open(fmt.Sprintf("./index/%v_idx.idx",this.IdxName))
 	//fmt.Printf("Start : %v   Lens : %v   file_name : %v  \n",this.KeyInvertList[index].StartPos,this.KeyInvertList[index].EndPos*8,fmt.Sprintf("./index/%v_idx.idx",this.IdxName))
 	defer f.Close()
@@ -114,50 +114,25 @@ func (this *InvertIdx) GetInvertIndex(index int64) ([]DocIdInfo, bool) {
 	}
 	
 	defer syscall.Munmap(MmapBytes)
-	fmt.Printf("Cost Time : %v \n",functime("mmap"))
 	
-	//fmt.Printf("%x\n",b)
-	//var doc_list *DocIdInfo
-	//this.KeyInvertList[index].DocIdList=(*DocIdInfo)b
-	//index_len:=int(this.KeyInvertList[index].EndPos)
-	//p:=(*[20]DocIdInfo)(unsafe.Pointer(&b))
-
-	//fmt.Printf("%v \n",p)
-	//this.IsMaped=true
-	//}
 	StartPos:=int(this.KeyInvertList[index].StartPos)
 	//reader := bytes.NewReader(MmapBytes[StartPos:StartPos+lens*8])
 	//fmt.Printf("Cost Time : %v \n",functime("reader"))
 	this.KeyInvertList[index].DocIdList = make([]DocIdInfo,lens)
-	fmt.Printf("Cost Time : %v \n",functime("make"))
-	//binary.Read(reader,binary.LittleEndian,this.KeyInvertList[index].DocIdList)
-	//fmt.Printf("Cost Time : %v \n",functime("read map byte"))
-	
-	//fmt.Printf("DOC_IDS:%v\n",this.KeyInvertList[index].DocIdList)
-	
-	
-	//buf := make([]byte,8)
+	//fmt.Printf("Cost Time : %v \n",functime("make"))
+
 	for i:=0;i<lens;i++{
 		start:=StartPos+i*8
 		end:=StartPos + (i+1)*8
 		this.KeyInvertList[index].DocIdList[i].DocId = int64(binary.LittleEndian.Uint64(MmapBytes[start:end]))
 	}
 	
-	fmt.Printf("Cost Time : %v \n",functime("MmapBytes op"))
+	//fmt.Printf("Cost Time : %v \n",functime("MmapBytes op"))
 	this.KeyInvertList[index].DocIdList=append(this.KeyInvertList[index].DocIdList,this.KeyInvertList[index].IncDocIdList...)
-	fmt.Printf("Cost Time : %v \n",functime("append op"))
+	//fmt.Printf("Cost Time : %v \n",functime("append op"))
 	//fmt.Printf("DOC_IDS:%v\n",this.KeyInvertList[index].DocIdList)
+	mt.Printf("DOC_IDS : %v \n",this.KeyInvertList[index].DocIdList)
 	
-
-	/*
-	testb := make([]byte,int(this.KeyInvertList[index].StartPos)+lens*8)
-	fmt.Printf("Cost Time : %v \n",functime("make testb"))
-	reader := bytes.NewReader(testb)
-	fmt.Printf("Cost Time : %v \n",functime("reader testb"))
-	binary.Read(reader,binary.LittleEndian,this.KeyInvertList[index].DocIdList)
-	fmt.Printf("Cost Time : %v \n",functime("read test byte"))
-	//fmt.Printf("DOC_IDS : %v \n",this.KeyInvertList[index].DocIdList)
-	*/
 	return this.KeyInvertList[index].DocIdList, true
 
 }

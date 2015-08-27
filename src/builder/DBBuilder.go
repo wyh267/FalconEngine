@@ -24,16 +24,18 @@ type FieldInfo struct {
 	IvtNumDic *utils.NumberIdxDic
 	PlfText   *indexer.TextProfile
 	PlfNumber *indexer.NumberProfile
+
 }
 
 type DBBuilder struct {
 	*Builder
 	sql    string
 	Fields []FieldInfo
+	DetailIdx *indexer.Detail
 }
 
 func NewDBBuilder(b *Builder) *DBBuilder {
-	this := &DBBuilder{b, "", make([]FieldInfo, 0)}
+	this := &DBBuilder{b, "", make([]FieldInfo, 0),nil}
 	return this
 }
 
@@ -171,7 +173,44 @@ func (this *DBBuilder) ScanInc(Data_chan chan UpdateInfo) error {
 			new_values[this.Fields[index].Name] = v
 			
 		}
+		
+		pk,err:=strconv.ParseInt(new_values["id"], 0, 0)
+		if err != nil {
+			this.Logger.Error("parse error : %v",err)
+			continue
+		}
+		doc_ids,ok := this.Index_set.SearchField(pk,"id")
+		if !ok{ //新增DOC_ID
+			isUpdate = true
+			isProfile = false
+		}else{
+			
+			redis_map,err:=this.Index_set.Detail.GetDocInfo(doc_ids[0].DocId)
+			if err != nil {
+				this.Logger.Error("Read Detail error...%v",err)
+				continue
+			}
+			
+			for k,v := range redis_map{
+				vv,ok := new_values[k]
+				if !ok{
+					break
+				}
+				
+				//this.Logger.Info("K : %v ==== V : %v === VV : %v",k,v,vv)
+				if (v != vv) && k != incField {
+					isUpdate = true
+
+					curr_time = new_values[incField]
+					if isIvert[k] {
+						isProfile = false
+					}
+				}
+			}
+			
+		}
 		//this.Logger.Info("New : %v ",new_values)
+		/*
 		fieldlist:=make([]string,0)
 		for k,_ := range new_values{
 			fieldlist=append(fieldlist,k)
@@ -203,11 +242,10 @@ func (this *DBBuilder) ScanInc(Data_chan chan UpdateInfo) error {
 				}
 			}
 		}
-		
+		*/
 		if isUpdate{
-			this.Logger.Info("Must Update ,Old : %v ",redis_map)
-			this.Logger.Info("Must Update ,New : %v ",new_values)
-			this.RedisCli.SetFields(0, new_values)
+
+			this.Logger.Info("Update Status : Just Update Profile : [%v] ",isProfile)
 			upinfo := UpdateInfo{new_values,isProfile,make(chan error)}
 			Data_chan <- upinfo
 			errinfo:= <-upinfo.ErrChan
@@ -278,6 +316,9 @@ func (this *DBBuilder) Buiding() error {
 
 	}
 	fmt.Printf("%v\n",fields)
+	
+	this.DetailIdx=indexer.NewDetail()
+	
 	sql := fmt.Sprintf(this.sql, fields[1:len(fields)])
 	fmt.Printf("SQL :: %v \n", sql)
 
@@ -364,8 +405,13 @@ func (this *DBBuilder) Buiding() error {
 			}
 
 		}
-
-		this.RedisCli.SetFields(doc_id, redis_map)
+		/////
+		//this.RedisCli.SetFields(doc_id, redis_map)
+		////
+		if this.DetailIdx.PutDocInfo(doc_id, redis_map)!=nil{
+			this.Logger.Error("PutDocInfo doc_id Error :  %v \n",err)
+		}
+		
 		
 		fieldlist:=make([]string,0)
 		for k,_ := range redis_map{
@@ -380,6 +426,7 @@ func (this *DBBuilder) Buiding() error {
 
 	}
 	
+	this.DetailIdx.WriteDetailToFile()
 	
 	//写入全部数据
 	//builder.WriteAllTempIndexToFile()

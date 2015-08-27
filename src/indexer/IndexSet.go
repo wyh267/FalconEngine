@@ -24,6 +24,7 @@ type IndexSet struct {
 	Logger    *log4jzl.Log4jzl
 	IvtIndex  map[string]IndexInterface
 	PflIndex  map[string]ProfileInterface
+	Detail	  *Detail
 	Segmenter *utils.Segmenter
 	MaxDocId  int64
 	PrimaryKey	string
@@ -237,6 +238,21 @@ func (this *IndexSet) InitIndexSet(fields map[string]string) error {
 			}
 		}
 	}
+	
+	//读取detail文件
+	this.Logger.Info("Loading Detail idx .....")
+	bidx, err := utils.ReadFromJson("./index/detail.idx.json")
+	if err != nil {
+		this.Logger.Info("Read Detail Error .....%v ",err)
+		return err
+	}
+	var detail Detail
+	err = json.Unmarshal(bidx, &detail)
+	if err != nil {
+		this.Logger.Info("Loading Detail Error .....%v ",err)
+		return err
+	}
+	this.Detail=&detail
 	
 	//保存最大DocId
 	this.MaxDocId = this.PflIndex[this.PrimaryKey].GetMaxDocId()
@@ -606,6 +622,29 @@ func (this *IndexSet) GetId(doc_id utils.DocIdInfo) (int64,[]string){
 }
 
 
+
+func (this *IndexSet) GetDetailsByDocId(doc_ids []utils.DocIdInfo) []interface{}{
+	
+	doc_infos := make([]interface{},0)
+	for _,doc_id := range doc_ids{
+		if this.BitMap.GetBit(uint64(doc_id.DocId)) == 1 {
+			this.Logger.Info("Get Bit Map  %v",  doc_id.DocId)
+			continue
+		}
+		info,err := this.Detail.GetDocInfo(doc_id.DocId)
+		if err !=nil {
+			this.Logger.Error("GetDocInfo %v ---  %v", doc_id, err)
+			continue
+		}
+		doc_infos = append(doc_infos,info)
+	}
+	
+	//this.Logger.Info("%v",doc_infos)
+	return doc_infos
+}
+
+
+
 func (this *IndexSet) GetDetails(doc_ids []utils.DocIdInfo) ([]int64,[]string){
 	
 	ids := make([]int64,0)
@@ -658,11 +697,13 @@ func (this *IndexSet) UpdateRecord(info map[string]string,isProfileUpdate bool) 
 	
 	//如果仅更新正排文件，不需要新建doc_id，直接更新
 	Doc_id,has_key:=this.SearchField(pk,this.PrimaryKey)
+	var doc_id int64
 	if isProfileUpdate {
 		if !has_key{
 			//this.Logger.Error("isProfileUpdate  %v",  err)
 			return errors.New("Update err...no doc_id to update")
 		}
+		doc_id=Doc_id[0].DocId
 		for k,v := range info{
 			this.UpdateProfile(k,v,Doc_id[0].DocId)
 		}
@@ -678,7 +719,7 @@ func (this *IndexSet) UpdateRecord(info map[string]string,isProfileUpdate bool) 
 
 		}
 		//新增一个doc_id
-		doc_id := this.MaxDocId + 1	
+		doc_id = this.MaxDocId + 1	
 		for k,v := range info {
 			//this.Logger.Info("K : %v  === V : %v === Doc_ID : %v",k,v,doc_id)
 			this.UpdateInvert(k,v,doc_id)
@@ -687,7 +728,11 @@ func (this *IndexSet) UpdateRecord(info map[string]string,isProfileUpdate bool) 
 		
 		this.MaxDocId++	
 	}
-	
+	//更新detail
+	err= this.Detail.SetNewValue(doc_id,info)
+	if err!=nil{
+		this.Logger.Error("Update Detail Error : %v ",err)
+	}
 	
 	return nil
 	
