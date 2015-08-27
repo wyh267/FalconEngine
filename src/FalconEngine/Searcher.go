@@ -205,11 +205,29 @@ func (this *Searcher) GroupContact(log_id string, body []byte, params map[string
 		total_doc_ids, _ = utils.Merge(total_doc_ids, doc_ids)
 	}
 
-	fields := make([]string, 0)
-	fields = append(fields, "contact_id")
-	fields = append(fields, "cid")
+	//fields := make([]string, 0)
+	//fields = append(fields, "contact_id")
+	//fields = append(fields, "cid")
 	//this.Logger.Info("doc_ids : %v ",total_doc_ids)
+	
+	infos := this.Indexer.GetDetailsByDocId(total_doc_ids)
+	for _,info := range infos {
+		v,ok:=info.(map[string]string)
+		if ok {
+			const ADDCONTACTSTOGROUP_SQL string = "REPLACE INTO jzl_groups_contacts (cid,creator_id,last_editor_id,group_id,contact_id,create_time,last_modify_time,is_delete) VALUES (?,?,?,?,?,NOW(),NOW(),0)"
+			err = this.DbAdaptor.ExecFormat(ADDCONTACTSTOGROUP_SQL, v["cid"], si.Editor_id, si.Editor_id, si.Id, v["contact_id"])
+			if err != nil {
+				this.Logger.Error("[LOG_ID:%v]  %v", log_id, err)
+				return err
+			}
+		}
+		
+	}
+	
+	
+	/*
 	for _, doc_id := range total_doc_ids {
+
 		id, _ := this.Indexer.GetId(doc_id)
 		//this.Logger.Info("Fields : %v",fields)
 		info, err := this.RedisCli.GetFields(id, fields)
@@ -224,6 +242,7 @@ func (this *Searcher) GroupContact(log_id string, body []byte, params map[string
 			return err
 		}
 	}
+	*/
 	this.Logger.Info("[LOG_ID:%v] End Grouping ....Time: %v \n\n", log_id, ftime("GroupContact"))
 	return nil
 
