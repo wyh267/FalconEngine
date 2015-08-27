@@ -1,19 +1,17 @@
 package main
 
 import (
-	"os"
-	"indexer"
 	"BaseFunctions"
+	"builder"
 	"flag"
 	"fmt"
 	"github.com/outmana/log4jzl"
+	"indexer"
 	"net/http"
-	"utils"
-	"builder"
+	"os"
 	"runtime"
+	"utils"
 )
-
-
 
 func main() {
 
@@ -25,7 +23,7 @@ func main() {
 	var err error
 	flag.StringVar(&configFile, "conf", "search.conf", "configure file full path")
 	flag.StringVar(&search, "mode", "search", "start mode[ search | build ]")
-	flag.IntVar(&cores,"core",4,"cpu cores")
+	flag.IntVar(&cores, "core", 4, "cpu cores")
 	flag.Parse()
 
 	runtime.GOMAXPROCS(cores)
@@ -60,31 +58,29 @@ func main() {
 	defer redisClient.Release()
 
 	if search == "search" {
-		
-		processor := &BaseFunctions.BaseProcessor{configure,logger,dbAdaptor,redisClient}
+
+		processor := &BaseFunctions.BaseProcessor{configure, logger, dbAdaptor, redisClient}
 		bitmap := utils.NewBitmap()
 		fields, err := configure.GetTableFields()
 		if err != nil {
 			logger.Error("%v", err)
 			return
 		}
-		index_set := indexer.NewIndexSet(bitmap,logger)
+		index_set := indexer.NewIndexSet(bitmap, logger)
 		index_set.InitIndexSet(fields)
-		
-		
-		searcher :=  NewSearcher(processor,index_set) // &Searcher{processor}
-		data_chan:=make(chan builder.UpdateInfo,1000)
-		updater := NewUpdater(processor,index_set,data_chan)
+
+		searcher := NewSearcher(processor, index_set) // &Searcher{processor}
+		data_chan := make(chan builder.UpdateInfo, 1000)
+		updater := NewUpdater(processor, index_set, data_chan)
 		updater.IncUpdating()
-		router := &BaseFunctions.Router{configure,logger,map[string]BaseFunctions.FEProcessor{
-			"search":	searcher,
-			"update":	updater,
+		router := &BaseFunctions.Router{configure, logger, map[string]BaseFunctions.FEProcessor{
+			"search": searcher,
+			"update": updater,
 		}}
-		
-		
-		builder := NewBuilderEngine(configure, dbAdaptor, logger, redisClient,index_set)
+
+		builder := NewBuilderEngine(configure, dbAdaptor, logger, redisClient, index_set)
 		builder.StartIncUpdate(data_chan)
-		
+
 		logger.Info("Server Start...")
 		port, _ := configure.GetPort()
 		addr := fmt.Sprintf(":%d", port)
@@ -93,16 +89,13 @@ func main() {
 			logger.Error("Server start fail: %v", err)
 			os.Exit(1)
 		}
-		
 
 	} else if search == "build" {
-		
-		builder := NewBuilderEngine(configure, dbAdaptor, logger, redisClient)
+
+		builder := NewBuilderEngine(configure, dbAdaptor, logger, redisClient, nil)
 		builder.BuidingAllIndex()
 	} else {
 		logger.Error("Wrong start mode...only support [ search | build ]")
 	}
 
 }
-
-
