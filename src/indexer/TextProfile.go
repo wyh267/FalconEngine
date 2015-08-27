@@ -130,7 +130,7 @@ func (this *TextProfile) FilterValue(doc_ids []u.DocIdInfo, value string, is_for
 		
 		case FILT_TYPE_INCLUDE:
 			for i, _ := range doc_ids {
-				if strings.Contains(value,this.ProfileList[doc_ids[i].DocId]) {
+				if strings.Contains(this.ProfileList[doc_ids[i].DocId],value) {
 					res = append(res, doc_ids[i])
 				}
 				

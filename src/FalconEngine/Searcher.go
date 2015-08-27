@@ -370,7 +370,7 @@ func (this *Searcher) ParseSearchInfo(log_id string, params map[string]string, b
 			if vv.Key == "user_attrib" {
 				//如果是包含，表示倒排检索
 				if vv.Op == "include" {
-					if vv.Desc == "zip"{
+					if vv.Desc == "zip" || vv.Desc == "email" || vv.Desc == "mobile_phone"{
 						var FR indexer.FilterRule
 						FR.Field = vv.Desc
 						FR.Value = vv.Value
