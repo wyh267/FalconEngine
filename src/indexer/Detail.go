@@ -62,7 +62,7 @@ func (this *Detail) GetDocInfo(doc_id int64) (map[string]string,error){
 		return info_detail,nil
 	}
 	
-	functime := utils.InitTime()
+	//functime := utils.InitTime()
 
 	//fmt.Printf("Cost Time : %v \n",functime("Start"))
 	f,_ := os.Open("./index/detail.dat")

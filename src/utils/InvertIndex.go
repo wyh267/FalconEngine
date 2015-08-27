@@ -86,7 +86,7 @@ func (this *InvertIdx) GetInvertIndex(index int64) ([]DocIdInfo, bool) {
 	if index > this.IdxLen || index < 1 {
 		return nil, false
 	}
-	functime := InitTime()
+	//functime := InitTime()
 	lens := int(this.KeyInvertList[index].EndPos)
 	//./index/%v_idx.
 	//if this.IsMaped == false {
@@ -131,7 +131,7 @@ func (this *InvertIdx) GetInvertIndex(index int64) ([]DocIdInfo, bool) {
 	this.KeyInvertList[index].DocIdList=append(this.KeyInvertList[index].DocIdList,this.KeyInvertList[index].IncDocIdList...)
 	//fmt.Printf("Cost Time : %v \n",functime("append op"))
 	//fmt.Printf("DOC_IDS:%v\n",this.KeyInvertList[index].DocIdList)
-	mt.Printf("DOC_IDS : %v \n",this.KeyInvertList[index].DocIdList)
+	//fmt.Printf("DOC_IDS : %v \n",this.KeyInvertList[index].DocIdList)
 	
 	return this.KeyInvertList[index].DocIdList, true
 
