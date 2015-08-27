@@ -370,10 +370,20 @@ func (this *Searcher) ParseSearchInfo(log_id string, params map[string]string, b
 			if vv.Key == "user_attrib" {
 				//如果是包含，表示倒排检索
 				if vv.Op == "include" {
-					var SR indexer.SearchRule
-					SR.Field = vv.Desc
-					SR.Query = vv.Value
-					SRs.SR = append(SRs.SR, SR)
+					if vv.Desc == "zip"{
+						var FR indexer.FilterRule
+						FR.Field = vv.Desc
+						FR.Value = vv.Value
+						FR.IsForward = true
+						FR.FiltType = indexer.FILT_TYPE_INCLUDE
+						SRs.FR = append(SRs.FR, FR)
+					}else{
+						var SR indexer.SearchRule
+						SR.Field = vv.Desc
+						SR.Query = vv.Value
+						SRs.SR = append(SRs.SR, SR)
+					}
+					
 				} else { //正排检索
 					var FR indexer.FilterRule
 					FR.Field = vv.Desc
