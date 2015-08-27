@@ -72,6 +72,8 @@ func (this *Searcher) SimpleSearch(log_id string, body []byte, params map[string
 	} else {
 		tmp_doc_ids = total_doc_ids
 	}
+	/*
+	this.Indexer.GetDetailsByDocId(tmp_doc_ids)
 	ids, fields := this.Indexer.GetDetails(tmp_doc_ids)
 	var infos []map[string]string
 	for _, id := range ids {
@@ -81,8 +83,9 @@ func (this *Searcher) SimpleSearch(log_id string, body []byte, params map[string
 		}
 		infos = append(infos, info)
 	}
+	*/
 	this.Logger.Info("[LOG_ID:%v]Running Simple Searcher ....Time: %v \n\n", log_id, ftime("Display Detail"))
-	result["DATA"] = infos
+	result["DATA"] = this.Indexer.GetDetailsByDocId(tmp_doc_ids)
 	return nil
 	//
 	//result["PAGES"] = len(doc_ids)/int(ps) + 1

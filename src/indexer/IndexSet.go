@@ -24,6 +24,7 @@ type IndexSet struct {
 	Logger    *log4jzl.Log4jzl
 	IvtIndex  map[string]IndexInterface
 	PflIndex  map[string]ProfileInterface
+	Detail	  *Detail
 	Segmenter *utils.Segmenter
 	MaxDocId  int64
 	PrimaryKey	string
@@ -56,7 +57,7 @@ type IndexFieldInfo struct {
 ******************************************************************************/
 func NewIndexSet(bitmap *utils.Bitmap,logger *log4jzl.Log4jzl) *IndexSet {
 	segment := utils.NewSegmenter("./data/dictionary.txt")
-	builder := &utils.IndexBuilder{segment}
+	builder := &utils.IndexBuilder{Segmenter:segment,TempIndex:make(map[string][]utils.TmpIdx),TempIndexNum:make(map[string]int64)}
 	this := &IndexSet{BitMap:bitmap,IncBuilder:builder,FieldInfo:make(map[string]*IndexFieldInfo),MaxDocId:0,PrimaryKey:"PK",Segmenter: segment, IvtIndex: make(map[string]IndexInterface), Logger: logger, PflIndex: make(map[string]ProfileInterface)}
 	return this
 
@@ -238,6 +239,21 @@ func (this *IndexSet) InitIndexSet(fields map[string]string) error {
 		}
 	}
 	
+	//读取detail文件
+	this.Logger.Info("Loading Detail idx .....")
+	bidx, err := utils.ReadFromJson("./index/detail.idx.json")
+	if err != nil {
+		this.Logger.Info("Read Detail Error .....%v ",err)
+		return err
+	}
+	var detail Detail
+	err = json.Unmarshal(bidx, &detail)
+	if err != nil {
+		this.Logger.Info("Loading Detail Error .....%v ",err)
+		return err
+	}
+	this.Detail=&detail
+	
 	//保存最大DocId
 	this.MaxDocId = this.PflIndex[this.PrimaryKey].GetMaxDocId()
 		
@@ -261,7 +277,8 @@ type SearchRule struct{
 }
 
 func (this *IndexSet) SearchByRules(rules /*map[string]interface{}*/[]SearchRule) ([]utils.DocIdInfo, bool) {
-
+	functime := utils.InitTime()
+	fmt.Printf("SearchByRules: %v \n",functime("Start"))
 	var res []utils.DocIdInfo
 	for index, rule := range rules {
 		var sub_res []utils.DocIdInfo
@@ -270,7 +287,9 @@ func (this *IndexSet) SearchByRules(rules /*map[string]interface{}*/[]SearchRule
 			sub_res, ok = this.Search(rule.Query)
 		} else {
 			//this.Logger.Info(" Field : %v Query : %v",rule.Field, rule.Query)
+			fmt.Printf("SearchByRules: %v \n",functime("Start SearchField"))
 			sub_res, ok = this.SearchField(rule.Query, rule.Field)
+			fmt.Printf("SearchByRules: %v \n",functime("End SearchField"))
 		}
 		if !ok {
 			return nil, false
@@ -278,7 +297,9 @@ func (this *IndexSet) SearchByRules(rules /*map[string]interface{}*/[]SearchRule
 		if index==0 {
 			res = sub_res
 		} else {
+			fmt.Printf("SearchByRules: %v \n",functime("Start Interaction"))
 			res, ok = utils.Interaction(res, sub_res)
+			fmt.Printf("SearchByRules: %v \n",functime("End Interaction"))
 			if !ok {
 				return nil, false
 			}
@@ -288,17 +309,22 @@ func (this *IndexSet) SearchByRules(rules /*map[string]interface{}*/[]SearchRule
 
 	//BitMap过滤失效的doc_id
 	//this.Logger.Info(" %v ",res)
-	r:=make([]utils.DocIdInfo,0)
+	fmt.Printf("SearchByRules: %v \n",functime("Start Bitmap"))
+	r:=make([]utils.DocIdInfo,len(res))
+	r_index:=0
 	for i,_:=range res{
 		//this.Logger.Info(" %v ",res[i].DocId)
 		if this.BitMap.GetBit(uint64(res[i].DocId)) == 0 {
-			r = append(r,res[i])
+			r[r_index]=res[i]
+			r_index++
+			//r = append(r,res[i])
 		}
 	}
+	fmt.Printf("SearchByRules: %v \n",functime("End Bitmap"))
 
 	//TODO 自定义过滤
-
-	return r, true
+	fmt.Printf("SearchByRules: %v \n",functime("End SearchByRules"))
+	return r[:r_index], true
 }
 
 /*****************************************************************************
@@ -381,7 +407,7 @@ func (this *IndexSet) FilterByRules(doc_ids []utils.DocIdInfo, rules []FilterRul
 		if !ok {
 			continue
 		}
-
+		fmt.Printf("rule.Field : %v\n",rule.Field)
 		res, _ = this.PflIndex[rule.Field].Filter(res, rule.Value, rule.IsForward,rule.FiltType)
 	}
 	return res, nil
@@ -564,7 +590,8 @@ func (this *IndexSet) SearchFieldByString(query string, field string) ([]utils.D
 *
 ******************************************************************************/
 func (this *IndexSet) SearchFieldByNumber(query int64, field string) ([]utils.DocIdInfo, bool) {
-
+	functime := utils.InitTime()
+	fmt.Printf("SearchFieldByNumber: %v \n",functime("Start"))
 	_, ok := this.IvtIndex[field]
 	if !ok {
 		return nil, false
@@ -575,7 +602,7 @@ func (this *IndexSet) SearchFieldByNumber(query int64, field string) ([]utils.Do
 		return nil, false
 	}
 	//this.Logger.Info("[Number : %v ] [Field: %v ] DocIDs : %v", query, field, l)
-
+	fmt.Printf("SearchFieldByNumber: %v \n",functime("Find"))
 	return l, true
 }
 
@@ -593,6 +620,29 @@ func (this *IndexSet) GetId(doc_id utils.DocIdInfo) (int64,[]string){
 	
 	return t,fields
 }
+
+
+
+func (this *IndexSet) GetDetailsByDocId(doc_ids []utils.DocIdInfo) []interface{}{
+	
+	doc_infos := make([]interface{},0)
+	for _,doc_id := range doc_ids{
+		if this.BitMap.GetBit(uint64(doc_id.DocId)) == 1 {
+			this.Logger.Info("Get Bit Map  %v",  doc_id.DocId)
+			continue
+		}
+		info,err := this.Detail.GetDocInfo(doc_id.DocId)
+		if err !=nil {
+			this.Logger.Error("GetDocInfo %v ---  %v", doc_id, err)
+			continue
+		}
+		doc_infos = append(doc_infos,info)
+	}
+	
+	//this.Logger.Info("%v",doc_infos)
+	return doc_infos
+}
+
 
 
 func (this *IndexSet) GetDetails(doc_ids []utils.DocIdInfo) ([]int64,[]string){
@@ -647,11 +697,13 @@ func (this *IndexSet) UpdateRecord(info map[string]string,isProfileUpdate bool) 
 	
 	//如果仅更新正排文件，不需要新建doc_id，直接更新
 	Doc_id,has_key:=this.SearchField(pk,this.PrimaryKey)
+	var doc_id int64
 	if isProfileUpdate {
 		if !has_key{
 			//this.Logger.Error("isProfileUpdate  %v",  err)
 			return errors.New("Update err...no doc_id to update")
 		}
+		doc_id=Doc_id[0].DocId
 		for k,v := range info{
 			this.UpdateProfile(k,v,Doc_id[0].DocId)
 		}
@@ -667,7 +719,7 @@ func (this *IndexSet) UpdateRecord(info map[string]string,isProfileUpdate bool) 
 
 		}
 		//新增一个doc_id
-		doc_id := this.MaxDocId + 1	
+		doc_id = this.MaxDocId + 1	
 		for k,v := range info {
 			//this.Logger.Info("K : %v  === V : %v === Doc_ID : %v",k,v,doc_id)
 			this.UpdateInvert(k,v,doc_id)
@@ -676,7 +728,11 @@ func (this *IndexSet) UpdateRecord(info map[string]string,isProfileUpdate bool) 
 		
 		this.MaxDocId++	
 	}
-	
+	//更新detail
+	err= this.Detail.SetNewValue(doc_id,info)
+	if err!=nil{
+		this.Logger.Error("Update Detail Error : %v ",err)
+	}
 	
 	return nil
 	
@@ -696,7 +752,7 @@ func (this *IndexSet) UpdateInvert(k,v string,doc_id int64){
 	if field_info.IsIvt {
 
 		if field_info.FType == "T" {
-			err := this.IncBuilder.BuildTextIndex(doc_id, v, this.IvtIndex[k].GetIvtIndex(), this.IvtIndex[k].GetStrDic(),field_info.SType)
+			err := this.IncBuilder.BuildTextIndex(doc_id, v, this.IvtIndex[k].GetIvtIndex(), this.IvtIndex[k].GetStrDic(),field_info.SType,true)
 			if err != nil {
 				this.Logger.Error("ERROR : %v", err)
 			}
@@ -709,7 +765,7 @@ func (this *IndexSet) UpdateInvert(k,v string,doc_id int64){
 				this.Logger.Error("ERROR : %v", err)
 			}
 
-			err = this.IncBuilder.BuildNumberIndex(doc_id, v_num, this.IvtIndex[k].GetIvtIndex(), this.IvtIndex[k].GetNumDic())
+			err = this.IncBuilder.BuildNumberIndex(doc_id, v_num, this.IvtIndex[k].GetIvtIndex(), this.IvtIndex[k].GetNumDic(),true)
 			if err != nil {
 				this.Logger.Error("ERROR : %v", err)
 			}

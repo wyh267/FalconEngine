@@ -12,6 +12,7 @@ package builder
 import (
 	"BaseFunctions"
 	"github.com/outmana/log4jzl"
+	"indexer"
 )
 
 type Builder struct {
@@ -19,9 +20,10 @@ type Builder struct {
 	Dbadaptor *BaseFunctions.DBAdaptor
 	Logger    *log4jzl.Log4jzl
 	RedisCli  *BaseFunctions.RedisClient
+	Index_set *indexer.IndexSet
 }
 
-func NewBuilder(configure *BaseFunctions.Configure, dbadaptor *BaseFunctions.DBAdaptor, logger *log4jzl.Log4jzl, redis *BaseFunctions.RedisClient) *Builder {
-	this := &Builder{configure, dbadaptor, logger, redis}
+func NewBuilder(configure *BaseFunctions.Configure, dbadaptor *BaseFunctions.DBAdaptor, logger *log4jzl.Log4jzl, redis *BaseFunctions.RedisClient,index_set *indexer.IndexSet) *Builder {
+	this := &Builder{configure, dbadaptor, logger, redis,index_set}
 	return this
 }

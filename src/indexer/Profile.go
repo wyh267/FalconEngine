@@ -23,6 +23,7 @@ type Profile struct {
 	Name string
 	Type int64
 	Len  int64
+	
 }
 
 
@@ -31,6 +32,11 @@ const FILT_TYPE_LESS  int64 = 1
 const FILT_TYPE_ABOVE int64 = 2 
 const FILT_TYPE_EQUAL int64 = 3
 const FILT_TYPE_UNEQUAL int64= 4 
+const FILT_TYPE_LESS_DATERANGE int64 = 5
+const FILT_TYPE_ABOVE_DATERANGE int64 = 6
+const FILT_TYPE_EQUAL_DATERANGE int64 = 7
+const FILT_TYPE_UNEQUAL_DATERANGE int64 = 8
+const FILT_TYPE_INCLUDE int64 = 9
 
 
 

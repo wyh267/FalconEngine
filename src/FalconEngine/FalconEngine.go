@@ -51,7 +51,7 @@ func main() {
 	}
 	defer dbAdaptor.Release()
 
-	//初始化ID生成器
+	//初始化本地redis
 	redisClient, err := BaseFunctions.NewRedisClient(configure, logger)
 	if err != nil {
 		fmt.Printf("[ERROR] Create redisClient Error: %v\n", err)
@@ -82,7 +82,7 @@ func main() {
 		}}
 		
 		
-		builder := NewBuilderEngine(configure, dbAdaptor, logger, redisClient)
+		builder := NewBuilderEngine(configure, dbAdaptor, logger, redisClient,index_set)
 		builder.StartIncUpdate(data_chan)
 		
 		logger.Info("Server Start...")
