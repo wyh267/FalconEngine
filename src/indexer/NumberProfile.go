@@ -10,11 +10,11 @@
 package indexer
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
-	u "utils"
 	"strconv"
-	"encoding/json"
+	u "utils"
 )
 
 type NumberProfile struct {
@@ -23,7 +23,7 @@ type NumberProfile struct {
 }
 
 func NewNumberProfile(name string) *NumberProfile {
-	profile := &Profile{name, 2, 1,false}
+	profile := &Profile{name, 2, 1, false}
 	this := &NumberProfile{profile, make([]int64, 1)}
 	return this
 }
@@ -63,62 +63,61 @@ func (this *NumberProfile) FindValue(doc_id int64) (int64, error) {
 
 }
 
-
-func (this *NumberProfile) FilterValue(doc_ids []u.DocIdInfo, value int64, is_forward bool,filt_type int64) ([]u.DocIdInfo, error) {
+func (this *NumberProfile) FilterValue(doc_ids []u.DocIdInfo, value int64, is_forward bool, filt_type int64) ([]u.DocIdInfo, error) {
 
 	res := make([]u.DocIdInfo, 0, 1000)
-	
+
 	switch filt_type {
-		case FILT_TYPE_LESS:
-			
-			for i, _ := range doc_ids {
+	case FILT_TYPE_LESS:
 
-				if this.ProfileList[doc_ids[i].DocId] < value {
-					res = append(res, doc_ids[i])
-				}
-			}
-		case FILT_TYPE_ABOVE:
-			for i, _ := range doc_ids {
-				if this.ProfileList[doc_ids[i].DocId] > value {
-					res = append(res, doc_ids[i])
-				}
-			}
-		case FILT_TYPE_EQUAL:
-			for i, _ := range doc_ids {
-				if this.ProfileList[doc_ids[i].DocId] == value {
-					res = append(res, doc_ids[i])
-				}
-			}
-		case FILT_TYPE_UNEQUAL:
-			for i, _ := range doc_ids {
-				if this.ProfileList[doc_ids[i].DocId] != value {
-					res = append(res, doc_ids[i])
-				}
-			}
-		default:
-			for i, _ := range doc_ids {
-				if this.ProfileList[doc_ids[i].DocId] == value {
-					res = append(res, doc_ids[i])
-				}
-			}
-	}
-	
-	/*
-	if is_forward == true {
+		for i, _ := range doc_ids {
 
+			if this.ProfileList[doc_ids[i].DocId] < value {
+				res = append(res, doc_ids[i])
+			}
+		}
+	case FILT_TYPE_ABOVE:
+		for i, _ := range doc_ids {
+			if this.ProfileList[doc_ids[i].DocId] > value {
+				res = append(res, doc_ids[i])
+			}
+		}
+	case FILT_TYPE_EQUAL:
 		for i, _ := range doc_ids {
 			if this.ProfileList[doc_ids[i].DocId] == value {
 				res = append(res, doc_ids[i])
 			}
 		}
-
-	} else {
+	case FILT_TYPE_UNEQUAL:
 		for i, _ := range doc_ids {
 			if this.ProfileList[doc_ids[i].DocId] != value {
 				res = append(res, doc_ids[i])
 			}
 		}
+	default:
+		for i, _ := range doc_ids {
+			if this.ProfileList[doc_ids[i].DocId] == value {
+				res = append(res, doc_ids[i])
+			}
+		}
 	}
+
+	/*
+		if is_forward == true {
+
+			for i, _ := range doc_ids {
+				if this.ProfileList[doc_ids[i].DocId] == value {
+					res = append(res, doc_ids[i])
+				}
+			}
+
+		} else {
+			for i, _ := range doc_ids {
+				if this.ProfileList[doc_ids[i].DocId] != value {
+					res = append(res, doc_ids[i])
+				}
+			}
+		}
 	*/
 	return res, nil
 }
@@ -138,33 +137,30 @@ func (this *NumberProfile) Find(doc_id int64) (interface{}, error) {
 	return this.FindValue(doc_id)
 }
 
-func (this *NumberProfile) Filter(doc_ids []u.DocIdInfo, value interface{}, is_forward bool,filt_type int64) ([]u.DocIdInfo, error) {
-
+func (this *NumberProfile) Filter(doc_ids []u.DocIdInfo, value interface{}, is_forward bool, filt_type int64) ([]u.DocIdInfo, error) {
 
 	if doc_ids == nil {
 		return nil, nil
 	}
-	
+
 	value_str, ok := value.(string)
 	if ok {
-		v,err := strconv.ParseInt(value_str, 0, 0)
-		if err != nil{
-			fmt.Printf("Error %v \n",value)
-			return doc_ids,nil
+		v, err := strconv.ParseInt(value_str, 0, 0)
+		if err != nil {
+			fmt.Printf("Error %v \n", value)
+			return doc_ids, nil
 		}
-		return this.FilterValue(doc_ids, v, is_forward,filt_type)	
+		return this.FilterValue(doc_ids, v, is_forward, filt_type)
 	}
-	
 
 	value_num, ok := value.(int64)
 	if ok {
-		return this.FilterValue(doc_ids, value_num, is_forward,filt_type)	
+		return this.FilterValue(doc_ids, value_num, is_forward, filt_type)
 	}
-	
 
 	value_num_float, ok := value.(float64)
 	if ok {
-		return this.FilterValue(doc_ids, int64(value_num_float), is_forward,filt_type)	
+		return this.FilterValue(doc_ids, int64(value_num_float), is_forward, filt_type)
 	}
 
 	return doc_ids, nil
@@ -183,21 +179,16 @@ func (this *NumberProfile) CustomFilter(doc_ids []u.DocIdInfo, value interface{}
 	return res, nil
 }
 
-
-
 func (this *NumberProfile) GetType() int64 {
 	return this.Type
 }
 
-
 func (this *NumberProfile) WriteToFile() error {
-	
-	file_name := fmt.Sprintf("./index/%v_plf.json",this.Name)
-	
+
+	file_name := fmt.Sprintf("./index/%v_plf.json", this.Name)
+
 	return u.WriteToJson(this, file_name)
 }
-
-
 
 func (this *NumberProfile) ReadFromFile() error {
 	pfl_name := fmt.Sprintf("./index/%v_pfl.json", this.Name)

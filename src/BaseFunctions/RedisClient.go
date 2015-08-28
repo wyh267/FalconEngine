@@ -16,9 +16,6 @@ type RedisClient struct {
 	logger *log4jzl.Log4jzl
 }
 
-
-
-
 func NewRemoteRedisClient(config *Configure, logger *log4jzl.Log4jzl) (*RedisClient, error) {
 	counter := &RedisClient{}
 	counter.config = config
@@ -46,11 +43,6 @@ func NewRemoteRedisClient(config *Configure, logger *log4jzl.Log4jzl) (*RedisCli
 
 	return counter, nil
 }
-
-
-
-
-
 
 func NewRedisClient(config *Configure, logger *log4jzl.Log4jzl) (*RedisClient, error) {
 	counter := &RedisClient{}
@@ -84,9 +76,8 @@ func (this *RedisClient) Release() {
 	this.pool.Close()
 }
 
-
-func (this *RedisClient) GetFields(PK interface{},fields []string) ( map[string]string ,error) {
-	key := fmt.Sprintf("PK:%v",PK)
+func (this *RedisClient) GetFields(PK interface{}, fields []string) (map[string]string, error) {
+	key := fmt.Sprintf("PK:%v", PK)
 	//var value string
 	var comm []interface{}
 	comm = append(comm, key)
@@ -94,29 +85,27 @@ func (this *RedisClient) GetFields(PK interface{},fields []string) ( map[string]
 		comm = append(comm, v)
 	}
 	//fmt.Printf("Comm : %v \n",comm)
-	
+
 	conn := this.pool.Get()
 	defer conn.Close()
 	reply, err := redis.MultiBulk(conn.Do("HMGET", comm...))
-    if err != nil {
-        return nil, err
-    }
-    //var list = make([]string, 0)
-    var res = make(map[string]string)
+	if err != nil {
+		return nil, err
+	}
+	//var list = make([]string, 0)
+	var res = make(map[string]string)
 	for index, v := range reply {
-        s, err := redis.String(v, nil)
-        if err != nil {
-            return nil,err
-        }
-        s = strings.Trim(s, "\"")
-		res[fields[index]]=s
-       // list = append(list, s)
-    }
+		s, err := redis.String(v, nil)
+		if err != nil {
+			return nil, err
+		}
+		s = strings.Trim(s, "\"")
+		res[fields[index]] = s
+		// list = append(list, s)
+	}
 	//fmt.Printf("\n ALL REDIS RESULT :: %v\n", res)
-    return res, nil
+	return res, nil
 }
-
-
 
 func (this *RedisClient) SetFields(doc_id int64, fields map[string]string) error {
 	key := fmt.Sprintf("PK:%v", fields["id"])
@@ -143,19 +132,16 @@ func (this *RedisClient) SetFields(doc_id int64, fields map[string]string) error
 
 }
 
-
-
-func (this *RedisClient) GetGroupInfos(cid int64) ([]string,error) {
+func (this *RedisClient) GetGroupInfos(cid int64) ([]string, error) {
 	key := fmt.Sprintf("G_CONDITIONS:%v", cid)
 	conn := this.pool.Get()
 	defer conn.Close()
 	const NilRedis = "redigo: nil returned"
-	group_infos,err:=redis.Strings(conn.Do("HVALS",key))
-	if err!= nil && err.Error() !=NilRedis  {
-		return nil,err
+	group_infos, err := redis.Strings(conn.Do("HVALS", key))
+	if err != nil && err.Error() != NilRedis {
+		return nil, err
 	}
-	
-	return group_infos,nil	
-	
-	
+
+	return group_infos, nil
+
 }

@@ -67,8 +67,6 @@ func (this *Searcher) SearchCount(log_id string, body []byte, params map[string]
 		result["HAS_RESULT"] = 1
 	}
 
-
-
 	var tmp_doc_ids []utils.DocIdInfo
 	if len(total_doc_ids) > 10 {
 		tmp_doc_ids = total_doc_ids[:10]
@@ -76,21 +74,17 @@ func (this *Searcher) SearchCount(log_id string, body []byte, params map[string]
 		tmp_doc_ids = total_doc_ids
 	}
 	/*
-	ids, fields := this.Indexer.GetDetails(tmp_doc_ids)
-	var infos []map[string]string
-	for _, id := range ids {
-		info, err := this.RedisCli.GetFields(id, fields)
-		if err != nil {
-			this.Logger.Error("%v", err)
+		ids, fields := this.Indexer.GetDetails(tmp_doc_ids)
+		var infos []map[string]string
+		for _, id := range ids {
+			info, err := this.RedisCli.GetFields(id, fields)
+			if err != nil {
+				this.Logger.Error("%v", err)
+			}
+			infos = append(infos, info)
 		}
-		infos = append(infos, info)
-	}
-*/
+	*/
 	result["DATA"] = this.Indexer.GetDetailsByDocId(tmp_doc_ids)
-
-
-
-
 
 	this.Logger.Info("[LOG_ID:%v] End Counting....Time: %v \n\n", log_id, ftime("SearchCount"))
 
@@ -154,20 +148,18 @@ func (this *Searcher) ComputeScore(log_id string, body []byte, params map[string
 			this.Logger.Error("[LOG_ID:%v]  %v", log_id, err)
 			return err
 		}
-		
 
 	}
 
-
 	//读取redis数据
-	group_infos,err := this.RemoteRedisCli.GetGroupInfos(cid)
+	group_infos, err := this.RemoteRedisCli.GetGroupInfos(cid)
 	if err != nil {
 		this.Logger.Error("[LOG_ID:%v] ComputeScore GroupContact Error : %v", log_id, err)
 		return err
 	}
-	
-	for _,group_info := range group_infos {
-		err := this.GroupContact(log_id,[]byte(group_info),params,result,ftime)
+
+	for _, group_info := range group_infos {
+		err := this.GroupContact(log_id, []byte(group_info), params, result, ftime)
 		if err != nil {
 			this.Logger.Error("[LOG_ID:%v] ComputeScore GroupContact Error : %v", log_id, err)
 		}
@@ -209,10 +201,10 @@ func (this *Searcher) GroupContact(log_id string, body []byte, params map[string
 	//fields = append(fields, "contact_id")
 	//fields = append(fields, "cid")
 	//this.Logger.Info("doc_ids : %v ",total_doc_ids)
-	
+
 	infos := this.Indexer.GetDetailsByDocId(total_doc_ids)
-	for _,info := range infos {
-		v,ok:=info.(map[string]string)
+	for _, info := range infos {
+		v, ok := info.(map[string]string)
 		if ok {
 			const ADDCONTACTSTOGROUP_SQL string = "REPLACE INTO jzl_groups_contacts (cid,creator_id,last_editor_id,group_id,contact_id,create_time,last_modify_time,is_delete) VALUES (?,?,?,?,?,NOW(),NOW(),0)"
 			err = this.DbAdaptor.ExecFormat(ADDCONTACTSTOGROUP_SQL, v["cid"], si.Editor_id, si.Editor_id, si.Id, v["contact_id"])
@@ -221,27 +213,26 @@ func (this *Searcher) GroupContact(log_id string, body []byte, params map[string
 				return err
 			}
 		}
-		
-	}
-	
-	
-	/*
-	for _, doc_id := range total_doc_ids {
 
-		id, _ := this.Indexer.GetId(doc_id)
-		//this.Logger.Info("Fields : %v",fields)
-		info, err := this.RedisCli.GetFields(id, fields)
-		if err != nil {
-			this.Logger.Error("%v", err)
-		}
-		//this.Logger.Info("DOC INFO ::  %v ",info)
-		const ADDCONTACTSTOGROUP_SQL string = "REPLACE INTO jzl_groups_contacts (cid,creator_id,last_editor_id,group_id,contact_id,create_time,last_modify_time,is_delete) VALUES (?,?,?,?,?,NOW(),NOW(),0)"
-		err = this.DbAdaptor.ExecFormat(ADDCONTACTSTOGROUP_SQL, info["cid"], si.Editor_id, si.Editor_id, si.Id, info["contact_id"])
-		if err != nil {
-			this.Logger.Error("[LOG_ID:%v]  %v", log_id, err)
-			return err
-		}
 	}
+
+	/*
+		for _, doc_id := range total_doc_ids {
+
+			id, _ := this.Indexer.GetId(doc_id)
+			//this.Logger.Info("Fields : %v",fields)
+			info, err := this.RedisCli.GetFields(id, fields)
+			if err != nil {
+				this.Logger.Error("%v", err)
+			}
+			//this.Logger.Info("DOC INFO ::  %v ",info)
+			const ADDCONTACTSTOGROUP_SQL string = "REPLACE INTO jzl_groups_contacts (cid,creator_id,last_editor_id,group_id,contact_id,create_time,last_modify_time,is_delete) VALUES (?,?,?,?,?,NOW(),NOW(),0)"
+			err = this.DbAdaptor.ExecFormat(ADDCONTACTSTOGROUP_SQL, info["cid"], si.Editor_id, si.Editor_id, si.Id, info["contact_id"])
+			if err != nil {
+				this.Logger.Error("[LOG_ID:%v]  %v", log_id, err)
+				return err
+			}
+		}
 	*/
 	this.Logger.Info("[LOG_ID:%v] End Grouping ....Time: %v \n\n", log_id, ftime("GroupContact"))
 	return nil
@@ -267,16 +258,16 @@ func (this *Searcher) SimpleSearch(log_id string, body []byte, params map[string
 		tmp_doc_ids = total_doc_ids
 	}
 	/*
-	this.Indexer.GetDetailsByDocId(tmp_doc_ids)
-	ids, fields := this.Indexer.GetDetails(tmp_doc_ids)
-	var infos []map[string]string
-	for _, id := range ids {
-		info, err := this.RedisCli.GetFields(id, fields)
-		if err != nil {
-			this.Logger.Error("%v", err)
+		this.Indexer.GetDetailsByDocId(tmp_doc_ids)
+		ids, fields := this.Indexer.GetDetails(tmp_doc_ids)
+		var infos []map[string]string
+		for _, id := range ids {
+			info, err := this.RedisCli.GetFields(id, fields)
+			if err != nil {
+				this.Logger.Error("%v", err)
+			}
+			infos = append(infos, info)
 		}
-		infos = append(infos, info)
-	}
 	*/
 	this.Logger.Info("[LOG_ID:%v]Running Simple Searcher ....Time: %v \n\n", log_id, ftime("Display Detail"))
 	result["DATA"] = this.Indexer.GetDetailsByDocId(tmp_doc_ids)
@@ -389,20 +380,20 @@ func (this *Searcher) ParseSearchInfo(log_id string, params map[string]string, b
 			if vv.Key == "user_attrib" {
 				//如果是包含，表示倒排检索
 				if vv.Op == "include" {
-					if vv.Desc == "zip" || vv.Desc == "email" || vv.Desc == "mobile_phone"{
+					if vv.Desc == "zip" || vv.Desc == "email" || vv.Desc == "mobile_phone" {
 						var FR indexer.FilterRule
 						FR.Field = vv.Desc
 						FR.Value = vv.Value
 						FR.IsForward = true
 						FR.FiltType = indexer.FILT_TYPE_INCLUDE
 						SRs.FR = append(SRs.FR, FR)
-					}else{
+					} else {
 						var SR indexer.SearchRule
 						SR.Field = vv.Desc
 						SR.Query = vv.Value
 						SRs.SR = append(SRs.SR, SR)
 					}
-					
+
 				} else { //正排检索
 					var FR indexer.FilterRule
 					FR.Field = vv.Desc
@@ -542,8 +533,7 @@ func (this *Searcher) ParseSearchInfo(log_id string, params map[string]string, b
 				if vv.Key == "email_client" { //TODO
 
 				}
-				
-				
+
 				if vv.Key == "buys" {
 					var FR indexer.FilterRule
 					FR.Field = vv.Key
@@ -556,7 +546,7 @@ func (this *Searcher) ParseSearchInfo(log_id string, params map[string]string, b
 					FR.Value = vv.Value
 					SRs.FR = append(SRs.FR, FR)
 					continue
-					
+
 				}
 
 				if vv.Op == "include" { //其他检索，倒排索引
@@ -659,7 +649,7 @@ func (this *Searcher) ParseParams(log_id string, params map[string]string) ([]in
 				this.Logger.Error("[LOG_ID:%v] %v %v", log_id, v, k[1:])
 				continue
 			}
-			if stype == 1 || stype ==2 {
+			if stype == 1 || stype == 2 {
 				frules = append(frules, indexer.FilterRule{k[1:], true, 3, v})
 			} else {
 				v_n, err := strconv.ParseInt(v, 0, 0)

@@ -76,11 +76,11 @@ func (this *Bitmap) Maxpos() uint64 {
 // String 实现 Stringer 接口（只输出开始的100个元素）
 func (this *Bitmap) String() string {
 	var maxTotal, bitTotal uint64 = 100, this.maxpos + 1
-	
+
 	if this.maxpos > maxTotal {
 		bitTotal = maxTotal
 	}
-	
+
 	numSlice := make([]uint64, 0, bitTotal)
 
 	var offset uint64

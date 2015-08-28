@@ -1,16 +1,15 @@
 package utils
 
 import (
+	"fmt"
 	"sort"
 	"time"
-	"fmt"
 )
-
 
 /*****************************************************************************
 *  function name : RemoveDuplicatesAndEmpty
-*  params : 
-*  return : 
+*  params :
+*  return :
 *
 *  description : Term去重去空
 *
@@ -27,12 +26,10 @@ func RemoveDuplicatesAndEmpty(a []string) (ret []string) {
 	return
 }
 
-
-
 /*****************************************************************************
 *  function name : Merge
-*  params : 
-*  return : 
+*  params :
+*  return :
 *
 *  description : 求并集
 *
@@ -59,7 +56,7 @@ func Merge(a []DocIdInfo, b []DocIdInfo) ([]DocIdInfo, bool) {
 		}
 
 		if a[ia].DocId < b[ib].DocId {
-		//	fmt.Printf("ia : %v ======== ib : %v \n",ia,ib)
+			//	fmt.Printf("ia : %v ======== ib : %v \n",ia,ib)
 			c = append(c, a[ia])
 			ia++
 		} else {
@@ -87,12 +84,10 @@ func Merge(a []DocIdInfo, b []DocIdInfo) ([]DocIdInfo, bool) {
 
 }
 
-
-
 /*****************************************************************************
 *  function name : Interaction
-*  params : 
-*  return : 
+*  params :
+*  return :
 *
 *  description : 求交集
 *
@@ -126,28 +121,24 @@ func Interaction(a []DocIdInfo, b []DocIdInfo) ([]DocIdInfo, bool) {
 
 }
 
-
 /*
 func InitCount() (func(int64) CountInfo) {
 	var searchCount int64 = 0
 	var updateCount int64 = 0
 	var pvCount		int64 = 0
-	
+
 }
 */
 
-
-func InitTime() (func(string) string ){
+func InitTime() func(string) string {
 	init_time := time.Now()
-	
+
 	return func(description string) string {
 		now := time.Now()
-		cost := fmt.Sprintf("[ %v ] cost:%v", description,now.Sub(init_time))
+		cost := fmt.Sprintf("[ %v ] cost:%v", description, now.Sub(init_time))
 		init_time = now
 		return cost
-		
+
 	}
-	
+
 }
-
-
