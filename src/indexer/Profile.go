@@ -17,13 +17,14 @@ const (
 	PflNum = iota
 	PflText
 	PflDate
+	PflByte
 )
 
 type Profile struct {
 	Name string
 	Type int64
 	Len  int64
-	
+	IsMmap bool
 }
 
 
@@ -48,6 +49,8 @@ type ProfileInterface interface {
 	GetType() int64
 	GetMaxDocId() int64
 	CustomFilter(doc_ids []u.DocIdInfo, value interface{}, r bool, cf func(v1, v2 interface{}) bool) ([]u.DocIdInfo, error)
+	WriteToFile() error
+	ReadFromFile() error
 }
 
 /*****************************************************************************

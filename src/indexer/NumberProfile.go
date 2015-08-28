@@ -14,6 +14,7 @@ import (
 	"fmt"
 	u "utils"
 	"strconv"
+	"encoding/json"
 )
 
 type NumberProfile struct {
@@ -22,7 +23,7 @@ type NumberProfile struct {
 }
 
 func NewNumberProfile(name string) *NumberProfile {
-	profile := &Profile{name, 2, 1}
+	profile := &Profile{name, 2, 1,false}
 	this := &NumberProfile{profile, make([]int64, 1)}
 	return this
 }
@@ -186,4 +187,24 @@ func (this *NumberProfile) CustomFilter(doc_ids []u.DocIdInfo, value interface{}
 
 func (this *NumberProfile) GetType() int64 {
 	return this.Type
+}
+
+
+func (this *NumberProfile) WriteToFile() error {
+	
+	file_name := fmt.Sprintf("./index/%v_plf.json",this.Name)
+	
+	return u.WriteToJson(this, file_name)
+}
+
+
+
+func (this *NumberProfile) ReadFromFile() error {
+	pfl_name := fmt.Sprintf("./index/%v_pfl.json", this.Name)
+	bpfl, _ := u.ReadFromJson(pfl_name)
+	err := json.Unmarshal(bpfl, this)
+	if err != nil {
+		return err
+	}
+	return nil
 }

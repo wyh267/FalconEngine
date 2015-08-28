@@ -156,7 +156,12 @@ func (this *IndexSet) GetIdxType(field string) int64 {
 *
 ******************************************************************************/
 func (this *IndexSet) InitIndexSet(fields map[string]string) error {
+	this.Logger.Info(" fields:%v \n",fields)
 	for k, v := range fields {
+		this.Logger.Info(" KEY:%v  VALUE:%v\n",k,v)
+	}
+	for k, v := range fields {
+		this.Logger.Info(" KEY:%v  VALUE:%v\n",k,v)
 		l := strings.Split(v, ",")
 		if len(l) != 5 {
 			this.Logger.Error("%v", errors.New("Wrong config file"))
@@ -227,7 +232,8 @@ func (this *IndexSet) InitIndexSet(fields map[string]string) error {
 				}
 				this.PutProfile(k, &pfl)
 
-			} else {
+			} else if l[3] == "N" {
+				this.FieldInfo[k].FType="N"
 				var pfl NumberProfile
 				this.Logger.Info("Loading Index Profile    [ %v ] type : Number ...", pfl_name)
 				err := json.Unmarshal(bpfl, &pfl)
@@ -235,6 +241,16 @@ func (this *IndexSet) InitIndexSet(fields map[string]string) error {
 					return err
 				}
 				this.PutProfile(k, &pfl)
+			} else if l[3] == "I" {
+				this.FieldInfo[k].FType="I"
+				var pfl ByteProfile
+				this.Logger.Info("Loading Index Profile    [ %v ] type : Bytes ...", pfl_name)
+				err := json.Unmarshal(bpfl, &pfl)
+				if err != nil {
+					return err
+				}
+				this.PutProfile(k, &pfl)
+			
 			}
 		}
 	}

@@ -659,7 +659,7 @@ func (this *Searcher) ParseParams(log_id string, params map[string]string) ([]in
 				this.Logger.Error("[LOG_ID:%v] %v %v", log_id, v, k[1:])
 				continue
 			}
-			if stype == 1 {
+			if stype == 1 || stype ==2 {
 				frules = append(frules, indexer.FilterRule{k[1:], true, 3, v})
 			} else {
 				v_n, err := strconv.ParseInt(v, 0, 0)

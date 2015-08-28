@@ -24,7 +24,7 @@ type FieldInfo struct {
 	IvtNumDic *utils.NumberIdxDic
 	PlfText   *indexer.TextProfile
 	PlfNumber *indexer.NumberProfile
-
+	PlfByte	  *indexer.ByteProfile
 }
 
 type DBBuilder struct {
@@ -209,40 +209,7 @@ func (this *DBBuilder) ScanInc(Data_chan chan UpdateInfo) error {
 			}
 			
 		}
-		//this.Logger.Info("New : %v ",new_values)
-		/*
-		fieldlist:=make([]string,0)
-		for k,_ := range new_values{
-			fieldlist=append(fieldlist,k)
-		}
-		
-		redis_map,err:=this.RedisCli.GetFields(new_values["id"],fieldlist)
-		if err != nil {
-			if err.Error() == "redigo: nil returned"{
-				//this.Logger.Info("Old continue : %v  ERR : %v ",redis_map,err.Error())
-				isUpdate=true
-				isProfile = false
-			}else{
-				continue
-			}
-		}
-		//this.Logger.Info("Old : %v  ERR : %v ",redis_map,err)
-		for k,v := range redis_map{
-			vv,ok := new_values[k]
-			if !ok{
-				break
-			}
-			
-			//this.Logger.Info("K : %v ==== V : %v === VV : %v",k,v,vv)
-			if (v != vv) && k != incField {
-				isUpdate = true
-				curr_time = new_values[incField]
-				if isIvert[k] {
-					isProfile = false
-				}
-			}
-		}
-		*/
+
 		if isUpdate{
 
 			this.Logger.Info("Update Status : Just Update Profile : [%v] ",isProfile)
@@ -310,6 +277,10 @@ func (this *DBBuilder) Buiding() error {
 
 			if v.FType == "N" {
 				this.Fields[index].PlfNumber = indexer.NewNumberProfile(v.Name)
+			}
+			
+			if v.FType == "I" {
+				this.Fields[index].PlfByte = indexer.NewByteProfile(v.Name)
 			}
 
 		}
@@ -401,6 +372,18 @@ func (this *DBBuilder) Buiding() error {
 						this.Logger.Error("ERROR : %v", err)
 					}
 				}
+				
+				
+				if this.Fields[index].FType == "I" {
+					v_byte:=[]byte(v)
+					err = this.Fields[index].PlfByte.PutProfile(doc_id, v_byte)
+					if err != nil {
+						this.Logger.Error("ERROR : %v", err)
+					}
+				}
+				
+				
+				
 
 			}
 
@@ -474,6 +457,15 @@ func (this *DBBuilder) Buiding() error {
 
 				//utils.WriteToJsonWithChan(fields.PlfNumber, fmt.Sprintf("./index/%v_pfl.json", fields.Name),writeChan)
 				utils.WriteToJson(fields.PlfNumber, fmt.Sprintf("./index/%v_pfl.json", fields.Name))
+				//writeCount++
+
+			}
+			
+			if this.Fields[index].FType == "I" {
+
+				//utils.WriteToJsonWithChan(fields.PlfNumber, fmt.Sprintf("./index/%v_pfl.json", fields.Name),writeChan)
+				
+				fields.PlfByte.WriteToFile()
 				//writeCount++
 
 			}

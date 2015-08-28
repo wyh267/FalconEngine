@@ -14,6 +14,7 @@ import (
 	"fmt"
 	"strings"
 	"strconv"
+	"encoding/json"
 	u "utils"
 )
 
@@ -23,7 +24,7 @@ type TextProfile struct {
 }
 
 func NewTextProfile(name string) *TextProfile {
-	profile := &Profile{name, 1, 1}
+	profile := &Profile{name, 1, 1,false}
 	this := &TextProfile{profile, make([]string, 1)}
 	return this
 }
@@ -196,3 +197,24 @@ func (this *TextProfile) GetType() int64 {
 	return this.Type
 }
 
+
+
+
+func (this *TextProfile) WriteToFile() error {
+	
+	file_name := fmt.Sprintf("./index/%v_plf.json",this.Name)
+	
+	return u.WriteToJson(this, file_name)
+	
+}
+
+
+func (this *TextProfile) ReadFromFile() error {
+	pfl_name := fmt.Sprintf("./index/%v_pfl.json", this.Name)
+	bpfl, _ := u.ReadFromJson(pfl_name)
+	err := json.Unmarshal(bpfl, this)
+	if err != nil {
+		return err
+	}
+	return nil
+}
