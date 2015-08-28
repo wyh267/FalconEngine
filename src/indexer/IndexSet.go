@@ -156,18 +156,23 @@ func (this *IndexSet) GetIdxType(field string) int64 {
 *
 ******************************************************************************/
 func (this *IndexSet) InitIndexSet(fields map[string]string) error {
-	this.Logger.Info(" fields:%v \n",fields)
+	
 	for k, v := range fields {
-		this.Logger.Info(" KEY:%v  VALUE:%v\n",k,v)
-	}
-	for k, v := range fields {
-		this.Logger.Info(" KEY:%v  VALUE:%v\n",k,v)
+		//this.Logger.Info(" KEY:%v  VALUE:%v\n",k,v)
 		l := strings.Split(v, ",")
 		if len(l) != 5 {
 			this.Logger.Error("%v", errors.New("Wrong config file"))
 			return errors.New("Wrong configure for index")
 		}
 		this.FieldInfo[k]=&IndexFieldInfo{false,false,false,"N",k,0}
+		stype, err := strconv.ParseInt(l[4], 0, 0)
+		if err != nil {
+			this.Logger.Error("Error to ParseInt[%v], %v",l[4],err)
+			return err
+		}
+		
+		this.FieldInfo[k].SType=stype
+		
 		if l[0] == "1"{
 			this.PrimaryKey=k
 			this.FieldInfo[k].IsPK=true
@@ -183,6 +188,7 @@ func (this *IndexSet) InitIndexSet(fields map[string]string) error {
 			var idx utils.InvertIdx
 			err := json.Unmarshal(bidx, &idx)
 			if err != nil {
+				this.Logger.Error("Error to unmarshal[%v], %v",k,err)
 				return err
 			}
 			this.Logger.Info("Loading Index            [ %v ] ...", idx_name)
@@ -192,23 +198,20 @@ func (this *IndexSet) InitIndexSet(fields map[string]string) error {
 				this.Logger.Info("Loading Index Dictionary [ %v ] type : Text ...", dic_name)
 				err = json.Unmarshal(bdic, &dic)
 				if err != nil {
+					this.Logger.Error("Error to unmarshal[%v], %v",k,err)
 					return err
 				}
 				index := NewTextIndex(k, &idx, &dic)
 				this.PutIndex(k, index)
 				
-				stype, err := strconv.ParseInt(l[4], 0, 0)
-				if err != nil {
-					return err
-				}
 				
-				this.FieldInfo[k].SType=stype
 
 			} else { //number ivt
 				var dic utils.NumberIdxDic
 				this.Logger.Info("Loading Index Dictionary [ %v ] type : Number...", dic_name)
 				err = json.Unmarshal(bdic, &dic)
 				if err != nil {
+					this.Logger.Error("Error to unmarshal[%v], %v",k,err)
 					return err
 				}
 				index := NewNumberIndex(k, &idx, &dic)
@@ -228,6 +231,7 @@ func (this *IndexSet) InitIndexSet(fields map[string]string) error {
 				this.Logger.Info("Loading Index Profile    [ %v ] type : Text ...", pfl_name)
 				err := json.Unmarshal(bpfl, &pfl)
 				if err != nil {
+					this.Logger.Error("Error to unmarshal[%v], %v",k,err)
 					return err
 				}
 				this.PutProfile(k, &pfl)
@@ -238,6 +242,7 @@ func (this *IndexSet) InitIndexSet(fields map[string]string) error {
 				this.Logger.Info("Loading Index Profile    [ %v ] type : Number ...", pfl_name)
 				err := json.Unmarshal(bpfl, &pfl)
 				if err != nil {
+					this.Logger.Error("Error to unmarshal[%v], %v",k,err)
 					return err
 				}
 				this.PutProfile(k, &pfl)
@@ -247,6 +252,7 @@ func (this *IndexSet) InitIndexSet(fields map[string]string) error {
 				this.Logger.Info("Loading Index Profile    [ %v ] type : Bytes ...", pfl_name)
 				err := json.Unmarshal(bpfl, &pfl)
 				if err != nil {
+					this.Logger.Error("Error to unmarshal[%v], %v",k,err)
 					return err
 				}
 				this.PutProfile(k, &pfl)
@@ -827,6 +833,16 @@ func (this *IndexSet) UpdateProfile(k,v string,doc_id int64) {
 				this.Logger.Error("ERROR : %v Key : %v ", err,k)
 			}
 		}
+		
+		
+		if field_info.FType == "I" {
+			
+			err := this.PflIndex[k].Put(doc_id, []byte(v))
+			if err != nil {
+				this.Logger.Error("ERROR : %v Key : %v ", err,k)
+			}
+		}
+		
 	}
 	
 	

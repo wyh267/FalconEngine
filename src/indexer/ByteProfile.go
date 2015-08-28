@@ -86,7 +86,7 @@ func (this *ByteProfile) FindValue(doc_id int64) ([]byte, error) {
 		return this.ProfileList[doc_id].Data, nil
 	}
 	
-	f,_ := os.Open(fmt.Sprintf("./index/%v_plf.dat",this.Name))
+	f,_ := os.Open(fmt.Sprintf("./index/%v_pfl.dat",this.Name))
 	defer f.Close()
 	fi, err := f.Stat()
 	if err != nil{
@@ -102,7 +102,8 @@ func (this *ByteProfile) FindValue(doc_id int64) ([]byte, error) {
 
 	StartPos:=int(this.ProfileList[doc_id].Start)
 	EndPos:=this.ProfileList[doc_id].DataLen+StartPos
-	this.ProfileList[doc_id].Data = MmapBytes[StartPos:EndPos]
+	this.ProfileList[doc_id].Data = make([]byte,this.ProfileList[doc_id].DataLen)
+	copy(this.ProfileList[doc_id].Data,MmapBytes[StartPos:EndPos])
 	//fmt.Printf("Cost Time : %v \n",functime("MmapBytes"))
 	
 	this.ProfileList[doc_id].InMomory=true
@@ -115,53 +116,106 @@ func (this *ByteProfile) FindValue(doc_id int64) ([]byte, error) {
 func (this *ByteProfile) FilterValue(doc_ids []u.DocIdInfo, value string, is_forward bool,filt_type int64) ([]u.DocIdInfo, error) {
 
 	res := make([]u.DocIdInfo, 0, 1000)
+	values:=strings.Split(value,",")
+	value_num,_:=strconv.ParseInt(values[0], 0, 0)
+	index_start,_:=strconv.ParseInt(values[1], 0, 0)
+	index_end,_:=strconv.ParseInt(values[2], 0, 0)
 	switch filt_type {
-		case FILT_TYPE_EQUAL:
-			fmt.Printf("FILT_TYPE_LESS_DATERANGE\n")
-			values:=strings.Split(value,",")
-			value_num,_:=strconv.ParseInt(values[0], 0, 0)
-			index_start,_:=strconv.ParseInt(values[1], 0, 0)
-			index_end,_:=strconv.ParseInt(values[2], 0, 0)
+		case FILT_TYPE_LESS:
+			fmt.Printf("FILT_TYPE_LESS\n")
+			OUTER_LESS:
 			for i, _ := range doc_ids {
 				byte_value,_:=this.FindValue(doc_ids[i].DocId)
 				items:=strings.Split(string(byte_value),",")
-				
+				lens := len(items)
+				fmt.Printf("value : %v , start : %v , end : %v , lens_items : %v \n",value_num,index_start,index_end,len(items))
+				if int(index_start) >= lens ||  int(index_end) >= lens || index_start>=index_end || lens<1 || index_start<0 || index_end < 1{
+					fmt.Printf("byteprofile info Error ... ")
+					continue
+				}
 				var total int64=0
 				for pos:=int(index_start);pos<int(index_end);pos++{
-					
 					data,_:=strconv.ParseInt(items[pos], 0, 0)
-					fmt.Printf("data : %v \n",data)
 					total+=data
+					if total >= value_num{
+						continue OUTER_LESS
+					}
 				}
 				if total < value_num  {
 					res = append(res, doc_ids[i])
 				}
 			
 			}
-			/*
+			
 		case FILT_TYPE_ABOVE:
+			fmt.Printf("FILT_TYPE_LESS\n")
 			for i, _ := range doc_ids {
-				if this.ProfileList[doc_ids[i].DocId] > value {
+				byte_value,_:=this.FindValue(doc_ids[i].DocId)
+				items:=strings.Split(string(byte_value),",")
+				lens := len(items)
+				fmt.Printf("value : %v , start : %v , end : %v , lens_items : %v \n",value_num,index_start,index_end,len(items))
+				if int(index_start) >= lens ||  int(index_end) >= lens || index_start>=index_end || lens<1 || index_start<0 || index_end < 1{
+					fmt.Printf("byteprofile info Error ... ")
+					continue
+				}
+				var total int64=0
+				for pos:=int(index_start);pos<int(index_end);pos++{
+					data,_:=strconv.ParseInt(items[pos], 0, 0)
+					total+=data
+				}
+				if total > value_num  {
 					res = append(res, doc_ids[i])
 				}
+			
 			}
 		case FILT_TYPE_EQUAL:
+			fmt.Printf("FILT_TYPE_LESS\n")
+			OUTER_EQUAL:
 			for i, _ := range doc_ids {
-				if this.ProfileList[doc_ids[i].DocId] == value {
+				byte_value,_:=this.FindValue(doc_ids[i].DocId)
+				items:=strings.Split(string(byte_value),",")
+				lens := len(items)
+				fmt.Printf("value : %v , start : %v , end : %v , lens_items : %v \n",value_num,index_start,index_end,len(items))
+				if int(index_start) >= lens ||  int(index_end) >= lens || index_start>=index_end || lens<1 || index_start<0 || index_end < 1{
+					fmt.Printf("byteprofile info Error ... ")
+					continue
+				}
+				var total int64=0
+				for pos:=int(index_start);pos<int(index_end);pos++{
+					data,_:=strconv.ParseInt(items[pos], 0, 0)
+					total+=data
+					if total > value_num{
+						continue OUTER_EQUAL
+					}
+				}
+				if total == value_num  {
 					res = append(res, doc_ids[i])
 				}
+			
 			}
 		case FILT_TYPE_UNEQUAL:
+			fmt.Printf("FILT_TYPE_LESS\n")
 			for i, _ := range doc_ids {
-				if this.ProfileList[doc_ids[i].DocId] != value {
+				byte_value,_:=this.FindValue(doc_ids[i].DocId)
+				items:=strings.Split(string(byte_value),",")
+				lens := len(items)
+				fmt.Printf("value : %v , start : %v , end : %v , lens_items : %v \n",value_num,index_start,index_end,len(items))
+				if int(index_start) >= lens ||  int(index_end) >= lens || index_start>=index_end || lens<1 || index_start<0 || index_end < 1{
+					fmt.Printf("byteprofile info Error ... ")
+					continue
+				}
+				var total int64=0
+				for pos:=int(index_start);pos<int(index_end);pos++{
+					data,_:=strconv.ParseInt(items[pos], 0, 0)
+					total+=data
+					
+				}
+				if total != value_num  {
 					res = append(res, doc_ids[i])
 				}
-			}
-			*/
 			
+			}			
 	}
-	
-
 
 	return res,nil
 }
@@ -216,7 +270,7 @@ func (this *ByteProfile) WriteToFile() error {
 	buf:=new(bytes.Buffer)
 	
 	//file_name := fmt.Sprintf("./index/detail.dat")
-	fout, err := os.Create(fmt.Sprintf("./index/%v_plf.dat",this.Name))
+	fout, err := os.Create(fmt.Sprintf("./index/%v_pfl.dat",this.Name))
 	if err != nil {
 		fmt.Printf("Create Error %v\n",err)
 		return err
@@ -237,7 +291,7 @@ func (this *ByteProfile) WriteToFile() error {
 	}
 	
 	fout.Write(buf.Bytes())	
-	u.WriteToJson(this,fmt.Sprintf("./index/%v_plf.json",this.Name))
+	u.WriteToJson(this,fmt.Sprintf("./index/%v_pfl.json",this.Name))
 	return nil
 	
 }

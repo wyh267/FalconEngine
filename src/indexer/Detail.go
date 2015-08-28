@@ -81,7 +81,8 @@ func (this *Detail) GetDocInfo(doc_id int64) (map[string]string,error){
 
 	StartPos:=int(this.DetailList[doc_id].ByteStart)
 	EndPos:=int(this.DetailList[doc_id].ByteLen)+StartPos
-	this.DetailList[doc_id].DetailBytes = MmapBytes[StartPos:EndPos]
+	this.DetailList[doc_id].DetailBytes = make([]byte,int(this.DetailList[doc_id].ByteLen)) 
+	copy(this.DetailList[doc_id].DetailBytes,MmapBytes[StartPos:EndPos])
 	//fmt.Printf("Cost Time : %v \n",functime("MmapBytes"))
 	
 	var info_detail map[string]string
