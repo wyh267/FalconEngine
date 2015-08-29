@@ -21,10 +21,10 @@ import (
 	"fmt"
 )
 
-func WriteToJsonWithChan(data interface{}, file_name string, wchan chan int) error {
+func WriteToJsonWithChan(data interface{}, file_name string, wchan chan string) error {
 
 	WriteToJson(data, file_name)
-	wchan <- 1
+	wchan <- file_name
 	return nil
 }
 
