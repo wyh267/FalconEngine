@@ -120,7 +120,7 @@ func (this *DBBuilder) StartBuildIndex() {
 
 type UpdateInfo struct {
 	Info      map[string]string
-	IsProfile bool
+	UpdateType int
 	ErrChan   chan error
 }
 
@@ -150,7 +150,7 @@ func (this *DBBuilder) ScanInc(Data_chan chan UpdateInfo) error {
 		defer rows.Close()
 		for rows.Next() {
 			isUpdate := false
-			isProfile := true
+			updateType := indexer.PlfUpdate
 			//values := make([]interface{},len(this.Fields))
 			values := make([]interface{}, len(this.Fields))
 			writeCols := make([]string, len(this.Fields))
@@ -168,6 +168,22 @@ func (this *DBBuilder) ScanInc(Data_chan chan UpdateInfo) error {
 				new_values[this.Fields[index].Name] = v
 
 			}
+			
+			//判断是否是删除操作
+			/*
+			if new_values["is_delete"] == "1" {
+				this.Logger.Info("Update Status : Delete doc  ")
+				upinfo := UpdateInfo{new_values, indexer.Delete, make(chan error)}
+				Data_chan <- upinfo
+				errinfo := <-upinfo.ErrChan
+				if errinfo != nil {
+					this.Logger.Info("Update Fail.... %v ", errinfo)
+				} else {
+					this.Logger.Info("Update Success.... ")
+				}
+				continue
+			}
+			*/
 
 			pk, err := strconv.ParseInt(new_values["id"], 0, 0)
 			if err != nil {
@@ -177,7 +193,7 @@ func (this *DBBuilder) ScanInc(Data_chan chan UpdateInfo) error {
 			doc_ids, ok := this.Index_set.SearchField(pk, "id")
 			if !ok { //新增DOC_ID
 				isUpdate = true
-				isProfile = false
+				updateType = indexer.IvtUpdate
 			} else {
 
 				redis_map, err := this.Index_set.Detail.GetDocInfo(doc_ids[0].DocId)
@@ -196,9 +212,9 @@ func (this *DBBuilder) ScanInc(Data_chan chan UpdateInfo) error {
 					if (v != vv) && k != incField {
 						isUpdate = true
 
-						curr_time = new_values[incField]
+						//curr_time = new_values[incField]
 						if isIvert[k] {
-							isProfile = false
+							updateType = indexer.IvtUpdate
 						}
 					}
 				}
@@ -206,9 +222,12 @@ func (this *DBBuilder) ScanInc(Data_chan chan UpdateInfo) error {
 			}
 
 			if isUpdate {
-
-				this.Logger.Info("Update Status : Just Update Profile : [%v] ", isProfile)
-				upinfo := UpdateInfo{new_values, isProfile, make(chan error)}
+				curr_time = new_values[incField]
+				if new_values["is_delete"] == "1" {
+					updateType=indexer.Delete
+				}
+				this.Logger.Info("Update Status : Just Update Profile : [%v] ", updateType)
+				upinfo := UpdateInfo{new_values, updateType, make(chan error)}
 				Data_chan <- upinfo
 				errinfo := <-upinfo.ErrChan
 				if errinfo != nil {

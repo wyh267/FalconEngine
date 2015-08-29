@@ -84,7 +84,7 @@ func main(){
 	
 	
 	//fmt.Printf("len : %v\n",len(citylist))
-	cids := [7]int64{321,322,323,324,325,326,327}
+	cids := [7]int64{321,322}
 	sexs := [2]int64{0,1}
 	namelist := strings.Split(names,",")
 	mobile_phone := "139111664323"
@@ -122,14 +122,20 @@ func main(){
 	//fmt.Printf("INSERT INTO `jzl_dmp` (`cid`, `contact_id`, `name`,`sex`,`email`,`mobile_phone`, `address`, `score`,`email_view`,`email_click`,`email_sended`,`sms_sended`,`sms_click`,`from_source`,`email_client`,`update_time`,`create_time`,`last_modify_time`) VALUES\n")
 	for i:=0;i<20;i++{
 
-		sql:="INSERT INTO `jzl_dmp` (`cid`, `contact_id`, `name`,`sex`,`email`,`mobile_phone`, `address`, `score`,`email_view`,`email_click`,`email_sended`,`sms_sended`,`sms_click`,`from_source`,`email_client`,`age`,`birth`,`source`,`zip`,`is_customer`,`job_title`,`company`,`website`,`annual_revenue`,`industry`,`update_time`,`create_time`,`last_modify_time`,`buys`) VALUES ('%v','%v','%v','%v','%v','%v','%v','%v','%v','%v','%v','%v','%v','%v','%v','%v','%v','%v','%v','%v','%v','%v','%v','%v','%v',NOW(),NOW(),NOW(),'%v');\n"
-		rname := rand.Intn(4999)
-		rsex :=rand.Intn(2)
-		rcid := rand.Intn(7)
+		sql:="INSERT INTO `jzl_dmp` (`cid`, `contact_id`, `name`,`sex`,`email`,`mobile_phone`, `address`, `score`,`email_view`,`email_click`,`email_sended`,`sms_sended`,`sms_click`,`from_source`,`email_client`,`age`,`birth`,`source`,`zip`,`is_customer`,`job_title`,`company`,`website`,`annual_revenue`,`industry`,`update_time`,`create_time`,`last_modify_time`,`buy_times`,`buy_total_amount`,`last_buy_date`) VALUES ('%v','%v','%v','%v','%v','%v','%v','%v','%v','%v','%v','%v','%v','%v','%v','%v','%v','%v','%v','%v','%v','%v','%v','%v','%v',NOW(),NOW(),NOW(),'%v','%v','%v');\n"
 		
+		//生成姓名
+		rname := rand.Intn(4999)
+		//生成性别
+		rsex :=rand.Intn(2)
+		
+		//生成cid的index
+		rcid := rand.Intn(2)
+		
+		//生成打分数据
 		score := rand.Intn(100)
 		
-		email_num:=rand.Intn(30)//邮件数量
+		email_num:=rand.Intn(100)//邮件数量
 		email_status := [3]string{"","",""}
 		for num:=0;num<email_num;num++{
 			task_id := rand.Intn(2000)
@@ -141,7 +147,7 @@ func main(){
 		}
 		
 		
-		sms_num:=rand.Intn(100)//邮件数量
+		sms_num:=rand.Intn(100)//短信数量
 		sms_status := [3]string{"","",""}
 		for num:=0;num<sms_num;num++{
 			task_id := rand.Intn(2000)
@@ -152,46 +158,67 @@ func main(){
 			}			
 		}
 		
+		//来源索引
 		rfrom:=rand.Intn(2800)
+		
+		//生成客户端
 		rclient:=rand.Intn(5)
 		
+		//生成年龄
 		age:=rand.Intn(50)
+		
+		//生成生日
 		birth:=fmt.Sprintf("%v-%02d-%02d",rand.Intn(45)+1970,rand.Intn(11)+1,rand.Intn(29)+1)
+		
+		//生成数据来源
 		source:=rand.Intn(2)+1
+		
+		//生成邮编
 		zip := rand.Intn(10000)
+		
+		//是否客户
 		is_customer := rand.Intn(3)+1
+		
+		//年收入
 		annual_revenue := rand.Intn(900000)
-		w,_:=TransNumToString(int64(rand.Intn(10000)))
+		
+		//生成网站
+		w,_:=TransNumToString(int64(rand.Intn(100000)))
 		website:="www." + w + ".com"
 		
+		//职位
 		job_title := job_titles[rand.Intn(10)]
+		
+		//公司
 		company := "有限公司"
+		
+		//兴趣爱好
 		industry := industrys[rand.Intn(10)]+","+industrys[rand.Intn(10)]+","+industrys[rand.Intn(10)]
+		
+		//生成email地址，后缀随机
 		email := "abc" + email_end[rand.Intn(10)]
+		
+		//生成购买次数的详情
 		var buys string
 		for i:=0;i<180;i++{
 			buys = fmt.Sprintf("%v,%v",buys,rand.Intn(10))
 		}
 		
-		//fmt.Printf("\n====================\ncid:%v , contact_id:%v , name:%v , sex:%v , email:%v , mobile_phone:%v , address:%v , score:%v , ",cids[rcid],contact_id,namelist[rname],sexs[rsex],email,mobile_phone,addresslist[rand.Intn(822)],score)
-		//fmt.Printf("email_view:%v , email_click:%v , email_sended:%v , sms_sended:%v , sms_click:%v , from:%v , email_client:%v \n===============\n",email_status[0],email_status[1],email_status[2],sms_status[0],sms_status[1],froms[rfrom],email_clients[rclient])
 		
+		//生成购买金额
+		var buy_total_amount string
+		for i:=0;i<180;i++ {
+			buy_total_amount = fmt.Sprintf("%v,%v",buy_total_amount,rand.Intn(100))
+		}
+		
+		//最后一次购买时间
+		last_buy_time:=fmt.Sprintf("%v-%02d-%02d",rand.Intn(6)+2010,rand.Intn(11)+1,rand.Intn(29)+1)
 		
 
-		//fmt.Printf("name : %v,sex : %v,cid : %v\n",namelist[rname],sexs[rsex],cids[rcid])
-		//email1,_:=TransNumToString(int64(rand.Intn(900000000)))
-		//email2,_:=TransNumToString(int64(rand.Intn(900000000)))
+		fmt.Printf(sql,cids[rcid],contact_id,namelist[rname],sexs[rsex],email,mobile_phone,addresslist[rand.Intn(822)],score,email_status[0],email_status[1],email_status[2],sms_status[0],sms_status[1],froms[rfrom],email_clients[rclient],age,birth,source,zip,is_customer,job_title,company,website,annual_revenue,industry,buys[1:],buy_total_amount[1:],last_buy_time)
 
-		//email := email1 + "@" + email2 + ".com"
-		//fmt.Printf("('%v','%v','%v','%v','%v','%v','%v','%v','%v','%v','%v','%v','%v','%v','%v',NOW(),NOW(),NOW()),\n",cids[rcid],contact_id,namelist[rname],sexs[rsex],email,mobile_phone,addresslist[rand.Intn(822)],score,email_status[0],email_status[1],email_status[2],sms_status[0],sms_status[1],froms[rfrom],email_clients[rclient])
-		fmt.Printf(sql,cids[rcid],contact_id,namelist[rname],sexs[rsex],email,mobile_phone,addresslist[rand.Intn(822)],score,email_status[0],email_status[1],email_status[2],sms_status[0],sms_status[1],froms[rfrom],email_clients[rclient],age,birth,source,zip,is_customer,job_title,company,website,annual_revenue,industry,buys[1:])
-		//_, err := db.Exec(sql,cids[rcid],contact_id,namelist[rname],sexs[rsex],email,mobile_phone,addresslist[rand.Intn(822)],score,email_status[0],email_status[1],email_status[2],sms_status[0],sms_status[1],froms[rfrom],email_clients[rclient])
-		//if err != nil {
-		//	fmt.Printf("%v...\n",err)
-		//	return 
-		//}
 		contact_id++
-		//fmt.Printf(" %v \n",float64(i)/10000*100)
+
 		
 	}
 
@@ -200,7 +227,6 @@ func main(){
 	
 	
 }
-
 
 
 func TransNumToString(num int64) (string, error) {
@@ -222,14 +248,3 @@ func TransNumToString(num int64) (string, error) {
 	return str, nil
 }
 
-/*
-
-
-INSERT INTO `jzl_contacts` (`id`, `cid`, `contact_id`, `creator_id`, `last_editor_id`, `name`, `sex`, `email`, `mobile_phone`, `salutation`, `fax`, `address`, `city`, `state`, `country`, `zip`, `job_title`, `company`, `website`, `annual_revenue`, `num_employees`, `industry`, `weibo`, `weixin`, `create_time`, `last_modify_time`, `is_delete`, `delete_time`, `age`, `message`, `birth`, `cookie_id`, `is_customer`, `create_customer_time`)
-VALUES
-	(5031, 322, 10418, 0, 0, ' 黄伟冰', 1, 'gvVfb@5vTxY.com', '13299616876', '', '', '孟州市', '阿图什', '江山市', '', '', '', '', '', '', 0, '', '', '', '2015-07-31 09:32:26', '2015-07-31 09:32:26', 0, '1900-01-01 00:00:00', 0, '', '1900-01-01', '', 0, '1900-01-01 00:00:00'),
-	(5032, 323, 10419, 0, 0, ' 戴千山', 0, '6hYFK@ow9Qg.com', '13453003900', '', '', '汉沽区', '攀枝花', '\n1县级市-日喀则', '', '', '', '', '', '', 0, '', '', '', '2015-07-31 09:32:26', '2015-07-31 09:32:26', 0, '1900-01-01 00:00:00', 0, '', '1900-01-01', '', 0, '1900-01-01 00:00:00'),
-	(5033, 323, 10420, 0, 0, ' 胡淑婷', 0, 'jAv6E@h6q7B.com', '13272771687', '', '', '贺州', '威海', '三门峡', '', '', '', '', '', '', 0, '', '', '', '2015-07-31 09:32:26', '2015-07-31 09:32:26', 0, '1900-01-01 00:00:00', 0, '', '1900-01-01', '', 0, '1900-01-01 00:00:00'),
-	(5034, 323, 10421, 0, 0, ' 李欣怡', 1, '8kEYc@ukI0G.com', '13907325154', '', '', '卫辉市', '胶州', '喀什', '', '', '', '', '', '', 0, '', '', '', '2015-07-31 09:32:26', '2015-07-31 09:32:26', 0, '1900-01-01 00:00:00', 0, '', '1900-01-01', '', 0, '1900-01-01 00:00:00');
-
-*/

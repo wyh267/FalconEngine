@@ -41,6 +41,15 @@ type IndexFieldInfo struct {
 	SType int64  `json:"Search Type"`
 }
 
+
+
+
+const (
+	PlfUpdate = iota
+	IvtUpdate
+	Delete
+)
+
 /*****************************************************************************
 *  function name : NewIndexSet
 *  params :
@@ -678,7 +687,7 @@ func (this *IndexSet) GetDetails(doc_ids []utils.DocIdInfo) ([]int64, []string) 
 
 //func (this *IndexSet) AddRecord()
 
-func (this *IndexSet) UpdateRecord(info map[string]string, isProfileUpdate bool) error {
+func (this *IndexSet) UpdateRecord(info map[string]string, UpdateType int) error {
 
 	//检查是否有PrimaryKey字段，如果没有的话，不允许更新
 	_, hasPK := info[this.PrimaryKey]
@@ -691,17 +700,28 @@ func (this *IndexSet) UpdateRecord(info map[string]string, isProfileUpdate bool)
 		this.Logger.Error("No Primary Key,Update is not allow  %v", err)
 		return err
 	}
-
-	//检查是否有着primary key ,如果没有，需要新增一个doc_id，进行全字段更新
-	//_,has_key:=this.SearchField(pk,this.PrimaryKey)
-	//if !has_key{
-	//}else{//如果存在primary key的话，要看需要更新的字段，如果都是正排文件，不需要新增doc_id，否则也需要新增doc_id进行全字段更新
-	//}
-
-	//如果仅更新正排文件，不需要新建doc_id，直接更新
+	
 	Doc_id, has_key := this.SearchField(pk, this.PrimaryKey)
 	var doc_id int64
-	if isProfileUpdate {
+	
+	//删除操作
+	if UpdateType==Delete {
+		
+		if has_key{
+			for index, _ := range Doc_id {
+					this.Logger.Info("Delete Doc_id : %v ", Doc_id[index].DocId)
+					this.BitMap.SetBit(uint64(Doc_id[index].DocId), 1)
+			}
+		}else{
+			this.Logger.Info("No record to Delete , can not find promary key[%v] in index  ", pk)
+		}
+		return nil
+	}
+	
+
+
+	//如果仅更新正排文件，不需要新建doc_id，直接更新
+	if UpdateType==PlfUpdate {
 		if !has_key {
 			//this.Logger.Error("isProfileUpdate  %v",  err)
 			return errors.New("Update err...no doc_id to update")
@@ -711,7 +731,7 @@ func (this *IndexSet) UpdateRecord(info map[string]string, isProfileUpdate bool)
 			this.UpdateProfile(k, v, Doc_id[0].DocId)
 		}
 
-	} else { //新增doc_id，全字段更新
+	} else if UpdateType==IvtUpdate { //检查是否有着primary key ,如果没有，需要新增一个doc_id，进行全字段更新
 		//如果doc_id存在，删除之前的doc_id
 		if has_key {
 			for index, _ := range Doc_id {

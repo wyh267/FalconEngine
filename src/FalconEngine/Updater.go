@@ -58,7 +58,7 @@ func (this *Updater) Process(log_id string, body []byte, params map[string]strin
 	info["mobile_phone"] = "13232"
 	info["last_modify_time"] = "2015-01-01 00:11:22"
 	updateInfo.Info = info
-	updateInfo.IsProfile = false
+	updateInfo.UpdateType = 1
 	updateInfo.ErrChan = make(chan error)
 	this.Data_chan <- updateInfo
 
@@ -86,7 +86,7 @@ func (this *Updater) updatingThread() {
 		select {
 		case info := <-this.Data_chan:
 			//this.Logger.Info("Got data ... %v ",info)
-			info.ErrChan <- this.Indexer.UpdateRecord(info.Info, info.IsProfile)
+			info.ErrChan <- this.Indexer.UpdateRecord(info.Info, info.UpdateType)
 
 		}
 
