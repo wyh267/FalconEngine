@@ -28,6 +28,14 @@ func WriteToJsonWithChan(data interface{}, file_name string, wchan chan string) 
 	return nil
 }
 
+
+func WriteToIndexFileWithChan(invertIdx *InvertIdx, file_name string, wchan chan string) error {
+
+	WriteToIndexFile(invertIdx, file_name)
+	wchan <- file_name
+	return nil
+}
+
 /*
 type DocIdInfo struct {
 	DocId  int64
@@ -74,9 +82,7 @@ func WriteToIndexFile(invertIdx *InvertIdx, file_name string) error {
 		invertIdx.KeyInvertList[index].DocIdList = nil
 
 	}
-	if invertIdx.IdxName == "cid" {
-		fmt.Printf("INDXE : %v \n", *invertIdx)
-	}
+
 	//fmt.Printf("%x\n", buf.Bytes())
 	//fmt.Printf("%v\n", this.TempIndex[index_name])
 	fout, err := os.Create(file_name)

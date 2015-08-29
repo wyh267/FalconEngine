@@ -412,14 +412,17 @@ func (this *DBBuilder) Buiding() error {
 
 	}
 
-	this.DetailIdx.WriteDetailToFile()
+	
 
 	//写入全部数据
 	//builder.WriteAllTempIndexToFile()
 	//builder.WriteIndexToFile()
 
 	writeCount:=0
-	writeChan:=make(chan string,10)
+	writeChan:=make(chan string,1000)
+
+	//this.DetailIdx.WriteDetailToFile()
+	this.DetailIdx.WriteDetailWithChan(writeChan)
 
 	for index, fields := range this.Fields {
 
@@ -427,7 +430,8 @@ func (this *DBBuilder) Buiding() error {
 
 
 			//utils.WriteToJson(fields.IvtIdx, fmt.Sprintf("./index/%v_idx.json", fields.Name))
-			utils.WriteToIndexFile(fields.IvtIdx, fmt.Sprintf("./index/%v_idx.idx", fields.Name))
+			go utils.WriteToIndexFileWithChan(fields.IvtIdx, fmt.Sprintf("./index/%v_idx.idx", fields.Name),writeChan)
+			writeCount++
 			//utils.WriteToJson(fields.IvtIdx, fmt.Sprintf("./index/%v_idx.json", fields.Name))
 			go utils.WriteToJsonWithChan(fields.IvtIdx, fmt.Sprintf("./index/%v_idx.json", fields.Name),writeChan)
 			writeCount++
@@ -470,7 +474,7 @@ func (this *DBBuilder) Buiding() error {
 
 				//utils.WriteToJsonWithChan(fields.PlfNumber, fmt.Sprintf("./index/%v_pfl.json", fields.Name),writeChan)
 
-				fields.PlfByte.WriteToFile()
+				go fields.PlfByte.WriteToFileWithChan(writeChan)
 				//writeCount++
 
 			}
@@ -487,6 +491,7 @@ func (this *DBBuilder) Buiding() error {
 					fmt.Printf("Write [%v] finished \n ",file_name)
 					if writeCount == 0 {
 						fmt.Printf("Finish building all index...\n")
+						close(writeChan)
 						return nil
 					}
 			}

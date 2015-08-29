@@ -160,3 +160,12 @@ func (this *Detail) WriteDetailToFile() error {
 	return nil
 
 }
+
+
+func (this *Detail) WriteDetailWithChan(wchan chan string) error {
+	
+	
+	this.WriteDetailToFile()
+	wchan <- "./index/detail.dat"
+	return nil
+}
