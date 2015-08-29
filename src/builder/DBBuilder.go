@@ -479,14 +479,14 @@ func (this *DBBuilder) Buiding() error {
 
 	}
 	
-		fmt.Printf("writeCount : %v \n ",writeCount)
+		fmt.Printf("Waiting %v threads\n ",writeCount)
 		for {
 			select{
-				case <-writeChan:
+				case file_name := <-writeChan:
 					writeCount--
-					fmt.Printf("recive writeCount : %v \n ",writeCount)
+					fmt.Printf("Write [%v] finished \n ",file_name)
 					if writeCount == 0 {
-						fmt.Printf("Finish building index...\n")
+						fmt.Printf("Finish building all index...\n")
 						return nil
 					}
 			}
