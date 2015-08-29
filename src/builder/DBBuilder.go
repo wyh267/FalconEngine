@@ -430,22 +430,28 @@ func (this *DBBuilder) Buiding() error {
 
 
 			//utils.WriteToJson(fields.IvtIdx, fmt.Sprintf("./index/%v_idx.json", fields.Name))
-			go utils.WriteToIndexFileWithChan(fields.IvtIdx, fmt.Sprintf("./index/%v_idx.idx", fields.Name),writeChan)
-			writeCount++
+			///////////go utils.WriteToIndexFileWithChan(fields.IvtIdx, fmt.Sprintf("./index/%v_idx.idx", fields.Name),writeChan)
+			///////////writeCount++
 			//utils.WriteToJson(fields.IvtIdx, fmt.Sprintf("./index/%v_idx.json", fields.Name))
-			go utils.WriteToJsonWithChan(fields.IvtIdx, fmt.Sprintf("./index/%v_idx.json", fields.Name),writeChan)
-			writeCount++
+			///////////go utils.WriteToJsonWithChan(fields.IvtIdx, fmt.Sprintf("./index/%v_idx.json", fields.Name),writeChan)
+			///////////writeCount++
 			if this.Fields[index].FType == "T" {
+				
+				
+				go utils.WriteIndexDataToFileWithChan(fields.IvtIdx,fields.IvtStrDic,fields.Name,writeChan)
+				
+				
 
-				go utils.WriteToJsonWithChan(fields.IvtStrDic, fmt.Sprintf("./index/%v_dic.json", fields.Name),writeChan)
+				///////////go utils.WriteToJsonWithChan(fields.IvtStrDic, fmt.Sprintf("./index/%v_dic.json", fields.Name),writeChan)
 				//utils.WriteToJson(fields.IvtStrDic, fmt.Sprintf("./index/%v_dic.json", fields.Name))
 				writeCount++
 
 			}
 
 			if this.Fields[index].FType == "N" {
-
-				go utils.WriteToJsonWithChan(fields.IvtNumDic, fmt.Sprintf("./index/%v_dic.json", fields.Name),writeChan)
+				
+				go utils.WriteIndexDataToFileWithChan(fields.IvtIdx,fields.IvtNumDic,fields.Name,writeChan)
+				/////////////////go utils.WriteToJsonWithChan(fields.IvtNumDic, fmt.Sprintf("./index/%v_dic.json", fields.Name),writeChan)
 				//utils.WriteToJson(fields.IvtNumDic, fmt.Sprintf("./index/%v_dic.json", fields.Name))
 				writeCount++
 			}

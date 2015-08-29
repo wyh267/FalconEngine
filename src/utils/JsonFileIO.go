@@ -21,6 +21,17 @@ import (
 	"fmt"
 )
 
+
+func WriteIndexDataToFileWithChan(invertIdx *InvertIdx,dic_data interface{},index_name string,wchan chan string) error {
+	
+	WriteToIndexFile(invertIdx, fmt.Sprintf("./index/%v_idx.idx", index_name))
+	WriteToJson(invertIdx, fmt.Sprintf("./index/%v_idx.json", index_name))
+	WriteToJson(dic_data, fmt.Sprintf("./index/%v_dic.json", index_name))
+	wchan <- index_name
+	return nil
+}
+
+
 func WriteToJsonWithChan(data interface{}, file_name string, wchan chan string) error {
 
 	WriteToJson(data, file_name)
@@ -106,6 +117,7 @@ func WriteToIndexFile(invertIdx *InvertIdx, file_name string) error {
 ******************************************************************************/
 func WriteToJson(data interface{}, file_name string) error {
 
+	fmt.Printf("Writing to File [%v]...\n", file_name)
 	info_json, err := json.Marshal(data)
 	if err != nil {
 		//fmt.Printf("Marshal %v\n",file_name)
