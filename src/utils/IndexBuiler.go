@@ -143,7 +143,7 @@ func (this *IndexBuilder) BuildNumberIndex(doc_id int64, content int64, ivt_idx 
 	}
 
 	//ivt_idx.Display()
-	ivt_dic.Display()
+	//ivt_dic.Display()
 	return nil
 }
 
