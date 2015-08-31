@@ -22,11 +22,15 @@ type NumItemDic struct {
 }
 
 type NumberIdxDic struct {
+	/*
 	Entity      []NumItemDic
 	HashIndex   []int64
 	EntityCount int64
 	Bukets      int64
+	*/
 	Lens        int64
+	IntMap		map[string]int64
+	Index    	int64
 }
 
 /*****************************************************************************
@@ -38,6 +42,7 @@ type NumberIdxDic struct {
 *
 ******************************************************************************/
 func NewNumberIdxDic(buket_type int64) *NumberIdxDic {
+	/*
 	var bukets int64
 	switch buket_type {
 	case 1:
@@ -56,19 +61,34 @@ func NewNumberIdxDic(buket_type int64) *NumberIdxDic {
 	this.Lens = bukets
 	this.Entity = make([]NumItemDic, this.Lens, 1000000)
 	this.HashIndex = make([]int64, this.Lens, 1000000)
+	*/
+	this := &NumberIdxDic{IntMap:make(map[string]int64),Lens:0,Index:1}
 	return this
 }
 
 func (this *NumberIdxDic) Display() {
-	fmt.Printf("========================= Bukets : %v  EntityCount :%v =========================\n", this.Bukets, this.EntityCount-1)
-	var i int64
-	for i = 1; i < this.EntityCount; i++ {
-		fmt.Printf("Key : %v \t\t--- Value : %v  \t\t  --- HashCode : %v \n", this.Entity[i].Key, this.Entity[i].Value, this.Entity[i].HashCode)
+	fmt.Printf("========================= Bukets : %v  EntityCount :%v =========================\n", this.Lens, this.Index)
+
+	for k,v := range this.IntMap {
+		fmt.Printf("Key : %v \t\t--- Value : %v  \n", k,v)
 	}
 	fmt.Printf("===============================================================================\n")
 }
 
 func (this *NumberIdxDic) Put(key int64) int64 {
+	
+	key_str:=fmt.Sprintf("%v",key)
+	id,_:= this.Find(key)
+	if id!=-1{
+		return id
+	}
+	
+	this.IntMap[key_str] = this.Index
+	this.Index ++ 
+	this.Lens ++
+	//fmt.Printf("Add Key %v ,value is : %v \n",key,this.IntMap[key_str])
+	return this.IntMap[key_str]
+	/*
 	//桶已经满了，不能添加
 	if this.EntityCount == this.Lens {
 		//fmt.Printf("Bukets Full...Append arrays [EntityCount : %v] [Lens : %v] \n",this.EntityCount,this.Lens)
@@ -93,6 +113,7 @@ func (this *NumberIdxDic) Put(key int64) int64 {
 	this.EntityCount++
 
 	return this.EntityCount - 1
+	*/
 
 }
 
@@ -105,10 +126,21 @@ func (this *NumberIdxDic) Put(key int64) int64 {
 *
 ******************************************************************************/
 func (this *NumberIdxDic) Length() int64 {
-	return this.EntityCount - 1
+	
+	return this.Lens
+	//return this.EntityCount - 1
 }
 
 func (this *NumberIdxDic) Find(key int64) (int64, int64) {
+	
+	key_str:=fmt.Sprintf("%v",key)
+	value,has_key:=this.IntMap[key_str]
+	if has_key{
+		return value,0
+	}
+	return -1,0
+	
+	/*
 	hash := ModHash(key, this.Bukets)
 	var k int64
 	for k = this.HashIndex[hash]; k != 0; k = this.Entity[k].Next {
@@ -118,6 +150,7 @@ func (this *NumberIdxDic) Find(key int64) (int64, int64) {
 		}
 	}
 	return -1, hash
+	*/
 }
 
 /*****************************************************************************

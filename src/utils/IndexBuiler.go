@@ -122,7 +122,6 @@ func (this *IndexBuilder) BuildNumberIndex(doc_id int64, content int64, ivt_idx 
 	//新增
 	if is_inc == false {
 		if key_id > len {
-			//fmt.Println("Add Bukent full")
 			invertList := NewInvertDocIdList(content)
 			invertList.DocIdList = append(invertList.DocIdList, DocIdInfo{DocId: doc_id})
 			ivt_idx.KeyInvertList = append(ivt_idx.KeyInvertList, *invertList)
@@ -144,7 +143,7 @@ func (this *IndexBuilder) BuildNumberIndex(doc_id int64, content int64, ivt_idx 
 	}
 
 	//ivt_idx.Display()
-	//ivt_dic.Display()
+	ivt_dic.Display()
 	return nil
 }
 

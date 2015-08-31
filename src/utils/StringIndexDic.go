@@ -27,23 +27,36 @@ type StringIdxDic struct {
 	EntityCount int64
 	Bukets      int64
 	Lens        int64
+	StringMap	map[string]int64
+	Index    	int64
+	
 }
 
+
+
+
+
+
+
 func NewStringIdxDic(bukets int64) *StringIdxDic {
+	/*
 	this := &StringIdxDic{EntityCount: 1, Bukets: bukets}
 	this.Lens = bukets
 	this.Entity = make([]StringItemDic, this.Lens, 100000)
 	this.HashIndex = make([]int64, this.Lens, 100000)
+	*/
+	this := &StringIdxDic{StringMap:make(map[string]int64),Lens:0,Index:1}
 	return this
 }
 
 func (this *StringIdxDic) Display() {
-	fmt.Printf("========================= Bukets : %v  EntityCount :%v =========================\n", this.Bukets, this.EntityCount-1)
-	var i int64
-	for i = 1; i < this.EntityCount; i++ {
-		fmt.Printf("Key : %v \t\t--- Value : %v \t\t--- HashCode : %v \n", this.Entity[i].Key, this.Entity[i].Value, this.Entity[i].HashCode)
+	
+	fmt.Printf("========================= Lens : %v  Count :%v =========================\n", this.Lens, this.Index)
+	for k,v := range this.StringMap {
+		fmt.Printf("Key : %v \t\t--- Value : %v  \n", k, v)
 	}
 	fmt.Printf("===============================================================================\n")
+	
 }
 
 /*****************************************************************************
@@ -55,6 +68,18 @@ func (this *StringIdxDic) Display() {
 *
 ******************************************************************************/
 func (this *StringIdxDic) Put(key string) int64 {
+	
+	id:= this.Find(key)
+	if id!=-1{
+		return id
+	}
+	
+	this.StringMap[key] = this.Index
+	this.Index ++ 
+	this.Lens ++
+	
+	return this.StringMap[key]
+	/*
 	//桶已经满了，不能添加
 	if this.EntityCount == this.Lens {
 		fmt.Printf("[StringIdxDic] Bukets Full...Append arrays [EntityCount : %v] [Lens : %v] \n", this.EntityCount, this.Lens)
@@ -79,6 +104,8 @@ func (this *StringIdxDic) Put(key string) int64 {
 	this.EntityCount++
 
 	return this.EntityCount - 1
+	*/
+	
 
 }
 
@@ -91,10 +118,19 @@ func (this *StringIdxDic) Put(key string) int64 {
 *
 ******************************************************************************/
 func (this *StringIdxDic) Length() int64 {
-	return this.EntityCount - 1
+	
+	return this.Lens
+//	return this.EntityCount - 1
 }
 
 func (this *StringIdxDic) Find(key string) int64 {
+	
+	value,has_key:=this.StringMap[key]
+	if has_key{
+		return value
+	}
+	return -1
+	/*
 	hash := ELFHash(key, this.Bukets)
 	var k int64
 	for k = this.HashIndex[hash]; k != 0; k = this.Entity[k].Next {
@@ -104,4 +140,5 @@ func (this *StringIdxDic) Find(key string) int64 {
 		}
 	}
 	return -1
+	*/
 }

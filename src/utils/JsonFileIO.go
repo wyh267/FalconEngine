@@ -120,7 +120,7 @@ func WriteToJson(data interface{}, file_name string) error {
 	fmt.Printf("Writing to File [%v]...\n", file_name)
 	info_json, err := json.Marshal(data)
 	if err != nil {
-		//fmt.Printf("Marshal %v\n",file_name)
+		fmt.Printf("Marshal err %v\n",file_name)
 		return err
 	}
 	//fmt.Printf("%v\n",info_json)
