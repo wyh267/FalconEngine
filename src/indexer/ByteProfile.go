@@ -101,7 +101,7 @@ func (this *ByteProfile) FindValue(doc_id int64) ([]byte, error) {
 	//fmt.Printf("Cost Time : %v \n",functime("MmapBytes"))
 
 	this.ProfileList[doc_id].InMomory = true
-	fmt.Printf("list : %v\n", string(this.ProfileList[doc_id].Data))
+	//fmt.Printf("list : %v\n", string(this.ProfileList[doc_id].Data))
 	return this.ProfileList[doc_id].Data, nil
 
 }
@@ -115,13 +115,13 @@ func (this *ByteProfile) FilterValue(doc_ids []u.DocIdInfo, value string, is_for
 	index_end, _ := strconv.ParseInt(values[2], 0, 0)
 	switch filt_type {
 	case FILT_TYPE_LESS:
-		fmt.Printf("FILT_TYPE_LESS\n")
+		//fmt.Printf("FILT_TYPE_LESS\n")
 	OUTER_LESS:
 		for i, _ := range doc_ids {
 			byte_value, _ := this.FindValue(doc_ids[i].DocId)
 			items := strings.Split(string(byte_value), ",")
 			lens := len(items)
-			fmt.Printf("value : %v , start : %v , end : %v , lens_items : %v \n", value_num, index_start, index_end, len(items))
+			//fmt.Printf("value : %v , start : %v , end : %v , lens_items : %v \n", value_num, index_start, index_end, len(items))
 			if int(index_start) >= lens || int(index_end) >= lens || index_start >= index_end || lens < 1 || index_start < 0 || index_end < 1 {
 				fmt.Printf("byteprofile info Error ... ")
 				continue
@@ -141,12 +141,12 @@ func (this *ByteProfile) FilterValue(doc_ids []u.DocIdInfo, value string, is_for
 		}
 
 	case FILT_TYPE_ABOVE:
-		fmt.Printf("FILT_TYPE_LESS\n")
+		//fmt.Printf("FILT_TYPE_LESS\n")
 		for i, _ := range doc_ids {
 			byte_value, _ := this.FindValue(doc_ids[i].DocId)
 			items := strings.Split(string(byte_value), ",")
 			lens := len(items)
-			fmt.Printf("value : %v , start : %v , end : %v , lens_items : %v \n", value_num, index_start, index_end, len(items))
+			//fmt.Printf("value : %v , start : %v , end : %v , lens_items : %v \n", value_num, index_start, index_end, len(items))
 			if int(index_start) >= lens || int(index_end) >= lens || index_start >= index_end || lens < 1 || index_start < 0 || index_end < 1 {
 				fmt.Printf("byteprofile info Error ... ")
 				continue
@@ -162,13 +162,13 @@ func (this *ByteProfile) FilterValue(doc_ids []u.DocIdInfo, value string, is_for
 
 		}
 	case FILT_TYPE_EQUAL:
-		fmt.Printf("FILT_TYPE_LESS\n")
+		//fmt.Printf("FILT_TYPE_LESS\n")
 	OUTER_EQUAL:
 		for i, _ := range doc_ids {
 			byte_value, _ := this.FindValue(doc_ids[i].DocId)
 			items := strings.Split(string(byte_value), ",")
 			lens := len(items)
-			fmt.Printf("value : %v , start : %v , end : %v , lens_items : %v \n", value_num, index_start, index_end, len(items))
+			//fmt.Printf("value : %v , start : %v , end : %v , lens_items : %v \n", value_num, index_start, index_end, len(items))
 			if int(index_start) >= lens || int(index_end) >= lens || index_start >= index_end || lens < 1 || index_start < 0 || index_end < 1 {
 				fmt.Printf("byteprofile info Error ... ")
 				continue
@@ -187,12 +187,12 @@ func (this *ByteProfile) FilterValue(doc_ids []u.DocIdInfo, value string, is_for
 
 		}
 	case FILT_TYPE_UNEQUAL:
-		fmt.Printf("FILT_TYPE_LESS\n")
+		//fmt.Printf("FILT_TYPE_LESS\n")
 		for i, _ := range doc_ids {
 			byte_value, _ := this.FindValue(doc_ids[i].DocId)
 			items := strings.Split(string(byte_value), ",")
 			lens := len(items)
-			fmt.Printf("value : %v , start : %v , end : %v , lens_items : %v \n", value_num, index_start, index_end, len(items))
+			//fmt.Printf("value : %v , start : %v , end : %v , lens_items : %v \n", value_num, index_start, index_end, len(items))
 			if int(index_start) >= lens || int(index_end) >= lens || index_start >= index_end || lens < 1 || index_start < 0 || index_end < 1 {
 				fmt.Printf("byteprofile info Error ... ")
 				continue
