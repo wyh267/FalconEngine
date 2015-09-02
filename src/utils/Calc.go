@@ -332,7 +332,7 @@ func ComputScore(body []byte, ContactInfo map[string]string) (int64, error) {
 	if err != nil {
 		contact_score = 0
 	}
-	maxScore := contact_score
+
 
 	//第一层循环
 	for _, data := range searchInfo.Conditions.Data {
@@ -350,13 +350,10 @@ func ComputScore(body []byte, ContactInfo map[string]string) (int64, error) {
 		}
 
 		if sub_flag == true {
-			score := contact_score + data.Score
-			if score > maxScore {
-				maxScore = score
-			}
+			return data.Score,nil
 		}
 	}
 
-	return maxScore, nil
+	return contact_score, nil
 
 }
