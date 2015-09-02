@@ -329,7 +329,7 @@ func (this *Searcher) ParseSearchInfo(log_id string, params map[string]string, b
 	searchrules := make([]SearchRules, 0)
 
 	//this.Logger.Info("SearchInfo : %v \n", searchInfo)
-	for i, data := range searchInfo.Conditions.Data {
+	for _, data := range searchInfo.Conditions.Data {
 		v := data.Childs
 		//this.Logger.Info("Conditions[%v] : %v \n", i, v)
 		var SRs SearchRules
@@ -339,7 +339,7 @@ func (this *Searcher) ParseSearchInfo(log_id string, params map[string]string, b
 		if searchInfo.Contact_id != 0 {
 			SRs.FR = append(SRs.FR, indexer.FilterRule{Field: "contact_id", Value: searchInfo.Contact_id, FiltType: indexer.FILT_TYPE_EQUAL, IsForward: true})
 		}
-		for ii, vv := range v {
+		for _, vv := range v {
 			//this.Logger.Info("\t\t Condition[%v] : %v \n", ii, vv)
 			if vv.Key == "user_attrib" {
 				//如果是包含，表示倒排检索
