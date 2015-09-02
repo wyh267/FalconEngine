@@ -137,10 +137,11 @@ func (this *Searcher) ComputeScore(log_id string, body []byte, params map[string
 		}
 		info["score"] = fmt.Sprintf("%v", score)
 		//写入正排文件中
-		this.Logger.Info("")
+		
 		inc_info:=make(map[string]string)
 		inc_info["score"]=info["score"]
 		inc_info["id"]=info["id"]
+		this.Logger.Info("write score to profile...\n",inc_info)
 		upinfo := builder.UpdateInfo{inc_info,indexer.PlfUpdate,make(chan error)}
 		this.Data_chan <- upinfo
 		errinfo:= <-upinfo.ErrChan
@@ -154,7 +155,8 @@ func (this *Searcher) ComputeScore(log_id string, body []byte, params map[string
 			//this.RedisCli.SetFields(0, info)
 		
 		//写入数据库中
-		const UPDATESCORE_SQL string = "UPDATE jzl_dmp SET score=?,last_modify_time=NOW() WHERE cid=? AND contact_id=?"
+		this.Logger.Info("write score to DB...\n",inc_info)
+		const UPDATESCORE_SQL string = "UPDATE jzl_dmp SET score=? WHERE cid=? AND contact_id=?"
 		err = this.DbAdaptor.ExecFormat(UPDATESCORE_SQL, info["score"], cid, info["contact_id"])
 		if err != nil {
 			this.Logger.Error("[LOG_ID:%v]  %v", log_id, err)
