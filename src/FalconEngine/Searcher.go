@@ -115,11 +115,18 @@ func (this *Searcher) ComputeScore(log_id string, body []byte, params map[string
 	}
 
 	for _, doc_id := range doc_ids {
+		/*
 		id, fields := this.Indexer.GetId(doc_id)
 		info, err := this.RedisCli.GetFields(id, fields)
 		if err != nil {
 			this.Logger.Error("%v", err)
 			continue
+		}
+		*/
+		
+		info,err := this.Indexer.GetDocIdInfo(doc_id.DocId)
+		if err != nil {
+			this.Logger.Error("DocId Error : %v\n",err)
 		}
 		score, err := utils.ComputScore(body, info)
 		if err != nil {

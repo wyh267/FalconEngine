@@ -638,6 +638,14 @@ func (this *IndexSet) GetId(doc_id utils.DocIdInfo) (int64, []string) {
 	return t, fields
 }
 
+
+
+func (this *IndexSet) GetDocIdInfo(doc_id int64) (map[string]string,error) {
+	
+	return this.Detail.GetDocInfo(doc_id)
+}
+
+
 func (this *IndexSet) GetDetailsByDocId(doc_ids []utils.DocIdInfo) []interface{} {
 
 	doc_infos := make([]interface{}, 0)

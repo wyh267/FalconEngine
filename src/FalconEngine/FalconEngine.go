@@ -50,13 +50,14 @@ func main() {
 	defer dbAdaptor.Release()
 
 	//初始化本地redis
-	redisClient, err := BaseFunctions.NewRedisClient(configure, logger)
-	if err != nil {
-		fmt.Printf("[ERROR] Create redisClient Error: %v\n", err)
-		return
-	}
-	defer redisClient.Release()
-
+	/*
+		redisClient, err := BaseFunctions.NewRedisClient(configure, logger)
+		if err != nil {
+			fmt.Printf("[ERROR] Create redisClient Error: %v\n", err)
+			return
+		}
+		defer redisClient.Release()
+	*/
 	//初始化远程redis
 	remoteRedisClient, err := BaseFunctions.NewRemoteRedisClient(configure, logger)
 	if err != nil {
@@ -67,7 +68,7 @@ func main() {
 
 	if search == "search" {
 
-		processor := &BaseFunctions.BaseProcessor{configure, logger, dbAdaptor, redisClient, remoteRedisClient}
+		processor := &BaseFunctions.BaseProcessor{configure, logger, dbAdaptor /*redisClient*/, nil, remoteRedisClient}
 		bitmap := utils.NewBitmap()
 		fields, err := configure.GetTableFields()
 		if err != nil {
@@ -86,7 +87,7 @@ func main() {
 			"update": updater,
 		}}
 
-		builder := NewBuilderEngine(configure, dbAdaptor, logger, redisClient, index_set)
+		builder := NewBuilderEngine(configure, dbAdaptor, logger /*redisClient*/, nil, index_set)
 		builder.StartIncUpdate(data_chan)
 
 		logger.Info("Server Start...")
@@ -100,7 +101,7 @@ func main() {
 
 	} else if search == "build" {
 
-		builder := NewBuilderEngine(configure, dbAdaptor, logger, redisClient, nil)
+		builder := NewBuilderEngine(configure, dbAdaptor, logger /*redisClient*/, nil, nil)
 		builder.BuidingAllIndex()
 	} else {
 		logger.Error("Wrong start mode...only support [ search | build ]")
