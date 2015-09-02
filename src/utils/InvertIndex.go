@@ -69,6 +69,7 @@ type InvertIdx struct {
 	IdxLen        int64
 	MmapBytes     []byte
 	IsMaped       bool
+	
 	KeyInvertList []InvertDocIdList
 }
 
