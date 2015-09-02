@@ -19,15 +19,17 @@ import (
 	"net/url"
 	"strconv"
 	"utils"
+	"builder"
 )
 
 type Searcher struct {
 	*BaseFunctions.BaseProcessor
 	Indexer *indexer.IndexSet
+	Data_chan chan builder.UpdateInfo
 }
 
-func NewSearcher(processor *BaseFunctions.BaseProcessor, indexer *indexer.IndexSet) *Searcher {
-	this := &Searcher{processor, indexer}
+func NewSearcher(processor *BaseFunctions.BaseProcessor, indexer *indexer.IndexSet,data_chan chan builder.UpdateInfo) *Searcher {
+	this := &Searcher{processor, indexer,data_chan}
 	return this
 }
 
@@ -135,19 +137,22 @@ func (this *Searcher) ComputeScore(log_id string, body []byte, params map[string
 		}
 		info["score"] = fmt.Sprintf("%v", score)
 		//写入正排文件中
-		/*
-			upinfo := builder.UpdateInfo{info,true,make(chan error)}
-			Data_chan <- upinfo
-			errinfo:= <-upinfo.ErrChan
-			if errinfo != nil {
-				this.Logger.Info("Update Fail.... %v ", errinfo)
-			}else{
-				this.Logger.Info("Update Success.... ")
-			}
+		this.Logger.Info("")
+		inc_info:=make(map[string]string)
+		inc_info["score"]=info["score"]
+		inc_info["id"]=info["id"]
+		upinfo := builder.UpdateInfo{inc_info,indexer.PlfUpdate,make(chan error)}
+		this.Data_chan <- upinfo
+		errinfo:= <-upinfo.ErrChan
+		if errinfo != nil {
+			this.Logger.Info("Update Fail.... %v ", errinfo)
+		}else{
+			this.Logger.Info("Update Success.... ")
+		}
 
 			//写入redis中
 			//this.RedisCli.SetFields(0, info)
-		*/
+		
 		//写入数据库中
 		const UPDATESCORE_SQL string = "UPDATE jzl_dmp SET score=?,last_modify_time=NOW() WHERE cid=? AND contact_id=?"
 		err = this.DbAdaptor.ExecFormat(UPDATESCORE_SQL, info["score"], cid, info["contact_id"])
