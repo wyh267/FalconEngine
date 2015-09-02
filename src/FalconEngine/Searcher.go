@@ -52,7 +52,7 @@ func (this *Searcher) SearchCount(log_id string, body []byte, params map[string]
 
 	}
 
-	this.Logger.Info("[LOG_ID:%v]Running Searcher  %v....Time: %v ", log_id, searchRules, ftime("ParseSearchInfo"))
+	this.Logger.Info("[LOG_ID:%v]Running SearchCount  %v....Time: %v ", log_id, searchRules, ftime("ParseSearchInfo"))
 
 	total_doc_ids := make([]utils.DocIdInfo, 0)
 	for _, search_rule := range searchRules {
@@ -75,17 +75,7 @@ func (this *Searcher) SearchCount(log_id string, body []byte, params map[string]
 	} else {
 		tmp_doc_ids = total_doc_ids
 	}
-	/*
-		ids, fields := this.Indexer.GetDetails(tmp_doc_ids)
-		var infos []map[string]string
-		for _, id := range ids {
-			info, err := this.RedisCli.GetFields(id, fields)
-			if err != nil {
-				this.Logger.Error("%v", err)
-			}
-			infos = append(infos, info)
-		}
-	*/
+
 	result["DATA"] = this.Indexer.GetDetailsByDocId(tmp_doc_ids)
 
 	this.Logger.Info("[LOG_ID:%v] End Counting....Time: %v \n\n", log_id, ftime("SearchCount"))
@@ -141,7 +131,7 @@ func (this *Searcher) ComputeScore(log_id string, body []byte, params map[string
 		inc_info:=make(map[string]string)
 		inc_info["score"]=info["score"]
 		inc_info["id"]=info["id"]
-		this.Logger.Info("write score to profile...\n",inc_info)
+		//this.Logger.Info("write score to profile...\n",inc_info)
 		upinfo := builder.UpdateInfo{inc_info,indexer.PlfUpdate,make(chan error)}
 		this.Data_chan <- upinfo
 		errinfo:= <-upinfo.ErrChan
@@ -150,12 +140,7 @@ func (this *Searcher) ComputeScore(log_id string, body []byte, params map[string
 		}else{
 			this.Logger.Info("Update Success.... ")
 		}
-
-			//写入redis中
-			//this.RedisCli.SetFields(0, info)
-		
 		//写入数据库中
-		this.Logger.Info("write score to DB...\n",inc_info)
 		const UPDATESCORE_SQL string = "UPDATE jzl_dmp SET score=? WHERE cid=? AND contact_id=?"
 		err = this.DbAdaptor.ExecFormat(UPDATESCORE_SQL, info["score"], cid, info["contact_id"])
 		if err != nil {
@@ -211,10 +196,7 @@ func (this *Searcher) GroupContact(log_id string, body []byte, params map[string
 		total_doc_ids, _ = utils.Merge(total_doc_ids, doc_ids)
 	}
 
-	//fields := make([]string, 0)
-	//fields = append(fields, "contact_id")
-	//fields = append(fields, "cid")
-	//this.Logger.Info("doc_ids : %v ",total_doc_ids)
+
 
 	infos := this.Indexer.GetDetailsByDocId(total_doc_ids)
 	for _, info := range infos {
@@ -230,24 +212,7 @@ func (this *Searcher) GroupContact(log_id string, body []byte, params map[string
 
 	}
 
-	/*
-		for _, doc_id := range total_doc_ids {
 
-			id, _ := this.Indexer.GetId(doc_id)
-			//this.Logger.Info("Fields : %v",fields)
-			info, err := this.RedisCli.GetFields(id, fields)
-			if err != nil {
-				this.Logger.Error("%v", err)
-			}
-			//this.Logger.Info("DOC INFO ::  %v ",info)
-			const ADDCONTACTSTOGROUP_SQL string = "REPLACE INTO jzl_groups_contacts (cid,creator_id,last_editor_id,group_id,contact_id,create_time,last_modify_time,is_delete) VALUES (?,?,?,?,?,NOW(),NOW(),0)"
-			err = this.DbAdaptor.ExecFormat(ADDCONTACTSTOGROUP_SQL, info["cid"], si.Editor_id, si.Editor_id, si.Id, info["contact_id"])
-			if err != nil {
-				this.Logger.Error("[LOG_ID:%v]  %v", log_id, err)
-				return err
-			}
-		}
-	*/
 	this.Logger.Info("[LOG_ID:%v] End Grouping ....Time: %v \n\n", log_id, ftime("GroupContact"))
 	return nil
 
@@ -271,25 +236,10 @@ func (this *Searcher) SimpleSearch(log_id string, body []byte, params map[string
 	} else {
 		tmp_doc_ids = total_doc_ids
 	}
-	/*
-		this.Indexer.GetDetailsByDocId(tmp_doc_ids)
-		ids, fields := this.Indexer.GetDetails(tmp_doc_ids)
-		var infos []map[string]string
-		for _, id := range ids {
-			info, err := this.RedisCli.GetFields(id, fields)
-			if err != nil {
-				this.Logger.Error("%v", err)
-			}
-			infos = append(infos, info)
-		}
-	*/
+
 	this.Logger.Info("[LOG_ID:%v]Running Simple Searcher ....Time: %v \n\n", log_id, ftime("Display Detail"))
 	result["DATA"] = this.Indexer.GetDetailsByDocId(tmp_doc_ids)
 	return nil
-	//
-	//result["PAGES"] = len(doc_ids)/int(ps) + 1
-
-	//result["DATA"]=doc_ids
 
 }
 
@@ -378,10 +328,10 @@ func (this *Searcher) ParseSearchInfo(log_id string, params map[string]string, b
 
 	searchrules := make([]SearchRules, 0)
 
-	this.Logger.Info("SearchInfo : %v \n", searchInfo)
+	//this.Logger.Info("SearchInfo : %v \n", searchInfo)
 	for i, data := range searchInfo.Conditions.Data {
 		v := data.Childs
-		this.Logger.Info("Conditions[%v] : %v \n", i, v)
+		//this.Logger.Info("Conditions[%v] : %v \n", i, v)
 		var SRs SearchRules
 		SRs.SR = make([]indexer.SearchRule, 0)
 		SRs.FR = make([]indexer.FilterRule, 0)
@@ -390,7 +340,7 @@ func (this *Searcher) ParseSearchInfo(log_id string, params map[string]string, b
 			SRs.FR = append(SRs.FR, indexer.FilterRule{Field: "contact_id", Value: searchInfo.Contact_id, FiltType: indexer.FILT_TYPE_EQUAL, IsForward: true})
 		}
 		for ii, vv := range v {
-			this.Logger.Info("\t\t Condition[%v] : %v \n", ii, vv)
+			//this.Logger.Info("\t\t Condition[%v] : %v \n", ii, vv)
 			if vv.Key == "user_attrib" {
 				//如果是包含，表示倒排检索
 				if vv.Op == "include" {

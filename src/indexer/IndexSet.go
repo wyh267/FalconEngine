@@ -308,9 +308,9 @@ func (this *IndexSet) SearchByRules(rules /*map[string]interface{}*/ []SearchRul
 			sub_res, ok = this.Search(rule.Query)
 		} else {
 			//this.Logger.Info(" Field : %v Query : %v",rule.Field, rule.Query)
-			fmt.Printf("SearchByRules: %v \n", functime("Start SearchField"))
+			//fmt.Printf("SearchByRules: %v \n", functime("Start SearchField"))
 			sub_res, ok = this.SearchField(rule.Query, rule.Field)
-			fmt.Printf("SearchByRules: %v \n", functime("End SearchField"))
+			//fmt.Printf("SearchByRules: %v \n", functime("End SearchField"))
 		}
 		if !ok {
 			return nil, false
@@ -318,9 +318,9 @@ func (this *IndexSet) SearchByRules(rules /*map[string]interface{}*/ []SearchRul
 		if index == 0 {
 			res = sub_res
 		} else {
-			fmt.Printf("SearchByRules: %v \n", functime("Start Interaction"))
+			//fmt.Printf("SearchByRules: %v \n", functime("Start Interaction"))
 			res, ok = utils.Interaction(res, sub_res)
-			fmt.Printf("SearchByRules: %v \n", functime("End Interaction"))
+			//fmt.Printf("SearchByRules: %v \n", functime("End Interaction"))
 			if !ok {
 				return nil, false
 			}
@@ -330,7 +330,7 @@ func (this *IndexSet) SearchByRules(rules /*map[string]interface{}*/ []SearchRul
 
 	//BitMap过滤失效的doc_id
 	//this.Logger.Info(" %v ",res)
-	fmt.Printf("SearchByRules: %v \n", functime("Start Bitmap"))
+	//fmt.Printf("SearchByRules: %v \n", functime("Start Bitmap"))
 	r := make([]utils.DocIdInfo, len(res))
 	r_index := 0
 	for i, _ := range res {
@@ -341,10 +341,10 @@ func (this *IndexSet) SearchByRules(rules /*map[string]interface{}*/ []SearchRul
 			//r = append(r,res[i])
 		}
 	}
-	fmt.Printf("SearchByRules: %v \n", functime("End Bitmap"))
+	//fmt.Printf("SearchByRules: %v \n", functime("End Bitmap"))
 
 	//TODO 自定义过滤
-	fmt.Printf("SearchByRules: %v \n", functime("End SearchByRules"))
+	//fmt.Printf("SearchByRules: %v \n", functime("End SearchByRules"))
 	return r[:r_index], true
 }
 
@@ -427,7 +427,7 @@ func (this *IndexSet) FilterByRules(doc_ids []utils.DocIdInfo, rules []FilterRul
 		if !ok {
 			continue
 		}
-		fmt.Printf("rule.Field : %v\n", rule.Field)
+		//fmt.Printf("rule.Field : %v\n", rule.Field)
 		res, _ = this.PflIndex[rule.Field].Filter(res, rule.Value, rule.IsForward, rule.FiltType)
 	}
 	return res, nil
