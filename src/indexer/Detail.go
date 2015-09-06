@@ -17,7 +17,7 @@ import (
 	"fmt"
 	"os"
 	"syscall"
-	"utils"
+	//"utils"
 )
 
 type DetailInfo struct {
@@ -33,6 +33,16 @@ type Detail struct {
 	DetailList    []DetailInfo
 	IncDetailList []DetailInfo
 }
+
+
+func NewDetailWithFile() *Detail {
+
+	this := &Detail{MaxDocId: 0, DetailList: make([]DetailInfo, 0), IncDetailList: make([]DetailInfo, 0), Offset: 0}
+
+	return this
+}
+
+
 
 func NewDetail() *Detail {
 
@@ -134,29 +144,103 @@ func (this *Detail) SetNewValue(doc_id int64, info map[string]string) error {
 
 }
 
+
+
+
+func (this *Detail) ReadDetailFromFile() error {
+	file_name := "./index/detail.dic"
+	f, err := os.Open(file_name)
+	defer f.Close()
+	if err != nil {
+		return err
+	}
+	
+	fi, err := f.Stat()
+	if err != nil {
+		fmt.Printf("ERR:%v", err)
+	}
+
+	MmapBytes, err := syscall.Mmap(int(f.Fd()), 0, int(fi.Size()), syscall.PROT_READ, syscall.MAP_PRIVATE)
+
+	if err != nil {
+		fmt.Printf("MAPPING ERROR  %v \n", err)
+		return nil
+	}
+
+	defer syscall.Munmap(MmapBytes)
+
+	this.MaxDocId = int64(binary.LittleEndian.Uint64(MmapBytes[:8]))
+	this.Offset = int64(binary.LittleEndian.Uint64(MmapBytes[8:16]))
+	var start int64 = 16
+	var i int64 = 0
+	for i = 0; i <= this.MaxDocId; i++ {
+		start_pos := int64(binary.LittleEndian.Uint64(MmapBytes[start : start+8]))
+		start += 8
+		byte_len := int64(binary.LittleEndian.Uint64(MmapBytes[start : start+8]))
+		start += 8
+		this.DetailList = append(this.DetailList, DetailInfo{nil,start_pos,byte_len,false})
+	}
+
+	return nil
+	
+}
+
+
+
 func (this *Detail) WriteDetailToFile() error {
 
 	buf := new(bytes.Buffer)
 
-	//file_name := fmt.Sprintf("./index/detail.dat")
+
 	fout, err := os.Create(fmt.Sprintf("./index/detail.dat"))
 	if err != nil {
 		fmt.Printf("Create Error %v\n", err)
 		return err
 	}
 	defer fout.Close()
+	
+	file_name := "./index/detail.dic"
+	fdetail_dic_out, err := os.Create(file_name)
+	defer fdetail_dic_out.Close()
+	if err != nil {
+		return err
+	}
+	
+	buf_detail_dic := new(bytes.Buffer)
+	err = binary.Write(buf_detail_dic, binary.LittleEndian, this.MaxDocId)
+	if err != nil {
+		fmt.Printf("MaxDocId ERROR :%v \n", err)
+	}
+	err = binary.Write(buf_detail_dic, binary.LittleEndian, this.Offset)
+	if err != nil {
+		fmt.Printf("Offset ERROR :%v \n", err)
+	}
+	
 
 	for index, _ := range this.DetailList {
 
 		err := binary.Write(buf, binary.LittleEndian, this.DetailList[index].DetailBytes)
 		if err != nil {
-			fmt.Printf("Write Error ..%v\n", err)
+			fmt.Printf("DetailBytes Error ..%v\n", err)
 		}
 		this.DetailList[index].DetailBytes = nil
+		
+		err = binary.Write(buf_detail_dic, binary.LittleEndian, this.DetailList[index].ByteStart)
+		if err != nil {
+			fmt.Printf("ByteStart Error ..%v\n", err)
+		}
+		
+		err = binary.Write(buf_detail_dic, binary.LittleEndian, this.DetailList[index].ByteLen)
+		if err != nil {
+			fmt.Printf("ByteLen Error ..%v\n", err)
+		}
 	}
 
 	fout.Write(buf.Bytes())
-	utils.WriteToJson(this, "./index/detail.idx.json")
+	fdetail_dic_out.Write(buf_detail_dic.Bytes())
+	//utils.WriteToJson(this, "./index/detail.idx.json")
+	
+	
 	return nil
 
 }
