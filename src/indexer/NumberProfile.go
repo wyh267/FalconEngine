@@ -11,14 +11,14 @@ package indexer
 
 import (
 	//"encoding/json"
+	"bytes"
+	"encoding/binary"
 	"errors"
 	"fmt"
-	"strconv"
-	u "utils"
 	"os"
-	"bytes"
+	"strconv"
 	"syscall"
-	"encoding/binary"
+	u "utils"
 )
 
 type NumberProfile struct {
@@ -195,15 +195,15 @@ func (this *NumberProfile) WriteToFile() error {
 	if err != nil {
 		return err
 	}
-	
+
 	buf := new(bytes.Buffer)
 	err = binary.Write(buf, binary.LittleEndian, this.Len)
 	if err != nil {
-			fmt.Printf("Lens ERROR :%v \n",err)
+		fmt.Printf("Lens ERROR :%v \n", err)
 	}
 	err = binary.Write(buf, binary.LittleEndian, this.Type)
 	if err != nil {
-			fmt.Printf("Type ERROR :%v \n",err)
+		fmt.Printf("Type ERROR :%v \n", err)
 	}
 	//err = binary.Write(buf, binary.LittleEndian, int64(this.IsMmap))
 	//if err != nil {
@@ -211,37 +211,37 @@ func (this *NumberProfile) WriteToFile() error {
 	//}
 	err = binary.Write(buf, binary.LittleEndian, int64(len(this.Name)))
 	if err != nil {
-		fmt.Printf("Write Name Lens Error :%v \n",err)
+		fmt.Printf("Write Name Lens Error :%v \n", err)
 	}
 	err = binary.Write(buf, binary.LittleEndian, []byte(this.Name))
 	if err != nil {
-		fmt.Printf("Write Name Error :%v \n",err)
+		fmt.Printf("Write Name Error :%v \n", err)
 	}
-	for _,value := range this.ProfileList {
+	for _, value := range this.ProfileList {
 		err := binary.Write(buf, binary.LittleEndian, value)
 		if err != nil {
-			fmt.Printf("Write value Error :%v \n",err)
+			fmt.Printf("Write value Error :%v \n", err)
 		}
 	}
 	fout.Write(buf.Bytes())
 	return nil
-	
+
 }
 
 func (this *NumberProfile) ReadFromFile() error {
-	
-	file_name := fmt.Sprintf("./index/%v_plf.plf",this.Name)
+
+	file_name := fmt.Sprintf("./index/%v_plf.plf", this.Name)
 	f, err := os.Open(file_name)
 	defer f.Close()
 	if err != nil {
-		return  err
+		return err
 	}
-	
+
 	fi, err := f.Stat()
 	if err != nil {
 		fmt.Printf("ERR:%v", err)
 	}
-	
+
 	MmapBytes, err := syscall.Mmap(int(f.Fd()), 0, int(fi.Size()), syscall.PROT_READ, syscall.MAP_PRIVATE)
 
 	if err != nil {
@@ -250,21 +250,19 @@ func (this *NumberProfile) ReadFromFile() error {
 	}
 
 	defer syscall.Munmap(MmapBytes)
-	
-	
-	this.Len=int64(binary.LittleEndian.Uint64(MmapBytes[:8]))
-	this.Type=int64(binary.LittleEndian.Uint64(MmapBytes[8:16]))
+
+	this.Len = int64(binary.LittleEndian.Uint64(MmapBytes[:8]))
+	this.Type = int64(binary.LittleEndian.Uint64(MmapBytes[8:16]))
 	//this.IsMmap=bool(binary.LittleEndian.Uint64(MmapBytes[16:24]))
-	name_lens:=int64(binary.LittleEndian.Uint64(MmapBytes[16:24]))
-	this.Name = string(MmapBytes[24:24+name_lens])
-	var start int64 = 24+name_lens
+	name_lens := int64(binary.LittleEndian.Uint64(MmapBytes[16:24]))
+	this.Name = string(MmapBytes[24 : 24+name_lens])
+	var start int64 = 24 + name_lens
 	var i int64 = 0
-	for i=1;i<this.Len;i++{
-		value:=int64(binary.LittleEndian.Uint64(MmapBytes[start:start+8]))
-		start+=8
-		this.ProfileList=append(this.ProfileList,value)
+	for i = 1; i < this.Len; i++ {
+		value := int64(binary.LittleEndian.Uint64(MmapBytes[start : start+8]))
+		start += 8
+		this.ProfileList = append(this.ProfileList, value)
 	}
-	
 
 	return nil
 }

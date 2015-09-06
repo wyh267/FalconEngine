@@ -15,21 +15,21 @@ import (
 	"errors"
 	"fmt"
 	//"github.com/Shopify/sarma"
+	"builder"
 	"indexer"
 	"net/url"
 	"strconv"
 	"utils"
-	"builder"
 )
 
 type Searcher struct {
 	*BaseFunctions.BaseProcessor
-	Indexer *indexer.IndexSet
+	Indexer   *indexer.IndexSet
 	Data_chan chan builder.UpdateInfo
 }
 
-func NewSearcher(processor *BaseFunctions.BaseProcessor, indexer *indexer.IndexSet,data_chan chan builder.UpdateInfo) *Searcher {
-	this := &Searcher{processor, indexer,data_chan}
+func NewSearcher(processor *BaseFunctions.BaseProcessor, indexer *indexer.IndexSet, data_chan chan builder.UpdateInfo) *Searcher {
+	this := &Searcher{processor, indexer, data_chan}
 	return this
 }
 
@@ -108,17 +108,17 @@ func (this *Searcher) ComputeScore(log_id string, body []byte, params map[string
 
 	for _, doc_id := range doc_ids {
 		/*
-		id, fields := this.Indexer.GetId(doc_id)
-		info, err := this.RedisCli.GetFields(id, fields)
-		if err != nil {
-			this.Logger.Error("%v", err)
-			continue
-		}
+			id, fields := this.Indexer.GetId(doc_id)
+			info, err := this.RedisCli.GetFields(id, fields)
+			if err != nil {
+				this.Logger.Error("%v", err)
+				continue
+			}
 		*/
-		
-		info,err := this.Indexer.GetDocIdInfo(doc_id.DocId)
+
+		info, err := this.Indexer.GetDocIdInfo(doc_id.DocId)
 		if err != nil {
-			this.Logger.Error("DocId Error : %v\n",err)
+			this.Logger.Error("DocId Error : %v\n", err)
 		}
 		score, err := utils.ComputScore(body, info)
 		if err != nil {
@@ -127,17 +127,17 @@ func (this *Searcher) ComputeScore(log_id string, body []byte, params map[string
 		}
 		info["score"] = fmt.Sprintf("%v", score)
 		//写入正排文件中
-		
-		inc_info:=make(map[string]string)
-		inc_info["score"]=info["score"]
-		inc_info["id"]=info["id"]
+
+		inc_info := make(map[string]string)
+		inc_info["score"] = info["score"]
+		inc_info["id"] = info["id"]
 		//this.Logger.Info("write score to profile...\n",inc_info)
-		upinfo := builder.UpdateInfo{inc_info,indexer.PlfUpdate,make(chan error)}
+		upinfo := builder.UpdateInfo{inc_info, indexer.PlfUpdate, make(chan error)}
 		this.Data_chan <- upinfo
-		errinfo:= <-upinfo.ErrChan
+		errinfo := <-upinfo.ErrChan
 		if errinfo != nil {
 			this.Logger.Info("Update Fail.... %v ", errinfo)
-		}else{
+		} else {
 			this.Logger.Info("Update Success.... ")
 		}
 		//写入数据库中
@@ -196,8 +196,6 @@ func (this *Searcher) GroupContact(log_id string, body []byte, params map[string
 		total_doc_ids, _ = utils.Merge(total_doc_ids, doc_ids)
 	}
 
-
-
 	infos := this.Indexer.GetDetailsByDocId(total_doc_ids)
 	for _, info := range infos {
 		v, ok := info.(map[string]string)
@@ -211,7 +209,6 @@ func (this *Searcher) GroupContact(log_id string, body []byte, params map[string
 		}
 
 	}
-
 
 	this.Logger.Info("[LOG_ID:%v] End Grouping ....Time: %v \n\n", log_id, ftime("GroupContact"))
 	return nil

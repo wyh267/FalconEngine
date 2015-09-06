@@ -288,10 +288,8 @@ func (this *ByteProfile) ReadFromFile() error {
 	return nil
 }
 
-
-
 func (this *ByteProfile) WriteToFileWithChan(wchan chan string) error {
-	
+
 	this.WriteToFile()
 	wchan <- fmt.Sprintf("./index/%v_pfl.dat", this.Name)
 	return nil

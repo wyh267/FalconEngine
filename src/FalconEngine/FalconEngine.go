@@ -78,10 +78,8 @@ func main() {
 		index_set := indexer.NewIndexSet(bitmap, logger)
 		index_set.InitIndexSet(fields)
 
-
-
 		data_chan := make(chan builder.UpdateInfo, 1000)
-		searcher := NewSearcher(processor, index_set,data_chan) // &Searcher{processor}
+		searcher := NewSearcher(processor, index_set, data_chan) // &Searcher{processor}
 		updater := NewUpdater(processor, index_set, data_chan)
 		updater.IncUpdating()
 		router := &BaseFunctions.Router{configure, logger, map[string]BaseFunctions.FEProcessor{

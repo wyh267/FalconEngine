@@ -119,9 +119,9 @@ func (this *DBBuilder) StartBuildIndex() {
 }
 
 type UpdateInfo struct {
-	Info      map[string]string
+	Info       map[string]string
 	UpdateType int
-	ErrChan   chan error
+	ErrChan    chan error
 }
 
 func (this *DBBuilder) ScanInc(Data_chan chan UpdateInfo) error {
@@ -168,21 +168,21 @@ func (this *DBBuilder) ScanInc(Data_chan chan UpdateInfo) error {
 				new_values[this.Fields[index].Name] = v
 
 			}
-			
+
 			//判断是否是删除操作
 			/*
-			if new_values["is_delete"] == "1" {
-				this.Logger.Info("Update Status : Delete doc  ")
-				upinfo := UpdateInfo{new_values, indexer.Delete, make(chan error)}
-				Data_chan <- upinfo
-				errinfo := <-upinfo.ErrChan
-				if errinfo != nil {
-					this.Logger.Info("Update Fail.... %v ", errinfo)
-				} else {
-					this.Logger.Info("Update Success.... ")
+				if new_values["is_delete"] == "1" {
+					this.Logger.Info("Update Status : Delete doc  ")
+					upinfo := UpdateInfo{new_values, indexer.Delete, make(chan error)}
+					Data_chan <- upinfo
+					errinfo := <-upinfo.ErrChan
+					if errinfo != nil {
+						this.Logger.Info("Update Fail.... %v ", errinfo)
+					} else {
+						this.Logger.Info("Update Success.... ")
+					}
+					continue
 				}
-				continue
-			}
 			*/
 
 			pk, err := strconv.ParseInt(new_values["id"], 0, 0)
@@ -224,7 +224,7 @@ func (this *DBBuilder) ScanInc(Data_chan chan UpdateInfo) error {
 			if isUpdate {
 				curr_time = new_values[incField]
 				if new_values["is_delete"] == "1" {
-					updateType=indexer.Delete
+					updateType = indexer.Delete
 				}
 				this.Logger.Info("Update Status : Just Update Profile : [%v] ", updateType)
 				upinfo := UpdateInfo{new_values, updateType, make(chan error)}
@@ -270,7 +270,6 @@ func (this *DBBuilder) Buiding() error {
 			if v.FType == "N" {
 				this.Fields[index].IvtIdx = utils.NewInvertIdx(utils.TYPE_NUM, v.Name)
 				this.Fields[index].IvtNumDic = utils.NewNumberIdxDic(v.Name)
-				
 
 			}
 		}
@@ -409,49 +408,24 @@ func (this *DBBuilder) Buiding() error {
 
 	}
 
-	
-
-	//写入全部数据
-	//builder.WriteAllTempIndexToFile()
-	//builder.WriteIndexToFile()
-
-	writeCount:=0
-	writeChan:=make(chan string,1000)
+	writeCount := 0
+	writeChan := make(chan string, 1000)
 
 	this.DetailIdx.WriteDetailToFile()
-	//this.DetailIdx.WriteDetailWithChan(writeChan)
 
-	for index,_ := range this.Fields {
+	for index, _ := range this.Fields {
 
 		if this.Fields[index].IsIvt {
 			utils.WriteToIndexFile(this.Fields[index].IvtIdx, fmt.Sprintf("./index/%v_idx.idx", this.Fields[index].Name))
-			
-			//utils.WriteToJson(this.Fields[index].IvtIdx, fmt.Sprintf("./index/%v_idx.json", this.Fields[index].Name))
 			this.Fields[index].IvtIdx.WriteToFile()
 			if this.Fields[index].FType == "T" {
-			/*	
-			go func (schan chan string) {
-				utils.WriteToIndexFile(fields.IvtIdx,fmt.Sprintf("./index/%v_idx.idx",fields.Name))
-				utils.WriteToJson(fields.IvtIdx, fmt.Sprintf("./index/%v_idx.json", fields.Name))	
-				utils.WriteToJson(fields.IvtStrDic, fmt.Sprintf("./index/%v_dic.json", fields.Name))
-				schan <- fields.Name
-			}(writeChan)
-			*/
-			//go utils.WriteIndexDataToFileWithChan(this.Fields[index].IvtIdx,this.Fields[index].IvtStrDic,this.Fields[index].Name,writeChan)
-			
-			this.Fields[index].IvtStrDic.WriteToFile()
-			//writeCount++
+
+				this.Fields[index].IvtStrDic.WriteToFile()
+
 			}
 
 			if this.Fields[index].FType == "N" {
-			/*
-			utils.WriteToIndexFile(fields.IvtIdx,fmt.Sprintf("./index/%v_idx.idx",fields.Name))
-			utils.WriteToJson(fields.IvtIdx, fmt.Sprintf("./index/%v_idx.json", fields.Name))
-			utils.WriteToJson(fields.IvtNumDic, fmt.Sprintf("./index/%v_dic.json", fields.Name))
-			*/
-			//go utils.WriteIndexDataToFileWithChan(this.Fields[index].IvtIdx,this.Fields[index].IvtNumDic,this.Fields[index].Name,writeChan)
-			this.Fields[index].IvtNumDic.WriteToFile()
-			//writeCount++
+				this.Fields[index].IvtNumDic.WriteToFile()
 			}
 
 		}
@@ -460,26 +434,17 @@ func (this *DBBuilder) Buiding() error {
 
 			if this.Fields[index].FType == "T" {
 
-				//go utils.WriteToJsonWithChan(this.Fields[index].PlfText, fmt.Sprintf("./index/%v_pfl.json", this.Fields[index].Name),writeChan)
-				
 				this.Fields[index].PlfText.WriteToFile()
-				//utils.WriteToJson(fields.PlfText, fmt.Sprintf("./index/%v_pfl.json", fields.Name))
-				//writeCount++
 
 			}
 
 			if this.Fields[index].FType == "N" {
 
-				//go utils.WriteToJsonWithChan(this.Fields[index].PlfNumber, fmt.Sprintf("./index/%v_pfl.json", this.Fields[index].Name),writeChan)
 				this.Fields[index].PlfNumber.WriteToFile()
-				//utils.WriteToJson(fields.PlfNumber, fmt.Sprintf("./index/%v_pfl.json", fields.Name))
-				//writeCount++
 
 			}
 
 			if this.Fields[index].FType == "I" {
-
-				//utils.WriteToJsonWithChan(fields.PlfNumber, fmt.Sprintf("./index/%v_pfl.json", fields.Name),writeChan)
 
 				go this.Fields[index].PlfByte.WriteToFileWithChan(writeChan)
 				writeCount++
@@ -489,25 +454,25 @@ func (this *DBBuilder) Buiding() error {
 		}
 
 	}
-	
-		fmt.Printf("Waiting %v threads\n ",writeCount)
-		if writeCount == 0 {
-			close(writeChan)
-			return nil
-		}
-		for {
-			select{
-				case file_name := <-writeChan:
-					writeCount--
-					fmt.Printf("Write [%v] finished \n ",file_name)
-					if writeCount == 0 {
-						fmt.Printf("Finish building all index...\n")
-						close(writeChan)
-						return nil
-					}
+
+	fmt.Printf("Waiting %v threads\n ", writeCount)
+	if writeCount == 0 {
+		close(writeChan)
+		return nil
+	}
+	for {
+		select {
+		case file_name := <-writeChan:
+			writeCount--
+			fmt.Printf("Write [%v] finished \n ", file_name)
+			if writeCount == 0 {
+				fmt.Printf("Finish building all index...\n")
+				close(writeChan)
+				return nil
 			}
 		}
-	
+	}
+
 	return nil
 
 }

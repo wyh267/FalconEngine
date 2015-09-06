@@ -48,30 +48,30 @@ type SearchInfo struct {
 
 func main() {
 	/*
-		condition := `{
-	         "name" : "智能6",
-	         "editor_id" : 155,
-	         "customer_id": 327,
-	         "contact_id" : 0,
-	         "group_type":2,
-	    "conditions":{"data":[
-	    {"childs":[
-	        {"desc":"age","key":"user_attrib","operate":"more","value":"11"},
-	       	{"desc":"sex","key":"user_attrib","operate":"equal","value":"1"},
-			{"desc":"name","key":"user_attrib","operate":"equal","value":"吴"}
-	        ]
-	    }]}}`
+			condition := `{
+		         "name" : "智能6",
+		         "editor_id" : 155,
+		         "customer_id": 327,
+		         "contact_id" : 0,
+		         "group_type":2,
+		    "conditions":{"data":[
+		    {"childs":[
+		        {"desc":"age","key":"user_attrib","operate":"more","value":"11"},
+		       	{"desc":"sex","key":"user_attrib","operate":"equal","value":"1"},
+				{"desc":"name","key":"user_attrib","operate":"equal","value":"吴"}
+		        ]
+		    }]}}`
 
-		cb:=[]byte(condition)
-
-
-		contact_info := map[string]string{ "age":"14","sex":"1","name":"吴英昊"  }
+			cb:=[]byte(condition)
 
 
+			contact_info := map[string]string{ "age":"14","sex":"1","name":"吴英昊"  }
 
-		fmt.Println(GroupBy(cb,contact_info))
-	// {"key":"create_time","operate":"more","value":"2015-03-06"},
-	//        {"key":"area","operate":"equal","value":"113"}
+
+
+			fmt.Println(GroupBy(cb,contact_info))
+		// {"key":"create_time","operate":"more","value":"2015-03-06"},
+		//        {"key":"area","operate":"equal","value":"113"}
 	*/
 }
 
@@ -333,7 +333,6 @@ func ComputScore(body []byte, ContactInfo map[string]string) (int64, error) {
 		contact_score = 0
 	}
 
-
 	//第一层循环
 	for _, data := range searchInfo.Conditions.Data {
 		sub_flag := false
@@ -350,7 +349,7 @@ func ComputScore(body []byte, ContactInfo map[string]string) (int64, error) {
 		}
 
 		if sub_flag == true {
-			return data.Score,nil
+			return data.Score, nil
 		}
 	}
 

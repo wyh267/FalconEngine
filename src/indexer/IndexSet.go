@@ -41,9 +41,6 @@ type IndexFieldInfo struct {
 	SType int64  `json:"Search Type"`
 }
 
-
-
-
 const (
 	PlfUpdate = iota
 	IvtUpdate
@@ -182,60 +179,27 @@ func (this *IndexSet) InitIndexSet(fields map[string]string) error {
 		this.Logger.Info("========= Loading Index/Dictionary and Profile [ %v ] =========", k)
 		if l[1] == "1" {
 			this.FieldInfo[k].IsIvt = true
-			
-			/*
-			idx_name := fmt.Sprintf("./index/%v_idx.json", k)
-			//dic_name := fmt.Sprintf("./index/%v_dic.json", k)
-			bidx, _ := utils.ReadFromJson(idx_name)
-			//bdic, _ := utils.ReadFromJson(dic_name)
-			var idx utils.InvertIdx
-			err := json.Unmarshal(bidx, &idx)
-			if err != nil {
-				this.Logger.Error("Error to unmarshal[%v], %v", k, err)
-				return err
-			}
-			this.Logger.Info("Loading Index            [ %v ] ...", idx_name)
-			*/
-			
-			idx:=utils.NewInvertIdxWithName(k)
+			idx := utils.NewInvertIdxWithName(k)
 			this.Logger.Info("\t Loading Invert Index [ %v.idx.dic ] ", k)
-			//this.Logger.Info("Loading Index            [ %v ] ...", idx_name)
+
 			idx.ReadFromFile()
 			if l[3] == "T" { //text ivt
-				
-				/*
-				var dic utils.StringIdxDic
-				this.Logger.Info("Loading Index Dictionary [ %v ] type : Text ...", dic_name)
-				err = json.Unmarshal(bdic, &dic)
-				if err != nil {
-					this.Logger.Error("Error to unmarshal[%v], %v", k, err)
-					return err
-				}
-				*/
+
 				this.FieldInfo[k].FType = "T"
-				dic:=utils.NewStringIdxDic(k)
+				dic := utils.NewStringIdxDic(k)
 				this.Logger.Info("\t Loading Invert Index Dictionary [ %v.dic ] ", k)
 				dic.ReadFromFile()
-				//dic.Display()
+
 				index := NewTextIndex(k, idx, dic)
 				this.PutIndex(k, index)
-				
 
 			} else { //number ivt
-				/*
-				var dic utils.NumberIdxDic
-				this.Logger.Info("Loading Index Dictionary [ %v ] type : Number...", dic_name)
-				err = json.Unmarshal(bdic, &dic)
-				if err != nil {
-					this.Logger.Error("Error to unmarshal[%v], %v", k, err)
-					return err
-				}
-				*/
+
 				this.FieldInfo[k].FType = "N"
-				dic:=utils.NewNumberIdxDic(k)
+				dic := utils.NewNumberIdxDic(k)
 				this.Logger.Info("\t Loading Invert Index Dictionary [ %v.dic ] ", k)
 				dic.ReadFromFile()
-				//dic.Display()
+
 				index := NewNumberIndex(k, idx, dic)
 				this.PutIndex(k, index)
 			}
@@ -249,36 +213,18 @@ func (this *IndexSet) InitIndexSet(fields map[string]string) error {
 
 			if l[3] == "T" {
 				this.FieldInfo[k].FType = "T"
-				/*
-				var pfl TextProfile
-				this.Logger.Info("Loading Index Profile    [ %v ] type : Text ...", pfl_name)
-				err := json.Unmarshal(bpfl, &pfl)
-				if err != nil {
-					this.Logger.Error("Error to unmarshal[%v], %v", k, err)
-					return err
-				}
-				*/
-				pfl:=NewTextProfile(k)
+				pfl := NewTextProfile(k)
 				this.Logger.Info("\t Loading Text Profile [ %v.pfl ] ", k)
 				pfl.ReadFromFile()
-				//pfl.Display()
+
 				this.PutProfile(k, pfl)
 
 			} else if l[3] == "N" {
 				this.FieldInfo[k].FType = "N"
-				/*
-				var pfl NumberProfile
-				this.Logger.Info("Loading Index Profile    [ %v ] type : Number ...", pfl_name)
-				err := json.Unmarshal(bpfl, &pfl)
-				if err != nil {
-					this.Logger.Error("Error to unmarshal[%v], %v", k, err)
-					return err
-				}
-				*/
-				pfl:=NewNumberProfile(k)
+				pfl := NewNumberProfile(k)
 				this.Logger.Info("\t Loading Number Profile [ %v.pfl ] ", k)
 				pfl.ReadFromFile()
-				//pfl.Display()
+
 				this.PutProfile(k, pfl)
 			} else if l[3] == "I" {
 				this.FieldInfo[k].FType = "I"
@@ -673,13 +619,10 @@ func (this *IndexSet) GetId(doc_id utils.DocIdInfo) (int64, []string) {
 	return t, fields
 }
 
+func (this *IndexSet) GetDocIdInfo(doc_id int64) (map[string]string, error) {
 
-
-func (this *IndexSet) GetDocIdInfo(doc_id int64) (map[string]string,error) {
-	
 	return this.Detail.GetDocInfo(doc_id)
 }
-
 
 func (this *IndexSet) GetDetailsByDocId(doc_ids []utils.DocIdInfo) []interface{} {
 
@@ -743,28 +686,26 @@ func (this *IndexSet) UpdateRecord(info map[string]string, UpdateType int) error
 		this.Logger.Error("No Primary Key,Update is not allow  %v", err)
 		return err
 	}
-	
+
 	Doc_id, has_key := this.SearchField(pk, this.PrimaryKey)
 	var doc_id int64
-	
+
 	//删除操作
-	if UpdateType==Delete {
-		
-		if has_key{
+	if UpdateType == Delete {
+
+		if has_key {
 			for index, _ := range Doc_id {
-					this.Logger.Info("Delete Doc_id : %v ", Doc_id[index].DocId)
-					this.BitMap.SetBit(uint64(Doc_id[index].DocId), 1)
+				this.Logger.Info("Delete Doc_id : %v ", Doc_id[index].DocId)
+				this.BitMap.SetBit(uint64(Doc_id[index].DocId), 1)
 			}
-		}else{
+		} else {
 			this.Logger.Info("No record to Delete , can not find promary key[%v] in index  ", pk)
 		}
 		return nil
 	}
-	
-
 
 	//如果仅更新正排文件，不需要新建doc_id，直接更新
-	if UpdateType==PlfUpdate {
+	if UpdateType == PlfUpdate {
 		if !has_key {
 			//this.Logger.Error("isProfileUpdate  %v",  err)
 			return errors.New("Update err...no doc_id to update")
@@ -774,7 +715,7 @@ func (this *IndexSet) UpdateRecord(info map[string]string, UpdateType int) error
 			this.UpdateProfile(k, v, Doc_id[0].DocId)
 		}
 
-	} else if UpdateType==IvtUpdate { //检查是否有着primary key ,如果没有，需要新增一个doc_id，进行全字段更新
+	} else if UpdateType == IvtUpdate { //检查是否有着primary key ,如果没有，需要新增一个doc_id，进行全字段更新
 		//如果doc_id存在，删除之前的doc_id
 		if has_key {
 			for index, _ := range Doc_id {
