@@ -263,17 +263,14 @@ func (this *DBBuilder) Buiding() error {
 
 			if v.FType == "T" {
 				this.Fields[index].IvtIdx = utils.NewInvertIdx(utils.TYPE_TEXT, v.Name)
-				this.Fields[index].IvtStrDic = utils.NewStringIdxDic(5001)
+				this.Fields[index].IvtStrDic = utils.NewStringIdxDic(v.Name)
 
 			}
 
 			if v.FType == "N" {
 				this.Fields[index].IvtIdx = utils.NewInvertIdx(utils.TYPE_NUM, v.Name)
-				if v.IsPK {
-					this.Fields[index].IvtNumDic = utils.NewNumberIdxDic(1)
-				} else {
-					this.Fields[index].IvtNumDic = utils.NewNumberIdxDic(4)
-				}
+				this.Fields[index].IvtNumDic = utils.NewNumberIdxDic(v.Name)
+				
 
 			}
 		}
@@ -427,7 +424,10 @@ func (this *DBBuilder) Buiding() error {
 	for index,_ := range this.Fields {
 
 		if this.Fields[index].IsIvt {
-
+			utils.WriteToIndexFile(this.Fields[index].IvtIdx, fmt.Sprintf("./index/%v_idx.idx", this.Fields[index].Name))
+			
+			//utils.WriteToJson(this.Fields[index].IvtIdx, fmt.Sprintf("./index/%v_idx.json", this.Fields[index].Name))
+			this.Fields[index].IvtIdx.WriteToFile()
 			if this.Fields[index].FType == "T" {
 			/*	
 			go func (schan chan string) {
@@ -437,8 +437,10 @@ func (this *DBBuilder) Buiding() error {
 				schan <- fields.Name
 			}(writeChan)
 			*/
-			go utils.WriteIndexDataToFileWithChan(this.Fields[index].IvtIdx,this.Fields[index].IvtStrDic,this.Fields[index].Name,writeChan)
-			writeCount++
+			//go utils.WriteIndexDataToFileWithChan(this.Fields[index].IvtIdx,this.Fields[index].IvtStrDic,this.Fields[index].Name,writeChan)
+			
+			this.Fields[index].IvtStrDic.WriteToFile()
+			//writeCount++
 			}
 
 			if this.Fields[index].FType == "N" {
@@ -447,8 +449,9 @@ func (this *DBBuilder) Buiding() error {
 			utils.WriteToJson(fields.IvtIdx, fmt.Sprintf("./index/%v_idx.json", fields.Name))
 			utils.WriteToJson(fields.IvtNumDic, fmt.Sprintf("./index/%v_dic.json", fields.Name))
 			*/
-			go utils.WriteIndexDataToFileWithChan(this.Fields[index].IvtIdx,this.Fields[index].IvtNumDic,this.Fields[index].Name,writeChan)
-			writeCount++
+			//go utils.WriteIndexDataToFileWithChan(this.Fields[index].IvtIdx,this.Fields[index].IvtNumDic,this.Fields[index].Name,writeChan)
+			this.Fields[index].IvtNumDic.WriteToFile()
+			//writeCount++
 			}
 
 		}
@@ -457,17 +460,20 @@ func (this *DBBuilder) Buiding() error {
 
 			if this.Fields[index].FType == "T" {
 
-				go utils.WriteToJsonWithChan(this.Fields[index].PlfText, fmt.Sprintf("./index/%v_pfl.json", this.Fields[index].Name),writeChan)
+				//go utils.WriteToJsonWithChan(this.Fields[index].PlfText, fmt.Sprintf("./index/%v_pfl.json", this.Fields[index].Name),writeChan)
+				
+				this.Fields[index].PlfText.WriteToFile()
 				//utils.WriteToJson(fields.PlfText, fmt.Sprintf("./index/%v_pfl.json", fields.Name))
-				writeCount++
+				//writeCount++
 
 			}
 
 			if this.Fields[index].FType == "N" {
 
-				go utils.WriteToJsonWithChan(this.Fields[index].PlfNumber, fmt.Sprintf("./index/%v_pfl.json", this.Fields[index].Name),writeChan)
+				//go utils.WriteToJsonWithChan(this.Fields[index].PlfNumber, fmt.Sprintf("./index/%v_pfl.json", this.Fields[index].Name),writeChan)
+				this.Fields[index].PlfNumber.WriteToFile()
 				//utils.WriteToJson(fields.PlfNumber, fmt.Sprintf("./index/%v_pfl.json", fields.Name))
-				writeCount++
+				//writeCount++
 
 			}
 
@@ -485,6 +491,10 @@ func (this *DBBuilder) Buiding() error {
 	}
 	
 		fmt.Printf("Waiting %v threads\n ",writeCount)
+		if writeCount == 0 {
+			close(writeChan)
+			return nil
+		}
 		for {
 			select{
 				case file_name := <-writeChan:

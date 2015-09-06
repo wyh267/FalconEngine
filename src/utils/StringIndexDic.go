@@ -12,24 +12,17 @@ package utils
 
 import (
 	"fmt"
+	"os"
+	"bytes"
+	"syscall"
+	"encoding/binary"
 )
 
-type StringItemDic struct {
-	HashCode int64
-	Key      string
-	Value    int64
-	Next     int64
-}
-
 type StringIdxDic struct {
-	Entity      []StringItemDic
-	HashIndex   []int64
-	EntityCount int64
-	Bukets      int64
 	Lens        int64
 	StringMap	map[string]int64
 	Index    	int64
-	
+	Name		string
 }
 
 
@@ -38,14 +31,9 @@ type StringIdxDic struct {
 
 
 
-func NewStringIdxDic(bukets int64) *StringIdxDic {
-	/*
-	this := &StringIdxDic{EntityCount: 1, Bukets: bukets}
-	this.Lens = bukets
-	this.Entity = make([]StringItemDic, this.Lens, 100000)
-	this.HashIndex = make([]int64, this.Lens, 100000)
-	*/
-	this := &StringIdxDic{StringMap:make(map[string]int64),Lens:0,Index:1}
+func NewStringIdxDic(name string) *StringIdxDic {
+
+	this := &StringIdxDic{StringMap:make(map[string]int64),Lens:0,Index:1,Name:name}
 	return this
 }
 
@@ -79,34 +67,7 @@ func (this *StringIdxDic) Put(key string) int64 {
 	this.Lens ++
 	
 	return this.StringMap[key]
-	/*
-	//桶已经满了，不能添加
-	if this.EntityCount == this.Lens {
-		fmt.Printf("[StringIdxDic] Bukets Full...Append arrays [EntityCount : %v] [Lens : %v] \n", this.EntityCount, this.Lens)
-		e := make([]StringItemDic, this.Bukets)
-		h := make([]int64, this.Bukets)
-		this.Entity = append(this.Entity, e...)
-		this.HashIndex = append(this.HashIndex, h...)
-		this.Lens = this.Lens + this.Bukets
-		fmt.Printf("[StringIdxDic] Bukets Full...Append arrays [ New EntityCount : %v] [ New Lens : %v] \n", this.EntityCount, this.Lens)
-	}
-	//已经添加过了，返回ID值
-	id := this.Find(key)
-	if id != -1 {
-		return id
-	}
-	hash := ELFHash(key, this.Bukets)
-	this.Entity[this.EntityCount].HashCode = hash
-	this.Entity[this.EntityCount].Key = key
-	this.Entity[this.EntityCount].Value = this.EntityCount
-	this.Entity[this.EntityCount].Next = this.HashIndex[hash]
-	this.HashIndex[hash] = this.EntityCount
-	this.EntityCount++
-
-	return this.EntityCount - 1
-	*/
 	
-
 }
 
 /*****************************************************************************
@@ -120,7 +81,7 @@ func (this *StringIdxDic) Put(key string) int64 {
 func (this *StringIdxDic) Length() int64 {
 	
 	return this.Lens
-//	return this.EntityCount - 1
+
 }
 
 func (this *StringIdxDic) Find(key string) int64 {
@@ -130,15 +91,84 @@ func (this *StringIdxDic) Find(key string) int64 {
 		return value
 	}
 	return -1
-	/*
-	hash := ELFHash(key, this.Bukets)
-	var k int64
-	for k = this.HashIndex[hash]; k != 0; k = this.Entity[k].Next {
-		if key == this.Entity[k].Key {
-			//fmt.Printf("K :%v ==== Value : %v\n",k,this.Entity[k].ValueInt)
-			return this.Entity[k].Value
+}
+
+
+func (this *StringIdxDic) WriteToFile() error {
+	
+	fmt.Printf("Writing to File [%v]...\n", this.Name)
+	file_name := fmt.Sprintf("./index/%v.dic",this.Name)
+	fout, err := os.Create(file_name)
+	defer fout.Close()
+	if err != nil {
+		return err
+	}
+	
+	buf := new(bytes.Buffer)
+	err = binary.Write(buf, binary.LittleEndian, this.Lens)
+	err = binary.Write(buf, binary.LittleEndian, this.Index)
+	if err != nil {
+			fmt.Printf("Lens ERROR :%v \n",err)
+		}
+	for k,v := range this.StringMap {
+		err := binary.Write(buf, binary.LittleEndian, int64(len(k)))
+		if err != nil {
+			fmt.Printf("Write Lens Error :%v \n",err)
+		}
+		err = binary.Write(buf, binary.LittleEndian, []byte(k))
+		if err != nil {
+			fmt.Printf("Write Key Error :%v \n",err)
+		}
+		err = binary.Write(buf, binary.LittleEndian, v)
+		if err != nil {
+			fmt.Printf("Write Value Error :%v \n",err)
 		}
 	}
-	return -1
-	*/
+	fout.Write(buf.Bytes())
+	return nil
+}
+
+
+func (this *StringIdxDic) ReadFromFile() error {
+	
+	file_name := fmt.Sprintf("./index/%v.dic",this.Name)
+	f, err := os.Open(file_name)
+	defer f.Close()
+	if err != nil {
+		return  err
+	}
+	
+	fi, err := f.Stat()
+	if err != nil {
+		fmt.Printf("ERR:%v", err)
+	}
+	
+	MmapBytes, err := syscall.Mmap(int(f.Fd()), 0, int(fi.Size()), syscall.PROT_READ, syscall.MAP_PRIVATE)
+
+	if err != nil {
+		fmt.Printf("MAPPING ERROR  %v \n", err)
+		return nil
+	}
+
+	defer syscall.Munmap(MmapBytes)
+	
+	
+	this.Lens=int64(binary.LittleEndian.Uint64(MmapBytes[:8]))
+	this.Index=int64(binary.LittleEndian.Uint64(MmapBytes[8:16]))
+	var start int64 = 16
+	var i int64 = 0
+	for i=0;i<this.Lens;i++{
+		lens:=int64(binary.LittleEndian.Uint64(MmapBytes[start:start+8]))
+		start+=8
+		key:=string(MmapBytes[start:start+lens])
+		start+=lens
+		value:=int64(binary.LittleEndian.Uint64(MmapBytes[start:start+8]))
+		start+=8
+		this.StringMap[key]=value
+	}
+	
+
+	return nil
+	
+	
 }

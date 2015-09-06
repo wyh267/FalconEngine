@@ -182,10 +182,12 @@ func (this *IndexSet) InitIndexSet(fields map[string]string) error {
 		this.Logger.Info("========= Loading Index/Dictionary and Profile [ %v ] =========", k)
 		if l[1] == "1" {
 			this.FieldInfo[k].IsIvt = true
+			
+			/*
 			idx_name := fmt.Sprintf("./index/%v_idx.json", k)
-			dic_name := fmt.Sprintf("./index/%v_dic.json", k)
+			//dic_name := fmt.Sprintf("./index/%v_dic.json", k)
 			bidx, _ := utils.ReadFromJson(idx_name)
-			bdic, _ := utils.ReadFromJson(dic_name)
+			//bdic, _ := utils.ReadFromJson(dic_name)
 			var idx utils.InvertIdx
 			err := json.Unmarshal(bidx, &idx)
 			if err != nil {
@@ -193,8 +195,15 @@ func (this *IndexSet) InitIndexSet(fields map[string]string) error {
 				return err
 			}
 			this.Logger.Info("Loading Index            [ %v ] ...", idx_name)
+			*/
+			
+			idx:=utils.NewInvertIdxWithName(k)
+			this.Logger.Info("\t Loading Invert Index [ %v.idx.dic ] ", k)
+			//this.Logger.Info("Loading Index            [ %v ] ...", idx_name)
+			idx.ReadFromFile()
 			if l[3] == "T" { //text ivt
-				this.FieldInfo[k].FType = "T"
+				
+				/*
 				var dic utils.StringIdxDic
 				this.Logger.Info("Loading Index Dictionary [ %v ] type : Text ...", dic_name)
 				err = json.Unmarshal(bdic, &dic)
@@ -202,10 +211,18 @@ func (this *IndexSet) InitIndexSet(fields map[string]string) error {
 					this.Logger.Error("Error to unmarshal[%v], %v", k, err)
 					return err
 				}
-				index := NewTextIndex(k, &idx, &dic)
+				*/
+				this.FieldInfo[k].FType = "T"
+				dic:=utils.NewStringIdxDic(k)
+				this.Logger.Info("\t Loading Invert Index Dictionary [ %v.dic ] ", k)
+				dic.ReadFromFile()
+				//dic.Display()
+				index := NewTextIndex(k, idx, dic)
 				this.PutIndex(k, index)
+				
 
 			} else { //number ivt
+				/*
 				var dic utils.NumberIdxDic
 				this.Logger.Info("Loading Index Dictionary [ %v ] type : Number...", dic_name)
 				err = json.Unmarshal(bdic, &dic)
@@ -213,7 +230,13 @@ func (this *IndexSet) InitIndexSet(fields map[string]string) error {
 					this.Logger.Error("Error to unmarshal[%v], %v", k, err)
 					return err
 				}
-				index := NewNumberIndex(k, &idx, &dic)
+				*/
+				this.FieldInfo[k].FType = "N"
+				dic:=utils.NewNumberIdxDic(k)
+				this.Logger.Info("\t Loading Invert Index Dictionary [ %v.dic ] ", k)
+				dic.ReadFromFile()
+				//dic.Display()
+				index := NewNumberIndex(k, idx, dic)
 				this.PutIndex(k, index)
 			}
 
@@ -226,6 +249,7 @@ func (this *IndexSet) InitIndexSet(fields map[string]string) error {
 
 			if l[3] == "T" {
 				this.FieldInfo[k].FType = "T"
+				/*
 				var pfl TextProfile
 				this.Logger.Info("Loading Index Profile    [ %v ] type : Text ...", pfl_name)
 				err := json.Unmarshal(bpfl, &pfl)
@@ -233,10 +257,16 @@ func (this *IndexSet) InitIndexSet(fields map[string]string) error {
 					this.Logger.Error("Error to unmarshal[%v], %v", k, err)
 					return err
 				}
-				this.PutProfile(k, &pfl)
+				*/
+				pfl:=NewTextProfile(k)
+				this.Logger.Info("\t Loading Text Profile [ %v.pfl ] ", k)
+				pfl.ReadFromFile()
+				//pfl.Display()
+				this.PutProfile(k, pfl)
 
 			} else if l[3] == "N" {
 				this.FieldInfo[k].FType = "N"
+				/*
 				var pfl NumberProfile
 				this.Logger.Info("Loading Index Profile    [ %v ] type : Number ...", pfl_name)
 				err := json.Unmarshal(bpfl, &pfl)
@@ -244,11 +274,16 @@ func (this *IndexSet) InitIndexSet(fields map[string]string) error {
 					this.Logger.Error("Error to unmarshal[%v], %v", k, err)
 					return err
 				}
-				this.PutProfile(k, &pfl)
+				*/
+				pfl:=NewNumberProfile(k)
+				this.Logger.Info("\t Loading Number Profile [ %v.pfl ] ", k)
+				pfl.ReadFromFile()
+				//pfl.Display()
+				this.PutProfile(k, pfl)
 			} else if l[3] == "I" {
 				this.FieldInfo[k].FType = "I"
 				var pfl ByteProfile
-				this.Logger.Info("Loading Index Profile    [ %v ] type : Bytes ...", pfl_name)
+				this.Logger.Info("\t Loading Byte Profile [ %v.pfl ] ", pfl_name)
 				err := json.Unmarshal(bpfl, &pfl)
 				if err != nil {
 					this.Logger.Error("Error to unmarshal[%v], %v", k, err)
