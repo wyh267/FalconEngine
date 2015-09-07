@@ -329,11 +329,11 @@ func ComputScore(body []byte, ContactInfo map[string]string) (int64, error) {
 		return 0, err
 	}
 
-	contact_score, err := strconv.ParseInt(fmt.Sprintf("%v", ContactInfo["score"]), 0, 0)
-	if err != nil {
-		contact_score = 0
-	}
-
+	//contact_score, err := strconv.ParseInt(fmt.Sprintf("%v", ContactInfo["score"]), 0, 0)
+	//if err != nil {
+	//	contact_score = 0
+	//}
+	contact_score := 0
 
 	//第一层循环
 	for _, data := range searchInfo.Conditions.Data {
