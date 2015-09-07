@@ -333,7 +333,7 @@ func ComputScore(body []byte, ContactInfo map[string]string) (int64, error) {
 	//if err != nil {
 	//	contact_score = 0
 	//}
-	contact_score := 0
+	//contact_score := 0
 
 	//第一层循环
 	for _, data := range searchInfo.Conditions.Data {
@@ -355,6 +355,6 @@ func ComputScore(body []byte, ContactInfo map[string]string) (int64, error) {
 		}
 	}
 
-	return contact_score, nil
+	return 0, nil
 
 }
