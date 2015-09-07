@@ -446,11 +446,11 @@ func (this *Searcher) ParseSearchInfo(log_id string, params map[string]string, b
 						//FR.Value = from_num*10000
 						//FR.FiltType = indexer.FILT_TYPE_EQUAL
 						//SRs.FR = append(SRs.FR,FR)
-
+						FR.Value = from_num*100
 						FR.FiltType = indexer.FILT_TYPE_ABOVE
 						SRs.FR = append(SRs.FR, FR)
 
-						FR.Value = from_num*10000 + 10000
+						FR.Value = from_num*100 + 100
 						FR.FiltType = indexer.FILT_TYPE_LESS
 						SRs.FR = append(SRs.FR, FR)
 						continue
