@@ -138,9 +138,7 @@ func checkAreaInfo(op, value string, contact_info map[string]string) bool {
 	}
 	var match_num int64
 	if area_num < 1000 {
-		match_num = area_field_num / 100000
-	} else if area_num < 100000 {
-		match_num = area_field_num / 1000
+		match_num = area_field_num / 100
 	} else {
 		match_num = area_field_num
 	}
