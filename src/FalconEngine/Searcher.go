@@ -128,11 +128,13 @@ func (this *Searcher) ComputeScore(log_id string, body []byte, params map[string
 		info["score"] = fmt.Sprintf("%v", score)
 		//写入正排文件中
 
-		inc_info := make(map[string]string)
-		inc_info["score"] = info["score"]
-		inc_info["id"] = info["id"]
+		
+		//inc_info:=make(map[string]string)
+		//inc_info["score"]=info["score"]
+		//inc_info["id"]=info["id"]
 		//this.Logger.Info("write score to profile...\n",inc_info)
-		upinfo := builder.UpdateInfo{inc_info, indexer.PlfUpdate, make(chan error)}
+		upinfo := builder.UpdateInfo{info,indexer.PlfUpdate,make(chan error)}
+
 		this.Data_chan <- upinfo
 		errinfo := <-upinfo.ErrChan
 		if errinfo != nil {
@@ -443,17 +445,18 @@ func (this *Searcher) ParseSearchInfo(log_id string, params map[string]string, b
 						//FR.Value = from_num*10000
 						//FR.FiltType = indexer.FILT_TYPE_EQUAL
 						//SRs.FR = append(SRs.FR,FR)
-
+						FR.Value = from_num*100-1
 						FR.FiltType = indexer.FILT_TYPE_ABOVE
 						SRs.FR = append(SRs.FR, FR)
 
-						FR.Value = from_num*10000 + 10000
+						FR.Value = from_num*100 + 100
 						FR.FiltType = indexer.FILT_TYPE_LESS
 						SRs.FR = append(SRs.FR, FR)
 						continue
 					}
 
 					if from_num < 100000 {
+						FR.Value = from_num - 1
 						FR.FiltType = indexer.FILT_TYPE_ABOVE
 						SRs.FR = append(SRs.FR, FR)
 						FR.FiltType = indexer.FILT_TYPE_LESS

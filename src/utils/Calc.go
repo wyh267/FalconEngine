@@ -83,17 +83,20 @@ func checkTermInString(op, value string, contact_info map[string]string, field s
 
 func checkDateTime(op, value string, contact_info map[string]string, field string) bool {
 
+	vl := strings.Split(contact_info[field], " ")
+	v := vl[0]
+	
 	switch op {
 	case "equal":
-		return value == contact_info[field]
+		return value == v 
 	case "unequal":
-		return value != contact_info[field]
+		return value != v 
 	case "less":
-		return contact_info[field] < value
+		return v < value
 	case "more":
-		return contact_info[field] > value
+		return v  > value
 	default:
-		return value == contact_info[field]
+		return value == v 
 	}
 
 	return false
@@ -138,9 +141,7 @@ func checkAreaInfo(op, value string, contact_info map[string]string) bool {
 	}
 	var match_num int64
 	if area_num < 1000 {
-		match_num = area_field_num / 100000
-	} else if area_num < 100000 {
-		match_num = area_field_num / 1000
+		match_num = area_field_num / 100
 	} else {
 		match_num = area_field_num
 	}
@@ -328,10 +329,13 @@ func ComputScore(body []byte, ContactInfo map[string]string) (int64, error) {
 		return 0, err
 	}
 
-	contact_score, err := strconv.ParseInt(fmt.Sprintf("%v", ContactInfo["score"]), 0, 0)
-	if err != nil {
-		contact_score = 0
-	}
+
+	//contact_score, err := strconv.ParseInt(fmt.Sprintf("%v", ContactInfo["score"]), 0, 0)
+	//if err != nil {
+	//	contact_score = 0
+	//}
+	//contact_score := 0
+
 
 	//第一层循环
 	for _, data := range searchInfo.Conditions.Data {
@@ -353,6 +357,6 @@ func ComputScore(body []byte, ContactInfo map[string]string) (int64, error) {
 		}
 	}
 
-	return contact_score, nil
+	return 0, nil
 
 }
