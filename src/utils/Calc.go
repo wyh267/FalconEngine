@@ -84,7 +84,7 @@ func checkTermInString(op, value string, contact_info map[string]string, field s
 func checkDateTime(op, value string, contact_info map[string]string, field string) bool {
 
 	vl := strings.Split(contact_info[field], " ")
-	v = vl[0]
+	v := vl[0]
 	
 	switch op {
 	case "equal":
