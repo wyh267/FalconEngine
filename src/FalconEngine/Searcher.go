@@ -446,7 +446,7 @@ func (this *Searcher) ParseSearchInfo(log_id string, params map[string]string, b
 						//FR.Value = from_num*10000
 						//FR.FiltType = indexer.FILT_TYPE_EQUAL
 						//SRs.FR = append(SRs.FR,FR)
-						FR.Value = from_num*100
+						FR.Value = from_num*100-1
 						FR.FiltType = indexer.FILT_TYPE_ABOVE
 						SRs.FR = append(SRs.FR, FR)
 
@@ -457,6 +457,7 @@ func (this *Searcher) ParseSearchInfo(log_id string, params map[string]string, b
 					}
 
 					if from_num < 100000 {
+						FR.Value = from_num - 1
 						FR.FiltType = indexer.FILT_TYPE_ABOVE
 						SRs.FR = append(SRs.FR, FR)
 						FR.FiltType = indexer.FILT_TYPE_LESS

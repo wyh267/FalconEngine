@@ -72,13 +72,13 @@ func (this *NumberProfile) FilterValue(doc_ids []u.DocIdInfo, value int64, is_fo
 
 		for i, _ := range doc_ids {
 
-			if this.ProfileList[doc_ids[i].DocId] <= value {
+			if this.ProfileList[doc_ids[i].DocId] < value {
 				res = append(res, doc_ids[i])
 			}
 		}
 	case FILT_TYPE_ABOVE:
 		for i, _ := range doc_ids {
-			if this.ProfileList[doc_ids[i].DocId] >= value {
+			if this.ProfileList[doc_ids[i].DocId] > value {
 				res = append(res, doc_ids[i])
 			}
 		}
