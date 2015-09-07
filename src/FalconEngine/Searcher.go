@@ -128,11 +128,11 @@ func (this *Searcher) ComputeScore(log_id string, body []byte, params map[string
 		info["score"] = fmt.Sprintf("%v", score)
 		//写入正排文件中
 		
-		inc_info:=make(map[string]string)
-		inc_info["score"]=info["score"]
-		inc_info["id"]=info["id"]
+		//inc_info:=make(map[string]string)
+		//inc_info["score"]=info["score"]
+		//inc_info["id"]=info["id"]
 		//this.Logger.Info("write score to profile...\n",inc_info)
-		upinfo := builder.UpdateInfo{inc_info,indexer.PlfUpdate,make(chan error)}
+		upinfo := builder.UpdateInfo{info,indexer.PlfUpdate,make(chan error)}
 		this.Data_chan <- upinfo
 		errinfo:= <-upinfo.ErrChan
 		if errinfo != nil {
