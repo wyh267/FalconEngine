@@ -204,9 +204,23 @@ func (this *Mmap) AppendString(value string) error {
 	
 }
 
-
-func (this *Mmap) Write(start int64,content []byte) error {
+func (this *Mmap) AppendBytes(value []byte) error {
+	lens:=int64(len(value))
+	if err:=this.checkFilePointer(lens);err!=nil{
+		return err
+	}
+	dst := this.MmapBytes[this.FilePointer:this.FilePointer+lens]
+	copy(dst,value)
+	this.FilePointer+=lens
+	return nil
 	
+} 
+
+
+func (this *Mmap) WriteBytes(start int64,value []byte) error {
+	lens:=int64(len(value))
+	dst := this.MmapBytes[start:this.FilePointer+lens]
+	copy(dst,value)
 	return nil
 }
 

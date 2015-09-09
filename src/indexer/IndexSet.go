@@ -722,7 +722,7 @@ func (this *IndexSet) UpdateRecord(info map[string]string, UpdateType int) error
 		//如果doc_id存在，删除之前的doc_id
 		if has_key {
 			for index, _ := range Doc_id {
-				this.Logger.Info("Set Bit Map  %v", Doc_id[index].DocId)
+				//this.Logger.Info("Set Bit Map  %v", Doc_id[index].DocId)
 				this.BitMap.SetBit(uint64(Doc_id[index].DocId), 1)
 			}
 

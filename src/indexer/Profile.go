@@ -25,6 +25,7 @@ type Profile struct {
 	Type   int64
 	Len    int64
 	IsMmap bool
+	IsSearch bool
 }
 
 const FILT_TYPE_LESS int64 = 1

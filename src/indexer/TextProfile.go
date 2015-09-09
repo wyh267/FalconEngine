@@ -18,18 +18,22 @@ import (
 	"os"
 	"strconv"
 	"strings"
-	"syscall"
+	//"syscall"
 	u "utils"
 )
 
 type TextProfile struct {
 	*Profile
 	ProfileList []string
+	textMmap	*u.Mmap
+	fieldLen	int64
 }
 
+const DEFAULT_LEN int64 = 128
+
 func NewTextProfile(name string) *TextProfile {
-	profile := &Profile{name, 1, 1, false}
-	this := &TextProfile{profile, make([]string, 1)}
+	profile := &Profile{Name:name, Type:PflText, Len:1, IsMmap:false,IsSearch:false}
+	this := &TextProfile{Profile:profile,ProfileList:make([]string, 1),textMmap:nil,fieldLen:DEFAULT_LEN}
 	return this
 }
 
@@ -46,14 +50,31 @@ func (this *TextProfile) PutProfile(doc_id int64, value string) error {
 	if doc_id > this.Len || doc_id < 1 {
 		return errors.New("docid is wrong")
 	}
+	str_bytes := make([]byte,this.fieldLen)
+	lens := int64(len(value))
+	if lens > this.fieldLen {
+		lens = this.fieldLen
+	}
+	copy(str_bytes,[]byte(value))
 
 	if doc_id == this.Len {
 		this.ProfileList = append(this.ProfileList, value)
 		this.Len++
+		if this.IsSearch== true { //如果是搜索中，持久化数据
+			this.textMmap.WriteInt64(0,this.Len)
+			this.textMmap.AppendInt64(lens)
+			this.textMmap.AppendBytes(str_bytes)
+		}
 		return nil
 	}
 
 	this.ProfileList[doc_id] = value
+	if this.IsSearch==true {
+		pos:= 16 + doc_id*(this.fieldLen+8)
+		this.textMmap.WriteInt64(pos,lens)
+		this.textMmap.WriteBytes(pos+8,str_bytes)
+	}
+	
 	return nil
 
 }
@@ -201,7 +222,7 @@ func (this *TextProfile) GetType() int64 {
 
 func (this *TextProfile) WriteToFile() error {
 
-	file_name := fmt.Sprintf("./index/%v_plf.plf", this.Name)
+	file_name := fmt.Sprintf("./index/%v.pfl", this.Name)
 	fout, err := os.Create(file_name)
 	defer fout.Close()
 	if err != nil {
@@ -217,6 +238,7 @@ func (this *TextProfile) WriteToFile() error {
 	if err != nil {
 		fmt.Printf("Type ERROR :%v \n", err)
 	}
+	/*
 	err = binary.Write(buf, binary.LittleEndian, int64(len(this.Name)))
 	if err != nil {
 		fmt.Printf("Write Name Lens Error :%v \n", err)
@@ -225,12 +247,20 @@ func (this *TextProfile) WriteToFile() error {
 	if err != nil {
 		fmt.Printf("Write Name Error :%v \n", err)
 	}
+	*/
+	
 	for _, value := range this.ProfileList {
-		err := binary.Write(buf, binary.LittleEndian, int64(len(value)))
+		str_bytes := make([]byte,this.fieldLen)
+		lens := int64(len(value))
+		if lens > this.fieldLen {
+			lens = this.fieldLen
+		}
+		err := binary.Write(buf, binary.LittleEndian, lens)
 		if err != nil {
 			fmt.Printf("Write value Error :%v \n", err)
 		}
-		err = binary.Write(buf, binary.LittleEndian, []byte(value))
+		copy(str_bytes,[]byte(value))
+		err = binary.Write(buf, binary.LittleEndian, str_bytes)
 		if err != nil {
 			fmt.Printf("Write value Error :%v \n", err)
 		}
@@ -242,7 +272,16 @@ func (this *TextProfile) WriteToFile() error {
 
 func (this *TextProfile) ReadFromFile() error {
 
-	file_name := fmt.Sprintf("./index/%v_plf.plf", this.Name)
+	var err error
+	file_name := fmt.Sprintf("./index/%v.pfl", this.Name)
+	this.textMmap,err = u.NewMmap(file_name,u.MODE_APPEND)
+	if err !=nil {
+		fmt.Printf("mmap error : %v \n",err)
+		return err
+	}
+	
+/*
+	file_name := fmt.Sprintf("./index/%v.pfl", this.Name)
 	f, err := os.Open(file_name)
 	defer f.Close()
 	if err != nil {
@@ -262,20 +301,20 @@ func (this *TextProfile) ReadFromFile() error {
 	}
 
 	defer syscall.Munmap(MmapBytes)
-
-	this.Len = int64(binary.LittleEndian.Uint64(MmapBytes[:8]))
-	this.Type = int64(binary.LittleEndian.Uint64(MmapBytes[8:16]))
-	name_lens := int64(binary.LittleEndian.Uint64(MmapBytes[16:24]))
-	this.Name = string(MmapBytes[24 : 24+name_lens])
-	var start int64 = 24 + name_lens
+*/
+	this.ProfileList = make([]string,0)
+	this.Len = this.textMmap.ReadInt64(0) //int64(binary.LittleEndian.Uint64(MmapBytes[:8]))
+	this.Type = this.textMmap.ReadInt64(8) // int64(binary.LittleEndian.Uint64(MmapBytes[8:16]))
+	var start int64 = 16 //24 + name_lens
 	var i int64 = 0
 	for i = 1; i < this.Len; i++ {
-		value_lens := int64(binary.LittleEndian.Uint64(MmapBytes[start : start+8]))
+		value_lens :=  this.textMmap.ReadInt64(start)//int64(binary.LittleEndian.Uint64(MmapBytes[start : start+8]))
 		start += 8
-		value := string(MmapBytes[start : start+value_lens])
-		start += value_lens
+		value :=  this.textMmap.ReadString(start,value_lens)// string(MmapBytes[start : start+value_lens])
+		start += this.fieldLen
 		this.ProfileList = append(this.ProfileList, value)
 	}
-
+	this.textMmap.SetFileEnd(start)
+	this.IsSearch=true
 	return nil
 }

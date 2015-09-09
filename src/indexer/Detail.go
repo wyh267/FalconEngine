@@ -311,6 +311,8 @@ func (this *Detail) WriteDetailToFile() error {
 	
 	this.WriteUpDetailFile()
 	
+	utils.MakeBitmapFile()
+	
 	return nil
 
 }

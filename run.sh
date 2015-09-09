@@ -5,7 +5,10 @@
 # Created Time: 二  7/14 00:11:29 2015
 #########################################################################
 #!/bin/sh
+sh install.sh
+rm -rf ./index/*
 
+./bin/FalconEngine -mode=build
 ./bin/FalconEngine
 
 
