@@ -5,7 +5,6 @@ import (
 	"builder"
 	"flag"
 	"fmt"
-	"github.com/outmana/log4jzl"
 	"indexer"
 	"net/http"
 	"os"
@@ -35,7 +34,7 @@ func main() {
 	}
 
 	//启动日志系统
-	logger, err := log4jzl.New("FalconEngine")
+	logger, err := utils.New("FalconEngine")
 	if err != nil {
 		fmt.Printf("[ERROR] Create logger Error: %v\n", err)
 		//return

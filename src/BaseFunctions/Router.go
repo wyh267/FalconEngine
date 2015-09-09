@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/outmana/log4jzl"
 	"io"
 	"io/ioutil"
 	"math/rand"
@@ -18,7 +17,7 @@ import (
 
 type Router struct {
 	Configure  *Configure
-	Logger     *log4jzl.Log4jzl
+	Logger     *utils.Log4FE
 	Processors map[string]FEProcessor
 }
 

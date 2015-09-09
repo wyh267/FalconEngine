@@ -13,14 +13,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/outmana/log4jzl"
 	"strconv"
 	"strings"
 	"utils"
 )
 
 type IndexSet struct {
-	Logger     *log4jzl.Log4jzl
+	Logger     *utils.Log4FE
 	IvtIndex   map[string]IndexInterface
 	PflIndex   map[string]ProfileInterface
 	Detail     *Detail
@@ -55,7 +54,7 @@ const (
 *  description : 默认初始化函数
 *
 ******************************************************************************/
-func NewIndexSet(bitmap *utils.Bitmap, logger *log4jzl.Log4jzl) *IndexSet {
+func NewIndexSet(bitmap *utils.Bitmap, logger *utils.Log4FE) *IndexSet {
 	segment := utils.NewSegmenter("./data/dictionary.txt")
 	builder := &utils.IndexBuilder{Segmenter: segment, TempIndex: make(map[string][]utils.TmpIdx), TempIndexNum: make(map[string]int64)}
 	this := &IndexSet{BitMap: bitmap, IncBuilder: builder, FieldInfo: make(map[string]*IndexFieldInfo), MaxDocId: 0, PrimaryKey: "PK", Segmenter: segment, IvtIndex: make(map[string]IndexInterface), Logger: logger, PflIndex: make(map[string]ProfileInterface)}
@@ -71,7 +70,7 @@ func NewIndexSet(bitmap *utils.Bitmap, logger *log4jzl.Log4jzl) *IndexSet {
 *  description : 带外部分词器的初始化函数
 *
 ******************************************************************************/
-func NewIndexSetWithSegment(logger *log4jzl.Log4jzl, segment *utils.Segmenter) *IndexSet {
+func NewIndexSetWithSegment(logger *utils.Log4FE, segment *utils.Segmenter) *IndexSet {
 	this := &IndexSet{Segmenter: segment, IvtIndex: make(map[string]IndexInterface), Logger: logger, PflIndex: make(map[string]ProfileInterface)}
 	return this
 }

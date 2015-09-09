@@ -3,7 +3,7 @@ package BaseFunctions
 import (
 	"fmt"
 	"github.com/garyburd/redigo/redis"
-	"github.com/outmana/log4jzl"
+	"utils"
 	"time"
 	//"errors"
 	"strings"
@@ -13,10 +13,10 @@ type RedisClient struct {
 	conn   redis.Conn
 	pool   *redis.Pool
 	config *Configure
-	logger *log4jzl.Log4jzl
+	logger *utils.Log4FE
 }
 
-func NewRemoteRedisClient(config *Configure, logger *log4jzl.Log4jzl) (*RedisClient, error) {
+func NewRemoteRedisClient(config *Configure, logger *utils.Log4FE) (*RedisClient, error) {
 	counter := &RedisClient{}
 	counter.config = config
 	counter.logger = logger
@@ -44,7 +44,7 @@ func NewRemoteRedisClient(config *Configure, logger *log4jzl.Log4jzl) (*RedisCli
 	return counter, nil
 }
 
-func NewRedisClient(config *Configure, logger *log4jzl.Log4jzl) (*RedisClient, error) {
+func NewRedisClient(config *Configure, logger *utils.Log4FE) (*RedisClient, error) {
 	counter := &RedisClient{}
 	counter.config = config
 	counter.logger = logger
