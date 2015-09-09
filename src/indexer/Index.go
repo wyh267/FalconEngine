@@ -14,8 +14,8 @@ import (
 )
 
 type Index struct {
-	Name     string `json:"name"`
-	Type     int64			//1表示文本索引，2表示数字索引
+	Name     string       `json:"name"`
+	Type     int64        //1表示文本索引，2表示数字索引
 	ivtIndex *u.InvertIdx `json:"ivtIndex"`
 }
 

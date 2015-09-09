@@ -22,7 +22,7 @@ import (
 // DocId的最小结构体，包括DocId本身和权重，权重目前都是0
 //
 type DocIdInfo struct {
-	DocId  int64
+	DocId int64
 	//Weight int64
 }
 
@@ -30,15 +30,15 @@ type DocIdInfo struct {
 //静态倒排索引的最小单位，包含一个docid链和这个链的元信息(这个链的对应key[可能是任何类型])
 //
 type InvertDocIdList struct {
-	Key       interface{}
-	DocIdList []DocIdInfo
-	StartPos  int64
-	EndPos	  int64
-	IncDocIdList	[]DocIdInfo
+	Key          interface{}
+	DocIdList    []DocIdInfo
+	StartPos     int64
+	EndPos       int64
+	IncDocIdList []DocIdInfo
 }
 
 func NewInvertDocIdList(key interface{}) *InvertDocIdList {
-	this := &InvertDocIdList{key, make([]DocIdInfo, 0),0,0,make([]DocIdInfo, 0)}
+	this := &InvertDocIdList{key, make([]DocIdInfo, 0), 0, 0, make([]DocIdInfo, 0)}
 	return this
 }
 
@@ -67,16 +67,16 @@ type InvertIdx struct {
 	IdxType       int64
 	IdxName       string
 	IdxLen        int64
-	MmapBytes	  []byte
-	IsMaped		  bool
+	MmapBytes     []byte
+	IsMaped       bool
 	KeyInvertList []InvertDocIdList
 }
 
 func NewInvertIdx(idx_type int64, name string) *InvertIdx {
 
 	list := make([]InvertDocIdList, 1)
-	list[0] = InvertDocIdList{"nil", make([]DocIdInfo, 0),0,0,make([]DocIdInfo, 0)}
-	this := &InvertIdx{IdxType: idx_type, IdxName: name, IdxLen: 0, KeyInvertList: list,MmapBytes : nil,IsMaped : false}
+	list[0] = InvertDocIdList{"nil", make([]DocIdInfo, 0), 0, 0, make([]DocIdInfo, 0)}
+	this := &InvertIdx{IdxType: idx_type, IdxName: name, IdxLen: 0, KeyInvertList: list, MmapBytes: nil, IsMaped: false}
 	return this
 
 }
@@ -90,49 +90,47 @@ func (this *InvertIdx) GetInvertIndex(index int64) ([]DocIdInfo, bool) {
 	lens := int(this.KeyInvertList[index].EndPos)
 	//./index/%v_idx.
 	//if this.IsMaped == false {
-		
-	
+
 	//fmt.Printf("Cost Time : %v \n",functime("Start"))
-	f,_ := os.Open(fmt.Sprintf("./index/%v_idx.idx",this.IdxName))
+	f, _ := os.Open(fmt.Sprintf("./index/%v_idx.idx", this.IdxName))
 	//fmt.Printf("Start : %v   Lens : %v   file_name : %v  \n",this.KeyInvertList[index].StartPos,this.KeyInvertList[index].EndPos*8,fmt.Sprintf("./index/%v_idx.idx",this.IdxName))
 	defer f.Close()
-	
 
 	fi, err := f.Stat()
-	if err != nil{
-		fmt.Printf("ERR:%v",err)
+	if err != nil {
+		fmt.Printf("ERR:%v", err)
 	}
 	//start:=int(this.KeyInvertList[index].StartPos)/4096
 	//page_offset:=int(this.KeyInvertList[index].StartPos) % 4096
 	//resultSize := int(page_offset+lens*8)
 
-	MmapBytes,err := syscall.Mmap(int(f.Fd()),0,int(fi.Size()),syscall.PROT_READ,syscall.MAP_PRIVATE)
+	MmapBytes, err := syscall.Mmap(int(f.Fd()), 0, int(fi.Size()), syscall.PROT_READ, syscall.MAP_PRIVATE)
 
-	if err != nil{
-		fmt.Printf("MAPPING ERROR  %v \n",err)
-		return nil,false
+	if err != nil {
+		fmt.Printf("MAPPING ERROR  %v \n", err)
+		return nil, false
 	}
-	
+
 	defer syscall.Munmap(MmapBytes)
-	
-	StartPos:=int(this.KeyInvertList[index].StartPos)
+
+	StartPos := int(this.KeyInvertList[index].StartPos)
 	//reader := bytes.NewReader(MmapBytes[StartPos:StartPos+lens*8])
 	//fmt.Printf("Cost Time : %v \n",functime("reader"))
-	this.KeyInvertList[index].DocIdList = make([]DocIdInfo,lens)
+	this.KeyInvertList[index].DocIdList = make([]DocIdInfo, lens)
 	//fmt.Printf("Cost Time : %v \n",functime("make"))
 
-	for i:=0;i<lens;i++{
-		start:=StartPos+i*8
-		end:=StartPos + (i+1)*8
+	for i := 0; i < lens; i++ {
+		start := StartPos + i*8
+		end := StartPos + (i+1)*8
 		this.KeyInvertList[index].DocIdList[i].DocId = int64(binary.LittleEndian.Uint64(MmapBytes[start:end]))
 	}
-	
+
 	//fmt.Printf("Cost Time : %v \n",functime("MmapBytes op"))
-	this.KeyInvertList[index].DocIdList=append(this.KeyInvertList[index].DocIdList,this.KeyInvertList[index].IncDocIdList...)
+	this.KeyInvertList[index].DocIdList = append(this.KeyInvertList[index].DocIdList, this.KeyInvertList[index].IncDocIdList...)
 	//fmt.Printf("Cost Time : %v \n",functime("append op"))
 	//fmt.Printf("DOC_IDS:%v\n",this.KeyInvertList[index].DocIdList)
 	//fmt.Printf("DOC_IDS : %v \n",this.KeyInvertList[index].DocIdList)
-	
+
 	return this.KeyInvertList[index].DocIdList, true
 
 }
@@ -155,4 +153,3 @@ func (this *InvertIdx) Display() {
 	}
 
 }
-

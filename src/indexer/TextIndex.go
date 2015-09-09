@@ -57,18 +57,13 @@ func (this *TextIndex) GetType() int64 {
 	return this.Type
 }
 
-
-
-
 func (this *TextIndex) GetIvtIndex() *u.InvertIdx {
 	return this.ivtIndex
 }
 
-
-
-func (this *TextIndex)GetNumDic() *u.NumberIdxDic{
+func (this *TextIndex) GetNumDic() *u.NumberIdxDic {
 	return nil
 }
-func (this *TextIndex)GetStrDic() *u.StringIdxDic{
+func (this *TextIndex) GetStrDic() *u.StringIdxDic {
 	return this.dicIndex
 }

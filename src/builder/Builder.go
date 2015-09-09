@@ -23,7 +23,7 @@ type Builder struct {
 	Index_set *indexer.IndexSet
 }
 
-func NewBuilder(configure *BaseFunctions.Configure, dbadaptor *BaseFunctions.DBAdaptor, logger *log4jzl.Log4jzl, redis *BaseFunctions.RedisClient,index_set *indexer.IndexSet) *Builder {
-	this := &Builder{configure, dbadaptor, logger, redis,index_set}
+func NewBuilder(configure *BaseFunctions.Configure, dbadaptor *BaseFunctions.DBAdaptor, logger *log4jzl.Log4jzl, redis *BaseFunctions.RedisClient, index_set *indexer.IndexSet) *Builder {
+	this := &Builder{configure, dbadaptor, logger, redis, index_set}
 	return this
 }

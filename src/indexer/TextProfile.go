@@ -12,8 +12,8 @@ package indexer
 import (
 	"errors"
 	"fmt"
-	"strings"
 	"strconv"
+	"strings"
 	u "utils"
 )
 
@@ -62,86 +62,86 @@ func (this *TextProfile) FindValue(doc_id int64) (string, error) {
 
 }
 
-func (this *TextProfile) FilterValue(doc_ids []u.DocIdInfo, value string, is_forward bool,filt_type int64) ([]u.DocIdInfo, error) {
+func (this *TextProfile) FilterValue(doc_ids []u.DocIdInfo, value string, is_forward bool, filt_type int64) ([]u.DocIdInfo, error) {
 
 	res := make([]u.DocIdInfo, 0, 1000)
 	switch filt_type {
-		case FILT_TYPE_LESS:
-			for i, _ := range doc_ids {
-				if this.ProfileList[doc_ids[i].DocId] < value {
-					res = append(res, doc_ids[i])
-				}
+	case FILT_TYPE_LESS:
+		for i, _ := range doc_ids {
+			if this.ProfileList[doc_ids[i].DocId] < value {
+				res = append(res, doc_ids[i])
 			}
-		case FILT_TYPE_ABOVE:
-			for i, _ := range doc_ids {
-				if this.ProfileList[doc_ids[i].DocId] > value {
-					res = append(res, doc_ids[i])
-				}
+		}
+	case FILT_TYPE_ABOVE:
+		for i, _ := range doc_ids {
+			if this.ProfileList[doc_ids[i].DocId] > value {
+				res = append(res, doc_ids[i])
 			}
-		case FILT_TYPE_EQUAL:
-			for i, _ := range doc_ids {
-				if this.ProfileList[doc_ids[i].DocId] == value {
-					res = append(res, doc_ids[i])
-				}
+		}
+	case FILT_TYPE_EQUAL:
+		for i, _ := range doc_ids {
+			if this.ProfileList[doc_ids[i].DocId] == value {
+				res = append(res, doc_ids[i])
 			}
-		case FILT_TYPE_UNEQUAL:
-			for i, _ := range doc_ids {
-				if this.ProfileList[doc_ids[i].DocId] != value {
-					res = append(res, doc_ids[i])
-				}
+		}
+	case FILT_TYPE_UNEQUAL:
+		for i, _ := range doc_ids {
+			if this.ProfileList[doc_ids[i].DocId] != value {
+				res = append(res, doc_ids[i])
 			}
-			
-		case FILT_TYPE_LESS_DATERANGE:
+		}
+
+	case FILT_TYPE_LESS_DATERANGE:
 		fmt.Printf("FILT_TYPE_LESS_DATERANGE\n")
-			values:=strings.Split(value,",")
-			value_num,_:=strconv.ParseInt(values[0], 0, 0)
-			index_start,_:=strconv.ParseInt(values[1], 0, 0)
-			index_end,_:=strconv.ParseInt(values[2], 0, 0)
-			for i, _ := range doc_ids {
-				items:=strings.Split(this.ProfileList[doc_ids[i].DocId],",")
-				
-				var total int64=0
-				for pos:=int(index_start);pos<int(index_end);pos++{
-					data,_:=strconv.ParseInt(items[pos], 0, 0)
-					total+=data
-				}
-				if total < value_num  {
-					res = append(res, doc_ids[i])
-				}
-			
+		values := strings.Split(value, ",")
+		value_num, _ := strconv.ParseInt(values[0], 0, 0)
+		index_start, _ := strconv.ParseInt(values[1], 0, 0)
+		index_end, _ := strconv.ParseInt(values[2], 0, 0)
+		for i, _ := range doc_ids {
+			items := strings.Split(this.ProfileList[doc_ids[i].DocId], ",")
+
+			var total int64 = 0
+			for pos := int(index_start); pos < int(index_end); pos++ {
+				data, _ := strconv.ParseInt(items[pos], 0, 0)
+				total += data
 			}
-		case FILT_TYPE_ABOVE_DATERANGE:
-			values:=strings.Split(value,",")
-			value_num,_:=strconv.ParseInt(values[0], 0, 0)
-			index_start,_:=strconv.ParseInt(values[1], 0, 0)
-			index_end,_:=strconv.ParseInt(values[2], 0, 0)
-			for i, _ := range doc_ids {
-				items:=strings.Split(this.ProfileList[doc_ids[i].DocId],",")
-				
-				var total int64=0
-				for pos:=int(index_start);pos<int(index_end);pos++{
-					data,_:=strconv.ParseInt(items[pos], 0, 0)
-					total+=data
-				}
-				if total > value_num  {
-					res = append(res, doc_ids[i])
-				}
+			if total < value_num {
+				res = append(res, doc_ids[i])
 			}
-		
-		case FILT_TYPE_INCLUDE:
-			for i, _ := range doc_ids {
-				if strings.Contains(this.ProfileList[doc_ids[i].DocId],value) {
-					res = append(res, doc_ids[i])
-				}
-				
+
+		}
+	case FILT_TYPE_ABOVE_DATERANGE:
+		values := strings.Split(value, ",")
+		value_num, _ := strconv.ParseInt(values[0], 0, 0)
+		index_start, _ := strconv.ParseInt(values[1], 0, 0)
+		index_end, _ := strconv.ParseInt(values[2], 0, 0)
+		for i, _ := range doc_ids {
+			items := strings.Split(this.ProfileList[doc_ids[i].DocId], ",")
+
+			var total int64 = 0
+			for pos := int(index_start); pos < int(index_end); pos++ {
+				data, _ := strconv.ParseInt(items[pos], 0, 0)
+				total += data
 			}
-			
-		default:
-			for i, _ := range doc_ids {
-				if this.ProfileList[doc_ids[i].DocId] == value {
-					res = append(res, doc_ids[i])
-				}
+			if total > value_num {
+				res = append(res, doc_ids[i])
 			}
+		}
+
+	case FILT_TYPE_INCLUDE:
+		for i, _ := range doc_ids {
+			if strings.Contains(this.ProfileList[doc_ids[i].DocId], value) {
+				res = append(res, doc_ids[i])
+			}
+
+		}
+
+	default:
+		for i, _ := range doc_ids {
+			if this.ProfileList[doc_ids[i].DocId] == value {
+				res = append(res, doc_ids[i])
+			}
+		}
 	}
 
 	return res, nil
@@ -162,7 +162,7 @@ func (this *TextProfile) Find(doc_id int64) (interface{}, error) {
 	return this.FindValue(doc_id)
 }
 
-func (this *TextProfile) Filter(doc_ids []u.DocIdInfo, value interface{}, is_forward bool,filt_type int64) ([]u.DocIdInfo, error) {
+func (this *TextProfile) Filter(doc_ids []u.DocIdInfo, value interface{}, is_forward bool, filt_type int64) ([]u.DocIdInfo, error) {
 
 	if doc_ids == nil {
 		return nil, nil
@@ -173,7 +173,7 @@ func (this *TextProfile) Filter(doc_ids []u.DocIdInfo, value interface{}, is_for
 		return doc_ids, nil
 	}
 
-	return this.FilterValue(doc_ids, value_str, is_forward,filt_type)
+	return this.FilterValue(doc_ids, value_str, is_forward, filt_type)
 
 }
 
@@ -190,9 +190,6 @@ func (this *TextProfile) CustomFilter(doc_ids []u.DocIdInfo, value interface{}, 
 
 }
 
-
-
 func (this *TextProfile) GetType() int64 {
 	return this.Type
 }
-

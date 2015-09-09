@@ -58,15 +58,13 @@ func (this *Configure) ParseConfigure(filename string) error {
 	return nil
 }
 
+func (this *Configure) GetIncSql() (string, error) {
 
-
-func (this *Configure) GetIncSql()(string,error){
-	
 	v, ok := this.ConfigureMap["inc"].(map[string]string)
 	if ok == false {
 		return "SELECT %v FROM jzl_contacts WHERE ( is_delete=0 OR is_delete is null ) AND last_modify_time> \"%v\" ORDER BY last_modify_time", errors.New("inc,use defualt")
 	}
-	
+
 	incsql, ok := v["sqlsentence"]
 
 	if ok == false {
@@ -76,13 +74,12 @@ func (this *Configure) GetIncSql()(string,error){
 	return incsql, nil
 }
 
-
-func (this *Configure) GetIncField()(string,error){
+func (this *Configure) GetIncField() (string, error) {
 	v, ok := this.ConfigureMap["inc"].(map[string]string)
 	if ok == false {
 		return "last_modify_time", errors.New("inc,use defualt")
 	}
-	
+
 	incfield, ok := v["incfield"]
 
 	if ok == false {
@@ -90,10 +87,8 @@ func (this *Configure) GetIncField()(string,error){
 	}
 
 	return incfield, nil
-	
+
 }
-
-
 
 //服务信息
 func (this *Configure) GetPort() (int, error) {
@@ -102,7 +97,7 @@ func (this *Configure) GetPort() (int, error) {
 	if ok == false {
 		return 9090, errors.New("No redis,use defualt")
 	}
-	
+
 	portstr, ok := v["port"]
 	if ok == false {
 		return 9090, errors.New("No Port set, use default")
@@ -115,8 +110,6 @@ func (this *Configure) GetPort() (int, error) {
 
 	return port, nil
 }
-
-
 
 func (this *Configure) GetRedisHost() (string, error) {
 

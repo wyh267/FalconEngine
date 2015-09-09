@@ -7,52 +7,43 @@
  *
 ******************************************************************************/
 
-
 package main
 
 import (
 	"BaseFunctions"
 	"indexer"
-	"strconv"
 	"net/url"
+	"strconv"
 	"utils"
 )
 
-
-
-type Searcher struct{
+type Searcher struct {
 	*BaseFunctions.BaseProcessor
-	Indexer		*indexer.IndexSet
+	Indexer *indexer.IndexSet
 }
 
-
-func NewSearcher(processor *BaseFunctions.BaseProcessor,indexer *indexer.IndexSet) *Searcher{
-	this:=&Searcher{processor,indexer}
+func NewSearcher(processor *BaseFunctions.BaseProcessor, indexer *indexer.IndexSet) *Searcher {
+	this := &Searcher{processor, indexer}
 	return this
 }
 
 const PAGE_NUM string = "pg"
 const PAGE_SIZE string = "ps"
-const SORT_BY	string = "sort_by"
-const GROUP_BY	string = "group_by"
-const QUERY		string = "query"
+const SORT_BY string = "sort_by"
+const GROUP_BY string = "group_by"
+const QUERY string = "query"
 
+func (this *Searcher) Process(log_id string, body []byte, params map[string]string, result map[string]interface{}, ftime func(string) string) error {
 
-func (this *Searcher)Process(log_id string,body []byte,params map[string]string , result map[string]interface{},ftime func(string)string) error {
-	
-	
 	_, has_ctl := params["_contrl"]
 	if has_ctl {
 		this.Indexer.GetIndexInfo(result)
 		return nil
 	}
-	
+
 	return this.SimpleSearch(log_id, body, params, result, ftime)
-	
 
 }
-
-
 
 func (this *Searcher) SimpleSearch(log_id string, body []byte, params map[string]string, result map[string]interface{}, ftime func(string) string) error {
 	srules, frules, _, _ := this.ParseParams(log_id, params)
@@ -73,16 +64,16 @@ func (this *Searcher) SimpleSearch(log_id string, body []byte, params map[string
 		tmp_doc_ids = total_doc_ids
 	}
 	/*
-	this.Indexer.GetDetailsByDocId(tmp_doc_ids)
-	ids, fields := this.Indexer.GetDetails(tmp_doc_ids)
-	var infos []map[string]string
-	for _, id := range ids {
-		info, err := this.RedisCli.GetFields(id, fields)
-		if err != nil {
-			this.Logger.Error("%v", err)
+		this.Indexer.GetDetailsByDocId(tmp_doc_ids)
+		ids, fields := this.Indexer.GetDetails(tmp_doc_ids)
+		var infos []map[string]string
+		for _, id := range ids {
+			info, err := this.RedisCli.GetFields(id, fields)
+			if err != nil {
+				this.Logger.Error("%v", err)
+			}
+			infos = append(infos, info)
 		}
-		infos = append(infos, info)
-	}
 	*/
 	this.Logger.Info("[LOG_ID:%v]Running Simple Searcher ....Time: %v \n\n", log_id, ftime("Display Detail"))
 	result["DATA"] = this.Indexer.GetDetailsByDocId(tmp_doc_ids)
@@ -93,9 +84,6 @@ func (this *Searcher) SimpleSearch(log_id string, body []byte, params map[string
 	//result["DATA"]=doc_ids
 
 }
-
-
-
 
 func (this *Searcher) ParseParams(log_id string, params map[string]string) ([]indexer.SearchRule, []indexer.FilterRule, int64, int64) {
 
@@ -197,8 +185,3 @@ func (this *Searcher) ParseParams(log_id string, params map[string]string) ([]in
 
 	return srules, frules, ps, pg
 }
-
-
-
-
-
