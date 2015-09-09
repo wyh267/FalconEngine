@@ -15,7 +15,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"os"
-	"syscall"
+	//"syscall"
 )
 
 type NumberIdxDic struct {
@@ -23,6 +23,8 @@ type NumberIdxDic struct {
 	IntMap map[string]int64
 	Index  int64
 	Name   string
+	mmap   *Mmap
+	isSearch bool
 }
 
 /*****************************************************************************
@@ -35,7 +37,17 @@ type NumberIdxDic struct {
 ******************************************************************************/
 func NewNumberIdxDic(name string) *NumberIdxDic {
 
-	this := &NumberIdxDic{IntMap: make(map[string]int64), Lens: 0, Index: 1, Name: name}
+	this := &NumberIdxDic{IntMap: make(map[string]int64), Lens: 0, Index: 1, Name: name,mmap:nil,isSearch:false}
+	/*
+	file_name := fmt.Sprintf("./index/%v.dic", this.Name)
+	
+	var err error
+	this.mmap,err = NewMmap(file_name,MODE_CREATE)
+	if err !=nil {
+		fmt.Printf("mmap error : %v \n",err)
+		return this
+	}
+	*/
 	return this
 }
 
@@ -57,9 +69,19 @@ func (this *NumberIdxDic) Put(key int64) int64 {
 	}
 
 	this.IntMap[key_str] = this.Index
+	
 	this.Index++
 	this.Lens++
-
+	
+	if this.isSearch{
+		//fmt.Printf("updating key_value : %v index:%v lens:%v \n",this.IntMap[key_str],this.Index,this.Lens)
+		this.mmap.WriteInt64(0,this.Lens)
+		this.mmap.WriteInt64(8,this.Index)
+		this.mmap.AppendStringWithLen(key_str)
+		this.mmap.AppendInt64(this.Index-1)
+	}
+	
+	
 	return this.IntMap[key_str]
 
 }
@@ -121,46 +143,39 @@ func (this *NumberIdxDic) WriteToFile() error {
 		}
 	}
 	fout.Write(buf.Bytes())
+
 	return nil
 }
 
 func (this *NumberIdxDic) ReadFromFile() error {
 
 	file_name := fmt.Sprintf("./index/%v.dic", this.Name)
-	f, err := os.Open(file_name)
-	defer f.Close()
-	if err != nil {
+	
+	var err error
+	this.mmap,err = NewMmap(file_name,MODE_APPEND)
+	if err !=nil {
+		fmt.Printf("mmap error : %v \n",err)
 		return err
 	}
-
-	fi, err := f.Stat()
-	if err != nil {
-		fmt.Printf("ERR:%v", err)
-	}
-
-	MmapBytes, err := syscall.Mmap(int(f.Fd()), 0, int(fi.Size()), syscall.PROT_READ, syscall.MAP_PRIVATE)
-
-	if err != nil {
-		fmt.Printf("MAPPING ERROR  %v \n", err)
-		return nil
-	}
-
-	defer syscall.Munmap(MmapBytes)
-
-	this.Lens = int64(binary.LittleEndian.Uint64(MmapBytes[:8]))
-	this.Index = int64(binary.LittleEndian.Uint64(MmapBytes[8:16]))
+	
+	this.Lens = this.mmap.ReadInt64(0)
+	this.Index = this.mmap.ReadInt64(8)
+	//fmt.Printf("lens : %v index : %v \n",this.Lens,this.Index)
 	var start int64 = 16
 	var i int64 = 0
 	for i = 0; i < this.Lens; i++ {
-		lens := int64(binary.LittleEndian.Uint64(MmapBytes[start : start+8]))
+		lens := this.mmap.ReadInt64(start)
+		//fmt.Printf("lens : %v \n",lens)
 		start += 8
-		key := string(MmapBytes[start : start+lens])
+		key := this.mmap.ReadString(start,lens)
 		start += lens
-		value := int64(binary.LittleEndian.Uint64(MmapBytes[start : start+8]))
+		value := this.mmap.ReadInt64(start)
 		start += 8
 		this.IntMap[key] = value
 	}
-
+	
+	this.mmap.SetFileEnd(start)
+	this.isSearch=true
 	return nil
 
 }

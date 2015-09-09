@@ -93,6 +93,8 @@ func (this *IndexBuilder) BuildTextIndex(doc_id int64, content string, ivt_idx *
 				ivt_idx.KeyInvertList[key_id].DocIdList = append(ivt_idx.KeyInvertList[key_id].DocIdList, DocIdInfo{DocId: doc_id})
 			}
 		} else {
+			ivt_idx.UpdateInvert(key_id,doc_id)
+			/*
 			if key_id > len {
 				invertList := NewInvertDocIdList(term)
 				invertList.IncDocIdList = append(invertList.IncDocIdList, DocIdInfo{DocId: doc_id})
@@ -101,6 +103,7 @@ func (this *IndexBuilder) BuildTextIndex(doc_id int64, content string, ivt_idx *
 			} else { //更新
 				ivt_idx.KeyInvertList[key_id].IncDocIdList = append(ivt_idx.KeyInvertList[key_id].IncDocIdList, DocIdInfo{DocId: doc_id})
 			}
+			*/
 		}
 
 		//将key_id,doc_id写入临时内存中
@@ -132,6 +135,8 @@ func (this *IndexBuilder) BuildNumberIndex(doc_id int64, content int64, ivt_idx 
 		}
 
 	} else {
+		ivt_idx.UpdateInvert(key_id,doc_id)
+		/*
 		if key_id > len {
 			invertList := NewInvertDocIdList(content)
 			invertList.IncDocIdList = append(invertList.IncDocIdList, DocIdInfo{DocId: doc_id})
@@ -140,6 +145,7 @@ func (this *IndexBuilder) BuildNumberIndex(doc_id int64, content int64, ivt_idx 
 		} else { //更新
 			ivt_idx.KeyInvertList[key_id].IncDocIdList = append(ivt_idx.KeyInvertList[key_id].IncDocIdList, DocIdInfo{DocId: doc_id})
 		}
+		*/
 	}
 
 	//ivt_idx.Display()

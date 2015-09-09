@@ -416,7 +416,7 @@ func (this *DBBuilder) Buiding() error {
 	for index, _ := range this.Fields {
 
 		if this.Fields[index].IsIvt {
-			utils.WriteToIndexFile(this.Fields[index].IvtIdx, fmt.Sprintf("./index/%v_idx.idx", this.Fields[index].Name))
+			//utils.WriteToIndexFile(this.Fields[index].IvtIdx, fmt.Sprintf("./index/%v_idx.idx", this.Fields[index].Name))
 			this.Fields[index].IvtIdx.WriteToFile()
 			if this.Fields[index].FType == "T" {
 

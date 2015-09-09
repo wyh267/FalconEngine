@@ -48,7 +48,7 @@ func (this *Updater) Process(log_id string, body []byte, params map[string]strin
 	var updateInfo builder.UpdateInfo
 	info := make(map[string]string)
 	info["id"] = "154"
-	info["cid"] = "146"
+	info["cid"] = "188"
 	info["name"] = "吴坚"
 	info["email"] = "hello@aa.com"
 	info["address"] = "ABCADDRESS"
@@ -61,14 +61,44 @@ func (this *Updater) Process(log_id string, body []byte, params map[string]strin
 	updateInfo.UpdateType = 1
 	updateInfo.ErrChan = make(chan error)
 	this.Data_chan <- updateInfo
-
 	errinfo := <-updateInfo.ErrChan
-
 	if errinfo != nil {
 		this.Logger.Info("Update Fail.... %v ", errinfo)
 	} else {
 		this.Logger.Info("Update success....")
 	}
+	
+	
+	info["id"] = "1564"
+	info["name"] = "吴yyuu坚"
+	updateInfo.Info = info
+	updateInfo.UpdateType = 1
+	updateInfo.ErrChan = make(chan error)
+	this.Data_chan <- updateInfo
+	errinfo = <-updateInfo.ErrChan
+	if errinfo != nil {
+		this.Logger.Info("Update Fail.... %v ", errinfo)
+	} else {
+		this.Logger.Info("Update success....")
+	}
+	
+	info["id"] = "1594"
+	info["cid"] = "999"
+	updateInfo.Info = info
+	updateInfo.UpdateType = 1
+	updateInfo.ErrChan = make(chan error)
+	this.Data_chan <- updateInfo
+	errinfo = <-updateInfo.ErrChan
+	if errinfo != nil {
+		this.Logger.Info("Update Fail.... %v ", errinfo)
+	} else {
+		this.Logger.Info("Update success....")
+	}
+	
+	
+	
+	
+	
 	//this.Indexer.UpdateRecord(info,false)
 	//this.Indexer.Display()
 	return nil

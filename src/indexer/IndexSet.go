@@ -199,7 +199,7 @@ func (this *IndexSet) InitIndexSet(fields map[string]string) error {
 				dic := utils.NewNumberIdxDic(k)
 				this.Logger.Info("\t Loading Invert Index Dictionary [ %v.dic ] ", k)
 				dic.ReadFromFile()
-
+				dic.Display()
 				index := NewNumberIndex(k, idx, dic)
 				this.PutIndex(k, index)
 			}
