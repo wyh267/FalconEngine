@@ -1,14 +1,16 @@
 package BaseFunctions
 
 import (
-	"github.com/outmana/log4jzl"
+	"utils"
 )
 
 type BaseProcessor struct {
-	Configure *Configure
-	Logger    *log4jzl.Log4jzl
-	DbAdaptor *DBAdaptor
-	RedisCli  *RedisClient
+	Configure      *Configure
+	Logger         *utils.Log4FE
+	DbAdaptor      *DBAdaptor
+	RedisCli       *RedisClient
+	RemoteRedisCli *RedisClient
+
 }
 
 type FEProcessor interface {

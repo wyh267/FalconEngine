@@ -11,6 +11,7 @@ package main
 
 import (
 	"BaseFunctions"
+	"builder"
 	"indexer"
 	"net/url"
 	"strconv"
@@ -19,11 +20,12 @@ import (
 
 type Searcher struct {
 	*BaseFunctions.BaseProcessor
-	Indexer *indexer.IndexSet
+	Indexer   *indexer.IndexSet
+	Data_chan chan builder.UpdateInfo
 }
 
-func NewSearcher(processor *BaseFunctions.BaseProcessor, indexer *indexer.IndexSet) *Searcher {
-	this := &Searcher{processor, indexer}
+func NewSearcher(processor *BaseFunctions.BaseProcessor, indexer *indexer.IndexSet, data_chan chan builder.UpdateInfo) *Searcher {
+	this := &Searcher{processor, indexer, data_chan}
 	return this
 }
 
@@ -32,6 +34,31 @@ const PAGE_SIZE string = "ps"
 const SORT_BY string = "sort_by"
 const GROUP_BY string = "group_by"
 const QUERY string = "query"
+
+
+func (this *Searcher) SimpleSearch(log_id string, body []byte, params map[string]string, result map[string]interface{}, ftime func(string) string) error {
+	srules, frules, _, _ := this.ParseParams(log_id, params)
+
+	total_doc_ids, ok := this.Indexer.SearchByRules(srules)
+	if !ok {
+		result["DATA"] = "NO DATA"
+		return nil
+	}
+	total_doc_ids, _ = this.Indexer.FilterByRules(total_doc_ids, frules)
+	this.Logger.Info("[LOG_ID:%v]Running Searcher ....Time: %v ", log_id, ftime("search fields"))
+
+	var tmp_doc_ids []utils.DocIdInfo
+	if len(total_doc_ids) > 10 {
+		tmp_doc_ids = total_doc_ids[:10]
+	} else {
+		tmp_doc_ids = total_doc_ids
+	}
+
+	this.Logger.Info("[LOG_ID:%v]Running Simple Searcher ....Time: %v \n\n", log_id, ftime("Display Detail"))
+	result["DATA"] = this.Indexer.GetDetailsByDocId(tmp_doc_ids)
+	return nil
+
+}
 
 func (this *Searcher) Process(log_id string, body []byte, params map[string]string, result map[string]interface{}, ftime func(string) string) error {
 
@@ -45,45 +72,6 @@ func (this *Searcher) Process(log_id string, body []byte, params map[string]stri
 
 }
 
-func (this *Searcher) SimpleSearch(log_id string, body []byte, params map[string]string, result map[string]interface{}, ftime func(string) string) error {
-	srules, frules, _, _ := this.ParseParams(log_id, params)
-
-	total_doc_ids, ok := this.Indexer.SearchByRules(srules)
-	if !ok {
-		result["DATA"] = "NO DATA"
-		return nil
-	}
-	//this.Logger.Info("[LOG_ID:%v]Running Searcher ....Time: %v ", log_id, ftime("search fields"))
-	total_doc_ids, _ = this.Indexer.FilterByRules(total_doc_ids, frules)
-	//this.Logger.Info("[LOG_ID:%v]Running Searcher ....Time: %v ", log_id, ftime("fliter fields"))
-
-	var tmp_doc_ids []utils.DocIdInfo
-	if len(total_doc_ids) > 10 {
-		tmp_doc_ids = total_doc_ids[:10]
-	} else {
-		tmp_doc_ids = total_doc_ids
-	}
-	/*
-		this.Indexer.GetDetailsByDocId(tmp_doc_ids)
-		ids, fields := this.Indexer.GetDetails(tmp_doc_ids)
-		var infos []map[string]string
-		for _, id := range ids {
-			info, err := this.RedisCli.GetFields(id, fields)
-			if err != nil {
-				this.Logger.Error("%v", err)
-			}
-			infos = append(infos, info)
-		}
-	*/
-	this.Logger.Info("[LOG_ID:%v]Running Simple Searcher ....Time: %v \n\n", log_id, ftime("Display Detail"))
-	result["DATA"] = this.Indexer.GetDetailsByDocId(tmp_doc_ids)
-	return nil
-	//
-	//result["PAGES"] = len(doc_ids)/int(ps) + 1
-
-	//result["DATA"]=doc_ids
-
-}
 
 func (this *Searcher) ParseParams(log_id string, params map[string]string) ([]indexer.SearchRule, []indexer.FilterRule, int64, int64) {
 
@@ -147,7 +135,7 @@ func (this *Searcher) ParseParams(log_id string, params map[string]string) ([]in
 				this.Logger.Error("[LOG_ID:%v] %v %v", log_id, v, k[1:])
 				continue
 			}
-			if stype == 1 {
+			if stype == 1 || stype == 2 {
 				frules = append(frules, indexer.FilterRule{k[1:], true, 3, v})
 			} else {
 				v_n, err := strconv.ParseInt(v, 0, 0)

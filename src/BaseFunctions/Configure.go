@@ -55,6 +55,8 @@ func (this *Configure) ParseConfigure(filename string) error {
 	this.loopConfigure("table", cfg)
 	this.loopConfigure("redis", cfg)
 	this.loopConfigure("inc", cfg)
+	this.loopConfigure("remote_redis", cfg)
+
 	return nil
 }
 
@@ -289,3 +291,37 @@ func (this *Configure) GetMysqlMaxIdleConns() (int, error) {
 
 	return mysqlmaxidleconns, nil
 }
+
+
+func (this *Configure) GetRemoteRedisHost() (string, error) {
+
+	v, ok := this.ConfigureMap["remote_redis"].(map[string]string)
+	if ok == false {
+		return "", errors.New("No redis,use defualt")
+	}
+
+	redishost, ok := v["redishost"]
+
+	if ok == false {
+		return "127.0.0.1", errors.New("No redishost,use defualt")
+	}
+
+	return redishost, nil
+}
+
+func (this *Configure) GetRemoteRedisPort() (string, error) {
+
+	v, ok := this.ConfigureMap["remote_redis"].(map[string]string)
+	if ok == false {
+		return "", errors.New("No redis,use defualt")
+	}
+
+	redisport, ok := v["redisport"]
+
+	if ok == false {
+		return "6379", errors.New("No redisport,use defualt")
+	}
+
+	return redisport, nil
+}
+

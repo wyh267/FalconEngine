@@ -12,7 +12,7 @@ package main
 import (
 	"BaseFunctions"
 	"builder"
-	"github.com/outmana/log4jzl"
+	"utils"
 	"indexer"
 )
 
@@ -20,8 +20,7 @@ type BuilderEngine struct {
 	DBBuilder *builder.DBBuilder
 }
 
-func NewBuilderEngine(configure *BaseFunctions.Configure, dbadaptor *BaseFunctions.DBAdaptor, logger *log4jzl.Log4jzl, redis *BaseFunctions.RedisClient, index_set *indexer.IndexSet) *BuilderEngine {
-
+func NewBuilderEngine(configure *BaseFunctions.Configure, dbadaptor *BaseFunctions.DBAdaptor, logger *utils.Log4FE, redis *BaseFunctions.RedisClient, index_set *indexer.IndexSet) *BuilderEngine {
 	BaseBuilder := builder.NewBuilder(configure, dbadaptor, logger, redis, index_set)
 	MyBuilder := builder.NewDBBuilder(BaseBuilder)
 	this := &BuilderEngine{MyBuilder}

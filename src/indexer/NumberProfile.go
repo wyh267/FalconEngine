@@ -10,20 +10,26 @@
 package indexer
 
 import (
+	//"encoding/json"
+	"bytes"
+	"encoding/binary"
 	"errors"
 	"fmt"
+	"os"
 	"strconv"
+	//"syscall"
 	u "utils"
 )
 
 type NumberProfile struct {
 	*Profile
 	ProfileList []int64
+	numMmap     *u.Mmap
 }
 
 func NewNumberProfile(name string) *NumberProfile {
-	profile := &Profile{name, 2, 1}
-	this := &NumberProfile{profile, make([]int64, 1)}
+	profile := &Profile{Name: name, Type: PflNum, Len: 1, IsMmap: false, IsSearch: false}
+	this := &NumberProfile{Profile: profile, ProfileList: make([]int64, 1), numMmap: nil}
 	return this
 }
 
@@ -45,10 +51,18 @@ func (this *NumberProfile) PutProfile(doc_id, value int64) error {
 	if doc_id == this.Len {
 		this.ProfileList = append(this.ProfileList, value)
 		this.Len++
+		if this.IsSearch == true { //如果是搜索中，持久化数据
+			this.numMmap.WriteInt64(0, this.Len)
+			this.numMmap.AppendInt64(value)
+		}
 		return nil
 	}
 
 	this.ProfileList[doc_id] = value
+	if this.IsSearch == true {
+		pos := 16 + doc_id*8
+		this.numMmap.WriteInt64(pos, value)
+	}
 	return nil
 
 }
@@ -180,4 +194,92 @@ func (this *NumberProfile) CustomFilter(doc_ids []u.DocIdInfo, value interface{}
 
 func (this *NumberProfile) GetType() int64 {
 	return this.Type
+}
+
+func (this *NumberProfile) WriteToFile() error {
+
+	file_name := fmt.Sprintf("./index/%v.plf", this.Name)
+	fout, err := os.Create(file_name)
+	defer fout.Close()
+	if err != nil {
+		return err
+	}
+
+	buf := new(bytes.Buffer)
+	err = binary.Write(buf, binary.LittleEndian, this.Len)
+	if err != nil {
+		fmt.Printf("Lens ERROR :%v \n", err)
+	}
+	err = binary.Write(buf, binary.LittleEndian, this.Type)
+	if err != nil {
+		fmt.Printf("Type ERROR :%v \n", err)
+	}
+	/*
+		err = binary.Write(buf, binary.LittleEndian, int64(len(this.Name)))
+		if err != nil {
+			fmt.Printf("Write Name Lens Error :%v \n", err)
+		}
+		err = binary.Write(buf, binary.LittleEndian, []byte(this.Name))
+		if err != nil {
+			fmt.Printf("Write Name Error :%v \n", err)
+		}
+	*/
+	for _, value := range this.ProfileList {
+		err := binary.Write(buf, binary.LittleEndian, value)
+		if err != nil {
+			fmt.Printf("Write value Error :%v \n", err)
+		}
+	}
+	fout.Write(buf.Bytes())
+	return nil
+
+}
+
+func (this *NumberProfile) ReadFromFile() error {
+
+	var err error
+	file_name := fmt.Sprintf("./index/%v.plf", this.Name)
+	this.numMmap, err = u.NewMmap(file_name, u.MODE_APPEND)
+	if err != nil {
+		fmt.Printf("mmap error : %v \n", err)
+		return err
+	}
+
+	/*
+		f, err := os.Open(file_name)
+		defer f.Close()
+		if err != nil {
+			return err
+		}
+
+		fi, err := f.Stat()
+		if err != nil {
+			fmt.Printf("ERR:%v", err)
+		}
+
+		MmapBytes, err := syscall.Mmap(int(f.Fd()), 0, int(fi.Size()), syscall.PROT_READ, syscall.MAP_PRIVATE)
+
+		if err != nil {
+			fmt.Printf("MAPPING ERROR  %v \n", err)
+			return nil
+		}
+
+		defer syscall.Munmap(MmapBytes)
+	*/
+
+	this.ProfileList = make([]int64, 0)
+	this.Len = this.numMmap.ReadInt64(0)  //int64(binary.LittleEndian.Uint64(MmapBytes[:8]))
+	this.Type = this.numMmap.ReadInt64(8) // int64(binary.LittleEndian.Uint64(MmapBytes[8:16]))
+	//name_lens := int64(binary.LittleEndian.Uint64(MmapBytes[16:24]))
+	//this.Name = string(MmapBytes[24 : 24+name_lens])
+	var start int64 = 16 //24 + name_lens
+	var i int64 = 0
+	for i = 1; i < this.Len; i++ {
+		value := this.numMmap.ReadInt64(start) //int64(binary.LittleEndian.Uint64(MmapBytes[start : start+8]))
+		start += 8
+		this.ProfileList = append(this.ProfileList, value)
+	}
+	this.numMmap.SetFileEnd(start)
+	this.IsSearch = true
+	return nil
 }

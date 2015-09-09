@@ -4,16 +4,17 @@ import (
 	"database/sql"
 	"fmt"
 	_ "github.com/go-sql-driver/mysql"
-	"github.com/outmana/log4jzl"
+	"utils"
+
 )
 
 type DBAdaptor struct {
 	db     *sql.DB
 	config *Configure
-	logger *log4jzl.Log4jzl
+	logger *utils.Log4FE
 }
 
-func NewDBAdaptor(config *Configure, logger *log4jzl.Log4jzl) (*DBAdaptor, error) {
+func NewDBAdaptor(config *Configure, logger *utils.Log4FE) (*DBAdaptor, error) {
 	dbAdaptor := &DBAdaptor{}
 	dbAdaptor.config = config
 	dbAdaptor.logger = logger

@@ -48,29 +48,58 @@ func (this *Updater) Process(log_id string, body []byte, params map[string]strin
 	var updateInfo builder.UpdateInfo
 	info := make(map[string]string)
 	info["id"] = "154"
-	info["cid"] = "146"
+	info["cid"] = "188"
 	info["name"] = "吴坚"
-	info["email"] = "hello@aa.com"
+	info["email"] = "yyz@aa.com"
 	info["address"] = "ABCADDRESS"
-	info["city"] = "Changsha"
-	info["country"] = "USA"
-	info["sex"] = "1"
-	info["mobile_phone"] = "13232"
+	info["age"] = "4506"
+	info["mobile_phone"] = "8897"
 	info["last_modify_time"] = "2015-01-01 00:11:22"
 	updateInfo.Info = info
-	updateInfo.IsProfile = false
+	updateInfo.UpdateType = 1
 	updateInfo.ErrChan = make(chan error)
 	this.Data_chan <- updateInfo
-
 	errinfo := <-updateInfo.ErrChan
-
 	if errinfo != nil {
 		this.Logger.Info("Update Fail.... %v ", errinfo)
 	} else {
 		this.Logger.Info("Update success....")
 	}
-	//this.Indexer.UpdateRecord(info,false)
-	//this.Indexer.Display()
+	
+	info["id"] = "1564"
+	info["name"] = "吴yyuu坚"
+	updateInfo.Info = info
+	updateInfo.UpdateType = 1
+	updateInfo.ErrChan = make(chan error)
+	this.Data_chan <- updateInfo
+	errinfo = <-updateInfo.ErrChan
+	if errinfo != nil {
+		this.Logger.Info("Update Fail.... %v ", errinfo)
+	} else {
+		this.Logger.Info("Update success....")
+	}
+	
+	
+	for i:=0;i<10;i++{
+		info["id"] = "1594"
+		info["cid"] = "999"
+		updateInfo.Info = info
+		updateInfo.UpdateType = 1
+		updateInfo.ErrChan = make(chan error)
+		this.Data_chan <- updateInfo
+		errinfo = <-updateInfo.ErrChan
+		if errinfo != nil {
+			this.Logger.Info("Update Fail.... %v ", errinfo)
+		} else {
+			this.Logger.Info("Update success....")
+		}
+	
+	}
+	
+	
+	
+	
+	
 	return nil
 }
 
@@ -86,7 +115,7 @@ func (this *Updater) updatingThread() {
 		select {
 		case info := <-this.Data_chan:
 			//this.Logger.Info("Got data ... %v ",info)
-			info.ErrChan <- this.Indexer.UpdateRecord(info.Info, info.IsProfile)
+			info.ErrChan <- this.Indexer.UpdateRecord(info.Info, info.UpdateType)
 
 		}
 

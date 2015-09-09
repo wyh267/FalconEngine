@@ -5,7 +5,6 @@ import (
 	"builder"
 	"flag"
 	"fmt"
-	"github.com/outmana/log4jzl"
 	"indexer"
 	"net/http"
 	"os"
@@ -35,7 +34,7 @@ func main() {
 	}
 
 	//启动日志系统
-	logger, err := log4jzl.New("FalconEngine")
+	logger, err := utils.New("FalconEngine")
 	if err != nil {
 		fmt.Printf("[ERROR] Create logger Error: %v\n", err)
 		//return
@@ -50,16 +49,25 @@ func main() {
 	defer dbAdaptor.Release()
 
 	//初始化本地redis
-	redisClient, err := BaseFunctions.NewRedisClient(configure, logger)
+	/*
+		redisClient, err := BaseFunctions.NewRedisClient(configure, logger)
+		if err != nil {
+			fmt.Printf("[ERROR] Create redisClient Error: %v\n", err)
+			return
+		}
+		defer redisClient.Release()
+	*/
+	//初始化远程redis
+	remoteRedisClient, err := BaseFunctions.NewRemoteRedisClient(configure, logger)
 	if err != nil {
 		fmt.Printf("[ERROR] Create redisClient Error: %v\n", err)
 		return
 	}
-	defer redisClient.Release()
+	defer remoteRedisClient.Release()
 
 	if search == "search" {
 
-		processor := &BaseFunctions.BaseProcessor{configure, logger, dbAdaptor, redisClient}
+		processor := &BaseFunctions.BaseProcessor{configure, logger, dbAdaptor /*redisClient*/, nil, remoteRedisClient}
 		bitmap := utils.NewBitmap()
 		fields, err := configure.GetTableFields()
 		if err != nil {
@@ -69,8 +77,8 @@ func main() {
 		index_set := indexer.NewIndexSet(bitmap, logger)
 		index_set.InitIndexSet(fields)
 
-		searcher := NewSearcher(processor, index_set) // &Searcher{processor}
 		data_chan := make(chan builder.UpdateInfo, 1000)
+		searcher := NewSearcher(processor, index_set, data_chan) // &Searcher{processor}
 		updater := NewUpdater(processor, index_set, data_chan)
 		updater.IncUpdating()
 		router := &BaseFunctions.Router{configure, logger, map[string]BaseFunctions.FEProcessor{
@@ -78,7 +86,7 @@ func main() {
 			"update": updater,
 		}}
 
-		builder := NewBuilderEngine(configure, dbAdaptor, logger, redisClient, index_set)
+		builder := NewBuilderEngine(configure, dbAdaptor, logger /*redisClient*/, nil, index_set)
 		builder.StartIncUpdate(data_chan)
 
 		logger.Info("Server Start...")
@@ -92,7 +100,7 @@ func main() {
 
 	} else if search == "build" {
 
-		builder := NewBuilderEngine(configure, dbAdaptor, logger, redisClient, nil)
+		builder := NewBuilderEngine(configure, dbAdaptor, logger /*redisClient*/, nil, nil)
 		builder.BuidingAllIndex()
 	} else {
 		logger.Error("Wrong start mode...only support [ search | build ]")

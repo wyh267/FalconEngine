@@ -11,22 +11,20 @@
 package utils
 
 import (
+	"bytes"
+	"encoding/binary"
 	"fmt"
+	"os"
+	//"syscall"
 )
 
-type NumItemDic struct {
-	HashCode int64
-	Key      int64
-	Value    int64
-	Next     int64
-}
-
 type NumberIdxDic struct {
-	Entity      []NumItemDic
-	HashIndex   []int64
-	EntityCount int64
-	Bukets      int64
-	Lens        int64
+	Lens     int64
+	IntMap   map[string]int64
+	Index    int64
+	Name     string
+	mmap     *Mmap
+	isSearch bool
 }
 
 /*****************************************************************************
@@ -37,62 +35,53 @@ type NumberIdxDic struct {
 *  description :
 *
 ******************************************************************************/
-func NewNumberIdxDic(buket_type int64) *NumberIdxDic {
-	var bukets int64
-	switch buket_type {
-	case 1:
-		bukets = 5001
-	case 2:
-		bukets = 50001
-	case 3:
-		bukets = 50001
-	case 4:
-		bukets = 50001
-	default:
-		bukets = 5001
+func NewNumberIdxDic(name string) *NumberIdxDic {
 
-	}
-	this := &NumberIdxDic{EntityCount: 1, Bukets: bukets}
-	this.Lens = bukets
-	this.Entity = make([]NumItemDic, this.Lens, 1000000)
-	this.HashIndex = make([]int64, this.Lens, 1000000)
+	this := &NumberIdxDic{IntMap: make(map[string]int64), Lens: 0, Index: 1, Name: name, mmap: nil, isSearch: false}
+	/*
+		file_name := fmt.Sprintf("./index/%v.dic", this.Name)
+
+		var err error
+		this.mmap,err = NewMmap(file_name,MODE_CREATE)
+		if err !=nil {
+			fmt.Printf("mmap error : %v \n",err)
+			return this
+		}
+	*/
 	return this
 }
 
 func (this *NumberIdxDic) Display() {
-	fmt.Printf("========================= Bukets : %v  EntityCount :%v =========================\n", this.Bukets, this.EntityCount-1)
-	var i int64
-	for i = 1; i < this.EntityCount; i++ {
-		fmt.Printf("Key : %v \t\t--- Value : %v  \t\t  --- HashCode : %v \n", this.Entity[i].Key, this.Entity[i].Value, this.Entity[i].HashCode)
+	fmt.Printf("========================= Bukets : %v  EntityCount :%v =========================\n", this.Lens, this.Index)
+
+	for k, v := range this.IntMap {
+		fmt.Printf("Key : %v \t\t--- Value : %v  \n", k, v)
 	}
 	fmt.Printf("===============================================================================\n")
 }
 
 func (this *NumberIdxDic) Put(key int64) int64 {
-	//桶已经满了，不能添加
-	if this.EntityCount == this.Lens {
-		//fmt.Printf("Bukets Full...Append arrays [EntityCount : %v] [Lens : %v] \n",this.EntityCount,this.Lens)
-		e := make([]NumItemDic, this.Bukets)
-		h := make([]int64, this.Bukets)
-		this.Entity = append(this.Entity, e...)
-		this.HashIndex = append(this.HashIndex, h...)
-		this.Lens = this.Lens + this.Bukets
-		//fmt.Printf("Bukets Full...Append arrays [ New EntityCount : %v] [ New Lens : %v] \n",this.EntityCount,this.Lens)
-	}
-	//已经添加过了，返回ID值
-	id, hash := this.Find(key)
+
+	key_str := fmt.Sprintf("%v", key)
+	id, _ := this.Find(key)
 	if id != -1 {
 		return id
 	}
-	//hash:= ModHash(key,this.Bukets)
-	this.Entity[this.EntityCount].HashCode = hash
-	this.Entity[this.EntityCount].Key = key
-	this.Entity[this.EntityCount].Value = this.EntityCount
-	this.Entity[this.EntityCount].Next = this.HashIndex[hash]
-	this.HashIndex[hash] = this.EntityCount
-	this.EntityCount++
 
-	return this.EntityCount - 1
+	this.IntMap[key_str] = this.Index
+
+	this.Index++
+	this.Lens++
+
+	if this.isSearch {
+		//fmt.Printf("updating key_value : %v index:%v lens:%v \n",this.IntMap[key_str],this.Index,this.Lens)
+		this.mmap.WriteInt64(0, this.Lens)
+		this.mmap.WriteInt64(8, this.Index)
+		this.mmap.AppendStringWithLen(key_str)
+		this.mmap.AppendInt64(this.Index - 1)
+	}
+
+	return this.IntMap[key_str]
 
 }
 
@@ -105,30 +94,87 @@ func (this *NumberIdxDic) Put(key int64) int64 {
 *
 ******************************************************************************/
 func (this *NumberIdxDic) Length() int64 {
-	return this.EntityCount - 1
+
+	return this.Lens
+
 }
 
 func (this *NumberIdxDic) Find(key int64) (int64, int64) {
-	hash := ModHash(key, this.Bukets)
-	var k int64
-	for k = this.HashIndex[hash]; k != 0; k = this.Entity[k].Next {
-		if key == this.Entity[k].Key {
-			//fmt.Printf("K :%v ==== Value : %v\n",k,this.Entity[k].ValueInt)
-			return this.Entity[k].Value, hash
-		}
+
+	key_str := fmt.Sprintf("%v", key)
+	value, has_key := this.IntMap[key_str]
+	if has_key {
+		return value, 0
 	}
-	return -1, hash
+	return -1, 0
+
 }
 
-/*****************************************************************************
-*  function name : ModHash
-*  params : int64
-*  return : int64
-*
-*  description : 整数hash函数
-*
-******************************************************************************/
-func ModHash(key, bukets int64) int64 {
+func (this *NumberIdxDic) WriteToFile() error {
 
-	return key % bukets
+	fmt.Printf("Writing to File [%v]...\n", this.Name)
+	file_name := fmt.Sprintf("./index/%v.dic", this.Name)
+	fout, err := os.Create(file_name)
+	defer fout.Close()
+	if err != nil {
+		//fmt.Printf("Create %v\n",file_name)
+		return err
+	}
+
+	buf := new(bytes.Buffer)
+	err = binary.Write(buf, binary.LittleEndian, this.Lens)
+	err = binary.Write(buf, binary.LittleEndian, this.Index)
+	if err != nil {
+		fmt.Printf("Lens ERROR :%v \n", err)
+	}
+	for k, v := range this.IntMap {
+		err := binary.Write(buf, binary.LittleEndian, int64(len(k)))
+		if err != nil {
+			fmt.Printf("Write Lens Error :%v \n", err)
+		}
+		err = binary.Write(buf, binary.LittleEndian, []byte(k))
+		if err != nil {
+			fmt.Printf("Write Key Error :%v \n", err)
+		}
+		err = binary.Write(buf, binary.LittleEndian, v)
+		if err != nil {
+			fmt.Printf("Write Value Error :%v \n", err)
+		}
+	}
+	fout.Write(buf.Bytes())
+
+	return nil
+}
+
+func (this *NumberIdxDic) ReadFromFile() error {
+
+	file_name := fmt.Sprintf("./index/%v.dic", this.Name)
+
+	var err error
+	this.mmap, err = NewMmap(file_name, MODE_APPEND)
+	if err != nil {
+		fmt.Printf("mmap error : %v \n", err)
+		return err
+	}
+
+	this.Lens = this.mmap.ReadInt64(0)
+	this.Index = this.mmap.ReadInt64(8)
+	//fmt.Printf("lens : %v index : %v \n",this.Lens,this.Index)
+	var start int64 = 16
+	var i int64 = 0
+	for i = 0; i < this.Lens; i++ {
+		lens := this.mmap.ReadInt64(start)
+		//fmt.Printf("lens : %v \n",lens)
+		start += 8
+		key := this.mmap.ReadString(start, lens)
+		start += lens
+		value := this.mmap.ReadInt64(start)
+		start += 8
+		this.IntMap[key] = value
+	}
+
+	this.mmap.SetFileEnd(start)
+	this.isSearch = true
+	return nil
+
 }

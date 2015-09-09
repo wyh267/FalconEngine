@@ -12,7 +12,7 @@
 
 ## 使用方法
 ### 依赖以下几个库
-- [github.com/outmana/log4jzl](https://github.com/outmana/log4jzl) log文件
+- [github.com/apsdehal/go-logger](https://github.com/apsdehal/go-logger) log文件
 - [github.com/ewangplay/config](https://github.com/ewangplay/config) 配置文件解析
 - [github.com/go-sql-driver/mysql](https://github.com/go-sql-driver/mysql) mysql驱动
 - [github.com/garyburd/redigo/redis](https://github.com/garyburd/redigo/redis) Redis驱动
