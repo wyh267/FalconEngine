@@ -23,13 +23,13 @@ type StringIdxDic struct {
 	StringMap map[string]int64
 	Index     int64
 	Name      string
-	mmap   	  *Mmap
+	mmap      *Mmap
 	isSearch  bool
 }
 
 func NewStringIdxDic(name string) *StringIdxDic {
 
-	this := &StringIdxDic{StringMap: make(map[string]int64), Lens: 0, Index: 1, Name: name ,mmap:nil,isSearch:false}
+	this := &StringIdxDic{StringMap: make(map[string]int64), Lens: 0, Index: 1, Name: name, mmap: nil, isSearch: false}
 	return this
 }
 
@@ -62,13 +62,12 @@ func (this *StringIdxDic) Put(key string) int64 {
 	this.Index++
 	this.Lens++
 
-
-	if this.isSearch{
+	if this.isSearch {
 		//fmt.Printf("updating key_value : %v index:%v lens:%v \n",this.IntMap[key_str],this.Index,this.Lens)
-		this.mmap.WriteInt64(0,this.Lens)
-		this.mmap.WriteInt64(8,this.Index)
+		this.mmap.WriteInt64(0, this.Lens)
+		this.mmap.WriteInt64(8, this.Index)
 		this.mmap.AppendStringWithLen(key)
-		this.mmap.AppendInt64(this.Index-1)
+		this.mmap.AppendInt64(this.Index - 1)
 	}
 
 	return this.StringMap[key]
@@ -134,14 +133,12 @@ func (this *StringIdxDic) WriteToFile() error {
 
 func (this *StringIdxDic) ReadFromFile() error {
 
-
-
 	file_name := fmt.Sprintf("./index/%v.dic", this.Name)
-	
+
 	var err error
-	this.mmap,err = NewMmap(file_name,MODE_APPEND)
-	if err !=nil {
-		fmt.Printf("mmap error : %v \n",err)
+	this.mmap, err = NewMmap(file_name, MODE_APPEND)
+	if err != nil {
+		fmt.Printf("mmap error : %v \n", err)
 		return err
 	}
 
@@ -152,15 +149,14 @@ func (this *StringIdxDic) ReadFromFile() error {
 	for i = 0; i < this.Lens; i++ {
 		lens := this.mmap.ReadInt64(start)
 		start += 8
-		key := this.mmap.ReadString(start,lens)
+		key := this.mmap.ReadString(start, lens)
 		start += lens
 		value := this.mmap.ReadInt64(start)
 		start += 8
 		this.StringMap[key] = value
 	}
 	this.mmap.SetFileEnd(start)
-	this.isSearch=true
+	this.isSearch = true
 	return nil
-
 
 }

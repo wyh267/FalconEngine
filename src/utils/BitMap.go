@@ -18,16 +18,14 @@ type Bitmap struct {
 	BitSize uint64
 	// 该 Bitmap 被设置为 1 的最大位置（方便遍历）
 	Maxpostion uint64
-	
-	bitmapMmap	*Mmap
+
+	bitmapMmap *Mmap
 }
 
 // NewBitmap 使用默认容量实例化一个 Bitmap
 func NewBitmap() *Bitmap {
 	return NewBitmapSize(BitmapSize)
 }
-
-
 
 func MakeBitmapFile() error {
 	size := BitmapSize
@@ -36,24 +34,22 @@ func MakeBitmapFile() error {
 	} else if remainder := size % 8; remainder != 0 {
 		size += 8 - remainder
 	}
-	
-	
+
 	file_name := "./index/bitmap.bit"
 	fout, err := os.Create(file_name)
 	defer fout.Close()
 	if err != nil {
 		return err
 	}
-	err=syscall.Ftruncate(int(fout.Fd()),int64(size>>3))
+	err = syscall.Ftruncate(int(fout.Fd()), int64(size>>3))
 	if err != nil {
-		fmt.Printf("ftruncate error : %v\n",err)
+		fmt.Printf("ftruncate error : %v\n", err)
 		return err
 	}
-	
-	return nil
-	
-}
 
+	return nil
+
+}
 
 // NewBitmapSize 根据指定的 size 实例化一个 Bitmap
 func NewBitmapSize(size int) *Bitmap {
@@ -62,8 +58,8 @@ func NewBitmapSize(size int) *Bitmap {
 	} else if remainder := size % 8; remainder != 0 {
 		size += 8 - remainder
 	}
-	this:=&Bitmap{Data: make([]byte, size>>3), BitSize: uint64(size - 1)}
-	
+	this := &Bitmap{Data: make([]byte, size>>3), BitSize: uint64(size - 1)}
+
 	this.ReadBitmapFile()
 	return this
 	//return &Bitmap{Data: make([]byte, size>>3), BitSize: uint64(size - 1)}
@@ -128,12 +124,9 @@ func (this *Bitmap) String() string {
 	return fmt.Sprintf("%v", numSlice)
 }
 
+func (this *Bitmap) ReadBitmapFile() error {
 
-
-
-func (this *Bitmap) ReadBitmapFile () error {
-	
-	f, err := os.OpenFile("./index/bitmap.bit",os.O_RDWR,0664)
+	f, err := os.OpenFile("./index/bitmap.bit", os.O_RDWR, 0664)
 	if err != nil {
 		return err
 	}
@@ -141,13 +134,13 @@ func (this *Bitmap) ReadBitmapFile () error {
 	if err != nil {
 		fmt.Printf("ERR:%v", err)
 	}
-	
+
 	this.Data, err = syscall.Mmap(int(f.Fd()), 0, int(fi.Size()), syscall.PROT_READ|syscall.PROT_WRITE, syscall.MAP_SHARED)
 	if err != nil {
 		fmt.Printf("MAPPING ERROR  %v \n", err)
 		return err
 	}
-	
+
 	return nil
-	
+
 }

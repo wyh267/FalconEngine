@@ -3,8 +3,8 @@ package BaseFunctions
 import (
 	"fmt"
 	"github.com/garyburd/redigo/redis"
-	"utils"
 	"time"
+	"utils"
 	//"errors"
 	"strings"
 )

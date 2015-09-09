@@ -91,7 +91,7 @@ END:
 	result["cost"] = fmt.Sprintf("%v", endTime.Sub(startTime))
 	result["request_url"] = r.RequestURI
 	this.Logger.Info("[LOG_ID:%v] [COST:%v] [URL : %v] ", log_id, result["cost"], result["request_url"])
-	this.Logger.Info("[LOG_ID:%v] BODY : %v",log_id,string(body))
+	this.Logger.Info("[LOG_ID:%v] BODY : %v", log_id, string(body))
 	resStr, _ := this.createJSON(result)
 	io.WriteString(w, resStr)
 	return

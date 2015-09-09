@@ -34,7 +34,7 @@ type ByteProfile struct {
 }
 
 func NewByteProfile(name string) *ByteProfile {
-	profile := &Profile{Name:name, Type:PflByte, Len:1, IsMmap:false,IsSearch:false}
+	profile := &Profile{Name: name, Type: PflByte, Len: 1, IsMmap: false, IsSearch: false}
 	this := &ByteProfile{profile, make([]ByteNode, 1)}
 	return this
 }

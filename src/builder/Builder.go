@@ -11,8 +11,8 @@ package builder
 
 import (
 	"BaseFunctions"
-	"utils"
 	"indexer"
+	"utils"
 )
 
 type Builder struct {

@@ -2,7 +2,6 @@ package BaseFunctions
 
 import (
 	"utils"
-
 )
 
 type BaseProcessor struct {

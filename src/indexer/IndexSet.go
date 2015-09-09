@@ -242,21 +242,21 @@ func (this *IndexSet) InitIndexSet(fields map[string]string) error {
 
 	//读取detail文件
 	this.Logger.Info("Loading Detail idx .....")
-	this.Detail= NewDetailWithFile()
+	this.Detail = NewDetailWithFile()
 	this.Detail.ReadDetailFromFile()
 	/*
-	bidx, err := utils.ReadFromJson("./index/detail.idx.json")
-	if err != nil {
-		this.Logger.Info("Read Detail Error .....%v ", err)
-		return err
-	}
-	var detail Detail
-	err = json.Unmarshal(bidx, &detail)
-	if err != nil {
-		this.Logger.Info("Loading Detail Error .....%v ", err)
-		return err
-	}
-	this.Detail = &detail
+		bidx, err := utils.ReadFromJson("./index/detail.idx.json")
+		if err != nil {
+			this.Logger.Info("Read Detail Error .....%v ", err)
+			return err
+		}
+		var detail Detail
+		err = json.Unmarshal(bidx, &detail)
+		if err != nil {
+			this.Logger.Info("Loading Detail Error .....%v ", err)
+			return err
+		}
+		this.Detail = &detail
 	*/
 	//保存最大DocId
 	this.MaxDocId = this.PflIndex[this.PrimaryKey].GetMaxDocId()

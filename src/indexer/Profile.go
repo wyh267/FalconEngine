@@ -21,10 +21,10 @@ const (
 )
 
 type Profile struct {
-	Name   string
-	Type   int64
-	Len    int64
-	IsMmap bool
+	Name     string
+	Type     int64
+	Len      int64
+	IsMmap   bool
 	IsSearch bool
 }
 

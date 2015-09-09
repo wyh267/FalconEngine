@@ -85,18 +85,18 @@ func checkDateTime(op, value string, contact_info map[string]string, field strin
 
 	vl := strings.Split(contact_info[field], " ")
 	v := vl[0]
-	
+
 	switch op {
 	case "equal":
-		return value == v 
+		return value == v
 	case "unequal":
-		return value != v 
+		return value != v
 	case "less":
 		return v < value
 	case "more":
-		return v  > value
+		return v > value
 	default:
-		return value == v 
+		return value == v
 	}
 
 	return false
@@ -329,13 +329,11 @@ func ComputScore(body []byte, ContactInfo map[string]string) (int64, error) {
 		return 0, err
 	}
 
-
 	//contact_score, err := strconv.ParseInt(fmt.Sprintf("%v", ContactInfo["score"]), 0, 0)
 	//if err != nil {
 	//	contact_score = 0
 	//}
 	//contact_score := 0
-
 
 	//第一层循环
 	for _, data := range searchInfo.Conditions.Data {
