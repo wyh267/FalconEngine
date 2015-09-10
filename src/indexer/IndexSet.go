@@ -10,7 +10,7 @@
 package indexer
 
 import (
-	"encoding/json"
+	//"encoding/json"
 	"errors"
 	"fmt"
 	"github.com/outmana/log4jzl"
@@ -199,7 +199,7 @@ func (this *IndexSet) InitIndexSet(fields map[string]string) error {
 				dic := utils.NewNumberIdxDic(k)
 				this.Logger.Info("\t Loading Invert Index Dictionary [ %v.dic ] ", k)
 				dic.ReadFromFile()
-				dic.Display()
+				//dic.Display()
 				index := NewNumberIndex(k, idx, dic)
 				this.PutIndex(k, index)
 			}
@@ -208,8 +208,8 @@ func (this *IndexSet) InitIndexSet(fields map[string]string) error {
 
 		if l[2] == "1" {
 			this.FieldInfo[k].IsPlf = true
-			pfl_name := fmt.Sprintf("./index/%v_pfl.json", k)
-			bpfl, _ := utils.ReadFromJson(pfl_name)
+			//pfl_name := fmt.Sprintf("./index/%v_pfl.json", k)
+			//bpfl, _ := utils.ReadFromJson(pfl_name)
 
 			if l[3] == "T" {
 				this.FieldInfo[k].FType = "T"
@@ -228,6 +228,10 @@ func (this *IndexSet) InitIndexSet(fields map[string]string) error {
 				this.PutProfile(k, pfl)
 			} else if l[3] == "I" {
 				this.FieldInfo[k].FType = "I"
+				pfl := NewByteProfile(k)
+				this.Logger.Info("\t Loading Byte Profile [ %v ] ", k)
+				pfl.ReadFromFile()
+				/*
 				var pfl ByteProfile
 				this.Logger.Info("\t Loading Byte Profile [ %v.pfl ] ", pfl_name)
 				err := json.Unmarshal(bpfl, &pfl)
@@ -235,7 +239,8 @@ func (this *IndexSet) InitIndexSet(fields map[string]string) error {
 					this.Logger.Error("Error to unmarshal[%v], %v", k, err)
 					return err
 				}
-				this.PutProfile(k, &pfl)
+				*/
+				this.PutProfile(k, pfl)
 
 			}
 		}

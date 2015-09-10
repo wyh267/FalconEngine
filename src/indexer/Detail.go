@@ -32,6 +32,8 @@ type DetailInfo struct {
 type Detail struct {
 	MaxDocId      int64
 	Offset        int64
+	IsSearch	  bool
+	Name		  string
 	DetailList    []DetailInfo
 	IncDetailList []DetailInfo
 	dicMmap		  *utils.Mmap
@@ -42,7 +44,16 @@ type Detail struct {
 
 func NewDetailWithFile() *Detail {
 
-	this := &Detail{MaxDocId: 0, DetailList: make([]DetailInfo, 0), IncDetailList: make([]DetailInfo, 0), Offset: 0}
+	this := &Detail{MaxDocId: 0, DetailList: make([]DetailInfo, 0), IncDetailList: make([]DetailInfo, 0), Offset: 0,Name:"detail",IsSearch:false}
+
+	return this
+}
+
+
+
+func NewDetailWithName(name string) *Detail {
+
+	this := &Detail{MaxDocId: 0, DetailList: make([]DetailInfo, 1), IncDetailList: make([]DetailInfo, 1), Offset: 0,Name:name,IsSearch:false}
 
 	return this
 }
@@ -51,7 +62,7 @@ func NewDetailWithFile() *Detail {
 
 func NewDetail() *Detail {
 
-	this := &Detail{MaxDocId: 0, DetailList: make([]DetailInfo, 1), IncDetailList: make([]DetailInfo, 1), Offset: 0}
+	this := &Detail{MaxDocId: 0, DetailList: make([]DetailInfo, 1), IncDetailList: make([]DetailInfo, 1), Offset: 0,Name:"detail",IsSearch:false}
 
 	return this
 }
@@ -66,7 +77,7 @@ func (this *Detail) GetDocInfo(doc_id int64) (map[string]string, error) {
 		var info_detail map[string]string
 		err := json.Unmarshal(this.DetailList[doc_id].DetailBytes, &info_detail)
 		if err != nil {
-			fmt.Printf("Unmarshal ERROR  %v \n", err)
+			fmt.Printf("Unmarshal11 ERROR  %v \n", err)
 			return nil, err
 		}
 		return info_detail, nil
@@ -86,12 +97,16 @@ func (this *Detail) GetDocInfo(doc_id int64) (map[string]string, error) {
 	var info_detail map[string]string
 	err := json.Unmarshal(this.DetailList[doc_id].DetailBytes, &info_detail)
 	if err != nil {
-		fmt.Printf("Unmarshal ERROR  %v \n", err)
+		fmt.Printf("%v\n",string(this.DetailList[doc_id].DetailBytes))
+		fmt.Printf("Unmarshal33 ERROR  %v \n", err)
 		return nil, err
 	}
 	return info_detail, nil
 
 }
+
+
+
 
 func (this *Detail) PutDocInfo(doc_id int64, info map[string]string) error {
 	if doc_id != this.MaxDocId+1 {
@@ -115,6 +130,11 @@ func (this *Detail) PutDocInfo(doc_id int64, info map[string]string) error {
 	return nil
 }
 
+
+
+
+
+
 func (this *Detail) SetNewValue(doc_id int64, info map[string]string) error {
 
 	binfo, err := json.Marshal(info)
@@ -125,7 +145,7 @@ func (this *Detail) SetNewValue(doc_id int64, info map[string]string) error {
 	//只要是新增的，都需要写入up文件中
 	info_start:=this.upMmap.GetPointer()
 	info_lens:=int64(len(binfo))
-	this.upMmap.AppendString(string(binfo))
+	this.upMmap.AppendBytes(binfo)
 	this.upMmap.WriteInt64(0,info_start+info_lens)
 
 	if doc_id > this.MaxDocId {
@@ -166,46 +186,16 @@ func (this *Detail) SetNewValue(doc_id int64, info map[string]string) error {
 func (this *Detail) ReadDetailFromFile() error {
 	
 	var err error
-	file_name := "./index/detail.dic"
+	file_name := fmt.Sprintf("./index/%v.dic",this.Name)
+	fmt.Printf("Read File : %v \n",file_name)
 	this.dicMmap,err = utils.NewMmap(file_name,utils.MODE_APPEND)
 	if err !=nil {
 		fmt.Printf("mmap error : %v \n",err)
 		return err
 	}
-	/*
-	f, err := os.Open(file_name)
-	defer f.Close()
-	if err != nil {
-		return err
-	}
 	
-	fi, err := f.Stat()
-	if err != nil {
-		fmt.Printf("ERR:%v", err)
-	}
-
-	MmapBytes, err := syscall.Mmap(int(f.Fd()), 0, int(fi.Size()), syscall.PROT_READ, syscall.MAP_PRIVATE)
-
-	if err != nil {
-		fmt.Printf("MAPPING ERROR  %v \n", err)
-		return nil
-	}
-
-	defer syscall.Munmap(MmapBytes)
-
+	this.DetailList=make([]DetailInfo, 0)
 	
-	this.MaxDocId = int64(binary.LittleEndian.Uint64(MmapBytes[:8]))
-	this.Offset = int64(binary.LittleEndian.Uint64(MmapBytes[8:16]))
-	var start int64 = 16
-	var i int64 = 0
-	for i = 0; i <= this.MaxDocId; i++ {
-		start_pos := int64(binary.LittleEndian.Uint64(MmapBytes[start : start+8]))
-		start += 8
-		byte_len := int64(binary.LittleEndian.Uint64(MmapBytes[start : start+8]))
-		start += 8
-		this.DetailList = append(this.DetailList, DetailInfo{nil,start_pos,byte_len,false})
-	}
-	*/
 	this.MaxDocId = this.dicMmap.ReadInt64(0)
 	this.Offset = this.dicMmap.ReadInt64(8)
 	var start int64 = 16
@@ -223,7 +213,8 @@ func (this *Detail) ReadDetailFromFile() error {
 	
 	
 	//mmap详细文件
-	file_name = "./index/detail.dat"
+	file_name = fmt.Sprintf("./index/%v.dat",this.Name)
+	fmt.Printf("Read File : %v \n",file_name)
 	this.detailMmap,err = utils.NewMmap(file_name,utils.MODE_APPEND)
 	if err !=nil {
 		fmt.Printf("mmap error : %v \n",err)
@@ -231,7 +222,8 @@ func (this *Detail) ReadDetailFromFile() error {
 	}
 	
 	//mmap增量文件
-	file_name = "./index/detail.up"
+	file_name = fmt.Sprintf("./index/%v.up",this.Name)
+	fmt.Printf("Read File : %v \n",file_name)
 	this.upMmap,err = utils.NewMmap(file_name,utils.MODE_APPEND)
 	if err !=nil {
 		fmt.Printf("mmap error : %v \n",err)
@@ -255,15 +247,17 @@ func (this *Detail) WriteDetailToFile() error {
 
 	buf := new(bytes.Buffer)
 
-
-	fout, err := os.Create(fmt.Sprintf("./index/detail.dat"))
+	file_name := fmt.Sprintf("./index/%v.dat",this.Name)
+	fmt.Printf("Write File : %v \n",file_name)
+	fout, err := os.Create(file_name)
 	if err != nil {
 		fmt.Printf("Create Error %v\n", err)
 		return err
 	}
 	defer fout.Close()
 	
-	file_name := "./index/detail.dic"
+	file_name = fmt.Sprintf("./index/%v.dic",this.Name)
+	fmt.Printf("Write File : %v \n",file_name)
 	fdetail_dic_out, err := os.Create(file_name)
 	defer fdetail_dic_out.Close()
 	if err != nil {
@@ -311,7 +305,7 @@ func (this *Detail) WriteDetailToFile() error {
 	
 	this.WriteUpDetailFile()
 	
-	utils.MakeBitmapFile()
+	
 	
 	return nil
 
@@ -329,8 +323,9 @@ func (this *Detail) WriteDetailWithChan(wchan chan string) error {
 
 func (this *Detail) WriteUpDetailFile() error {
 	
-	
-	fout, err := os.Create("./index/detail.up")
+	file_name := fmt.Sprintf("./index/%v.up",this.Name)
+	fmt.Printf("Write File : %v \n",file_name)
+	fout, err := os.Create(file_name)
 	defer fout.Close()
 	if err != nil {
 		//fmt.Printf("Create %v\n",file_name)

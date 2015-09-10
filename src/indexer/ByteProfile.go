@@ -10,26 +10,193 @@
 package indexer
 
 import (
-	"bytes"
-	"encoding/binary"
+	//"bytes"
+	//"encoding/binary"
 	"errors"
 	"fmt"
-	"os"
-	"strconv"
-	"strings"
-	"syscall"
+	//"os"
+	//"strconv"
+	//"strings"
+	//"syscall"
 	u "utils"
 )
 
+
+//type ByteProfile Detail
+
+
+
+func NewByteProfile(name string) *Detail {
+	profile_name:=fmt.Sprintf("%v.pfl",name)
+	this := NewDetailWithName(profile_name)
+	return this
+}
+
+
+func (this *Detail) PutProfile(doc_id int64, value []byte) error {
+	
+	if this.IsSearch == true {
+		
+		return this.SetNewValueByte(doc_id,value)
+		
+	}else{
+		
+		return this.PutDocInfoByte(doc_id,value)
+	}
+
+}
+
+
+
+func (this *Detail) Put(doc_id int64, value interface{}) error{
+	value_byte, ok := value.([]byte)
+	if !ok {
+		return errors.New("Wrong type..")
+	}
+
+	return this.PutProfile(doc_id, value_byte)
+}
+
+
+func (this *Detail) Find(doc_id int64) (interface{}, error){
+	
+
+	if doc_id > this.MaxDocId {
+		return nil, errors.New("DocId Wrong")
+	}
+
+	if this.DetailList[doc_id].IsInc == true {
+		return this.DetailList[doc_id].DetailBytes, nil
+	}
+
+
+	StartPos := int(this.DetailList[doc_id].ByteStart)
+	EndPos := int(this.DetailList[doc_id].ByteLen) + StartPos
+	this.DetailList[doc_id].DetailBytes = make([]byte, int(this.DetailList[doc_id].ByteLen))
+	
+	if this.DetailList[doc_id].InInc == 0 {
+		copy(this.DetailList[doc_id].DetailBytes, this.detailMmap.Read(int64(StartPos),int64(EndPos)))
+	}else{
+		copy(this.DetailList[doc_id].DetailBytes, this.upMmap.Read(int64(StartPos),int64(EndPos)))
+	}
+	
+	return this.DetailList[doc_id].DetailBytes,nil
+}
+
+
+func (this *Detail) Filter(doc_ids []u.DocIdInfo, value interface{}, is_forward bool, filt_type int64) ([]u.DocIdInfo, error){
+	
+	return doc_ids,nil
+}
+
+
+func (this *Detail) Display(){
+	
+	
+}
+
+
+func (this *Detail) GetType() int64{
+	
+	return PflByte
+}
+
+
+func (this *Detail) GetMaxDocId() int64{
+	
+	return this.MaxDocId
+}
+
+
+func (this *Detail) CustomFilter(doc_ids []u.DocIdInfo, value interface{}, r bool, cf func(v1, v2 interface{}) bool) ([]u.DocIdInfo, error){
+	
+	return doc_ids,nil
+}
+
+
+func (this *Detail) WriteToFile() error{
+	
+	return this.WriteDetailToFile()
+}
+
+
+func (this *Detail) ReadFromFile() error{
+	
+	this.IsSearch = true 
+	return this.ReadDetailFromFile()
+}
+
+
+func (this *Detail) PutDocInfoByte(doc_id int64, info_byte []byte) error {
+	
+	if doc_id != this.MaxDocId+1 {
+		return errors.New("DocID Wrong")
+	}
+
+	var detail_info DetailInfo
+	detail_info.DetailBytes = info_byte
+	detail_info.ByteLen = int64(len(info_byte))
+	detail_info.ByteStart = this.Offset
+	detail_info.IsInc = false
+	detail_info.InInc = 0
+	this.Offset += int64(len(info_byte))
+	this.MaxDocId++
+	this.DetailList = append(this.DetailList, detail_info)
+
+	return nil
+}
+
+func (this *Detail) SetNewValueByte(doc_id int64, binfo []byte) error {
+	//只要是新增的，都需要写入up文件中
+	info_start:=this.upMmap.GetPointer()
+	info_lens:=int64(len(binfo))
+	this.upMmap.AppendString(string(binfo))
+	this.upMmap.WriteInt64(0,info_start+info_lens)
+
+	if doc_id > this.MaxDocId {
+		var detail_info DetailInfo
+		detail_info.DetailBytes = binfo
+		this.MaxDocId++
+		this.DetailList = append(this.DetailList, detail_info)
+		
+		
+		
+		//新增一个doc_id,写入字典文件中
+		this.dicMmap.WriteInt64(0,this.MaxDocId)
+		this.dicMmap.AppendInt64(info_start)
+		this.dicMmap.AppendInt64(info_lens)
+		this.dicMmap.AppendInt64(1)
+		//this.detailMmap.AppendString(string(binfo))
+		
+
+	} else {
+		this.DetailList[int(doc_id)].DetailBytes = binfo
+		//没有新增，需要定位到doc_id的位置上
+		start_pos:=16+(doc_id)*24
+		this.dicMmap.WriteInt64(start_pos,info_start)
+		start_pos+=8
+		this.dicMmap.WriteInt64(start_pos,info_lens)
+		start_pos+=8
+		this.dicMmap.WriteInt64(start_pos,1)
+	}
+
+	this.DetailList[doc_id].IsInc = true
+	return nil
+}
+
+
+/*
 type ByteNode struct {
 	Data     []byte
-	Start    int64
-	DataLen  int
-	InMomory bool
+	ByteStart   int64
+	ByteLen     int64
+	InInc		int64
+	IsInc       bool
 }
 
 type ByteProfile struct {
 	*Profile
+	Offset		  int64
 	ProfileList   []ByteNode
 	posMmap		  *u.Mmap
 	profileMmap	  *u.Mmap
@@ -38,7 +205,7 @@ type ByteProfile struct {
 
 func NewByteProfile(name string) *ByteProfile {
 	profile := &Profile{Name:name, Type:PflByte, Len:1, IsMmap:false,IsSearch:false}
-	this := &ByteProfile{profile, make([]ByteNode, 1),nil,nil,nil}
+	this := &ByteProfile{Profile:profile, ProfileList:make([]ByteNode, 1),posMmap:nil,profileMmap:nil,profileUpMmap:nil,Offset:0}
 	return this
 }
 
@@ -46,30 +213,63 @@ func (this *ByteProfile) Display() {
 
 	fmt.Printf(" ========== [ NAME : %v ] [ LEN : %v ]============\n", this.Name, this.Len)
 	for index, v := range this.ProfileList {
-		fmt.Printf(" [ DOC_ID : %v ] [ VALUE : %v ] \n", index, v.DataLen)
+		fmt.Printf(" [ DOC_ID : %v ] [ VALUE : %v ] \n", index, string(v.Data))
 	}
 	fmt.Printf(" ================================================= \n")
 }
 
 func (this *ByteProfile) PutProfile(doc_id int64, value []byte) error {
-	//fmt.Printf(" ========== [ NAME : %v ] [ LEN : %v ] [ DOC_ID : %v ]============\n", this.Name, this.Len,doc_id)
+
+
+	var byte_node ByteNode
+	byte_node.Data = value
+	byte_node.ByteStart = 0
+	byte_node.ByteLen = int64(len(value))
+	byte_node.IsInc = true
+
+	
+	
+	
+	
 	if doc_id > this.Len || doc_id < 1 {
+		fmt.Printf(" ========== [ NAME : %v ] [ LEN : %v ] [ DOC_ID : %v ]============\n", this.Name, this.Len,doc_id)
 		return errors.New("docid is wrong")
 	}
 
 	var byte_node ByteNode
 	byte_node.Data = value
-	byte_node.Start = 0
-	byte_node.DataLen = len(value)
-	byte_node.InMomory = true
+	byte_node.ByteLen = int64(len(value))
+	
+
 
 	if doc_id == this.Len {
 		this.ProfileList = append(this.ProfileList, byte_node)
 		this.Len++
+		
+		if this.IsSearch == true {
+			
+			this.posMmap.WriteInt64(0,this.Len)
+			this.profileUpMmap.AppendBytes(value)
+			
+			
+		}else{
+			
+			byte_node.ByteStart = this.Offset
+			byte_node.IsInc = false
+			byte_node.InInc = 0
+			this.Offset += int64(len(value))
+			
+			
+		}
 		return nil
 	}
 
 	this.ProfileList[doc_id] = byte_node
+	return nil
+
+
+
+
 	return nil
 
 }
@@ -80,7 +280,7 @@ func (this *ByteProfile) FindValue(doc_id int64) ([]byte, error) {
 		return nil, errors.New("docid is wrong")
 	}
 
-	if this.ProfileList[doc_id].InMomory == true {
+	if this.ProfileList[doc_id].IsInc == true {
 		return this.ProfileList[doc_id].Data, nil
 	}
 
@@ -97,13 +297,13 @@ func (this *ByteProfile) FindValue(doc_id int64) ([]byte, error) {
 	}
 	defer syscall.Munmap(MmapBytes)
 
-	StartPos := int(this.ProfileList[doc_id].Start)
-	EndPos := this.ProfileList[doc_id].DataLen + StartPos
-	this.ProfileList[doc_id].Data = make([]byte, this.ProfileList[doc_id].DataLen)
+	StartPos := this.ProfileList[doc_id].ByteStart
+	EndPos := this.ProfileList[doc_id].ByteLen + StartPos
+	this.ProfileList[doc_id].Data = make([]byte, this.ProfileList[doc_id].ByteLen)
 	copy(this.ProfileList[doc_id].Data, MmapBytes[StartPos:EndPos])
 	//fmt.Printf("Cost Time : %v \n",functime("MmapBytes"))
 
-	this.ProfileList[doc_id].InMomory = true
+	this.ProfileList[doc_id].IsInc = true
 	//fmt.Printf("list : %v\n", string(this.ProfileList[doc_id].Data))
 	return this.ProfileList[doc_id].Data, nil
 
@@ -259,29 +459,62 @@ func (this *ByteProfile) WriteToFile() error {
 
 	buf := new(bytes.Buffer)
 
-	//file_name := fmt.Sprintf("./index/detail.dat")
-	fout, err := os.Create(fmt.Sprintf("./index/%v_pfl.dat", this.Name))
+
+	fout, err := os.Create(fmt.Sprintf("./index/%v.pfl.dat",this.Name))
 	if err != nil {
 		fmt.Printf("Create Error %v\n", err)
 		return err
 	}
 	defer fout.Close()
-	var start int64 = 0
+	
+	file_name := fmt.Sprintf("./index/%v.pfl.pos",this.Name)
+	profile_pos_out, err := os.Create(file_name)
+	defer profile_pos_out.Close()
+	if err != nil {
+		return err
+	}
+	
+	buf_profile_pos := new(bytes.Buffer)
+	err = binary.Write(buf_profile_pos, binary.LittleEndian, this.Len)
+	if err != nil {
+		fmt.Printf("Len ERROR :%v \n", err)
+	}
+	err = binary.Write(buf_profile_pos, binary.LittleEndian, this.Type)
+	if err != nil {
+		fmt.Printf("Type ERROR :%v \n", err)
+	}
+	
+	var isInc int64 = 0
 	for index, _ := range this.ProfileList {
 
 		err := binary.Write(buf, binary.LittleEndian, this.ProfileList[index].Data)
 		if err != nil {
-			fmt.Printf("Write Error ..%v\n", err)
+			fmt.Printf("Data Error ..%v\n", err)
 		}
-		this.ProfileList[index].Start = start
-		this.ProfileList[index].DataLen = len(this.ProfileList[index].Data)
-		this.ProfileList[index].InMomory = false
 		this.ProfileList[index].Data = nil
-		start += int64(this.ProfileList[index].DataLen)
+		
+		err = binary.Write(buf_profile_pos, binary.LittleEndian, this.ProfileList[index].ByteStart)
+		if err != nil {
+			fmt.Printf("ByteStart Error ..%v\n", err)
+		}
+		
+		err = binary.Write(buf_profile_pos, binary.LittleEndian, this.ProfileList[index].ByteLen)
+		if err != nil {
+			fmt.Printf("ByteLen Error ..%v\n", err)
+		}
+		
+		err = binary.Write(buf_profile_pos, binary.LittleEndian, isInc)
+		if err != nil {
+			fmt.Printf("ByteLen Error ..%v\n", err)
+		}
 	}
 
 	fout.Write(buf.Bytes())
-	u.WriteToJson(this, fmt.Sprintf("./index/%v_pfl.json", this.Name))
+	profile_pos_out.Write(buf_profile_pos.Bytes())
+	//utils.WriteToJson(this, "./index/detail.idx.json")
+	
+	this.WriteUpProfileFile()
+	
 	return nil
 
 }
@@ -297,3 +530,26 @@ func (this *ByteProfile) WriteToFileWithChan(wchan chan string) error {
 	wchan <- fmt.Sprintf("./index/%v_pfl.dat", this.Name)
 	return nil
 }
+
+
+func (this *ByteProfile) WriteUpProfileFile() error {
+	
+	file_name := fmt.Sprintf("./index/%v.pfl.up",this.Name)
+	fout, err := os.Create(file_name)
+	defer fout.Close()
+	if err != nil {
+		//fmt.Printf("Create %v\n",file_name)
+		return err
+	}
+	err=syscall.Ftruncate(int(fout.Fd()),u.APPEND_DATA)
+	if err != nil {
+		fmt.Printf("ftruncate error : %v\n",err)
+		return err
+	}
+	
+	return nil
+	
+}
+
+
+*/

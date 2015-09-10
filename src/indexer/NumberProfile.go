@@ -215,16 +215,7 @@ func (this *NumberProfile) WriteToFile() error {
 	if err != nil {
 		fmt.Printf("Type ERROR :%v \n", err)
 	}
-	/*
-	err = binary.Write(buf, binary.LittleEndian, int64(len(this.Name)))
-	if err != nil {
-		fmt.Printf("Write Name Lens Error :%v \n", err)
-	}
-	err = binary.Write(buf, binary.LittleEndian, []byte(this.Name))
-	if err != nil {
-		fmt.Printf("Write Name Error :%v \n", err)
-	}
-	*/
+
 	for _, value := range this.ProfileList {
 		err := binary.Write(buf, binary.LittleEndian, value)
 		if err != nil {

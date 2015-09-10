@@ -24,7 +24,7 @@ type FieldInfo struct {
 	IvtNumDic *utils.NumberIdxDic
 	PlfText   *indexer.TextProfile
 	PlfNumber *indexer.NumberProfile
-	PlfByte   *indexer.ByteProfile
+	PlfByte   *indexer.Detail
 }
 
 type DBBuilder struct {
@@ -412,6 +412,9 @@ func (this *DBBuilder) Buiding() error {
 	writeChan := make(chan string, 1000)
 
 	this.DetailIdx.WriteDetailToFile()
+	this.Logger.Info("Make BitMap File")
+	utils.MakeBitmapFile()
+	
 
 	for index, _ := range this.Fields {
 
@@ -445,9 +448,10 @@ func (this *DBBuilder) Buiding() error {
 			}
 
 			if this.Fields[index].FType == "I" {
-
-				go this.Fields[index].PlfByte.WriteToFileWithChan(writeChan)
-				writeCount++
+				
+				this.Fields[index].PlfByte.WriteToFile()
+				//go this.Fields[index].PlfByte.WriteToFileWithChan(writeChan)
+				//writeCount++
 
 			}
 

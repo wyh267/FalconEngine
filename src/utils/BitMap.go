@@ -134,6 +134,7 @@ func (this *Bitmap) String() string {
 func (this *Bitmap) ReadBitmapFile () error {
 	
 	f, err := os.OpenFile("./index/bitmap.bit",os.O_RDWR,0664)
+	
 	if err != nil {
 		return err
 	}
