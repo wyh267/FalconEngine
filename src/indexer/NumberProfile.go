@@ -45,6 +45,7 @@ func (this *NumberProfile) Display() {
 func (this *NumberProfile) PutProfile(doc_id, value int64) error {
 	//fmt.Printf(" ========== [ NAME : %v ] [ LEN : %v ] [ DOC_ID : %v ]============\n", this.Name, this.Len,doc_id)
 	if doc_id > this.Len || doc_id < 1 {
+		fmt.Printf(" ========== [ NAME : %v ] [ LEN : %v ] [ DOC_ID : %v ]============\n", this.Name, this.Len,doc_id)
 		return errors.New("docid is wrong")
 	}
 

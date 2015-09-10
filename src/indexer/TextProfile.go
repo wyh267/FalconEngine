@@ -48,6 +48,7 @@ func (this *TextProfile) Display() {
 
 func (this *TextProfile) PutProfile(doc_id int64, value string) error {
 	if doc_id > this.Len || doc_id < 1 {
+		fmt.Printf(" ========== [ NAME : %v ] [ LEN : %v ] [ DOC_ID : %v ]============\n", this.Name, this.Len,doc_id)
 		return errors.New("docid is wrong")
 	}
 	str_bytes := make([]byte,this.fieldLen)

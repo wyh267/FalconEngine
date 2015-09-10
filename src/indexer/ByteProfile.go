@@ -30,12 +30,15 @@ type ByteNode struct {
 
 type ByteProfile struct {
 	*Profile
-	ProfileList []ByteNode
+	ProfileList   []ByteNode
+	posMmap		  *u.Mmap
+	profileMmap	  *u.Mmap
+	profileUpMmap *u.Mmap
 }
 
 func NewByteProfile(name string) *ByteProfile {
 	profile := &Profile{Name:name, Type:PflByte, Len:1, IsMmap:false,IsSearch:false}
-	this := &ByteProfile{profile, make([]ByteNode, 1)}
+	this := &ByteProfile{profile, make([]ByteNode, 1),nil,nil,nil}
 	return this
 }
 
