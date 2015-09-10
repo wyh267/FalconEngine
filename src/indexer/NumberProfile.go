@@ -198,7 +198,7 @@ func (this *NumberProfile) GetType() int64 {
 
 func (this *NumberProfile) WriteToFile() error {
 
-	file_name := fmt.Sprintf("./index/%v.plf", this.Name)
+	file_name := fmt.Sprintf("./index/%v.pfl", this.Name)
 	fout, err := os.Create(file_name)
 	defer fout.Close()
 	if err != nil {
@@ -238,7 +238,7 @@ func (this *NumberProfile) WriteToFile() error {
 func (this *NumberProfile) ReadFromFile() error {
 
 	var err error
-	file_name := fmt.Sprintf("./index/%v.plf", this.Name)
+	file_name := fmt.Sprintf("./index/%v.pfl", this.Name)
 	this.numMmap,err = u.NewMmap(file_name,u.MODE_APPEND)
 	if err !=nil {
 		fmt.Printf("mmap error : %v \n",err)
