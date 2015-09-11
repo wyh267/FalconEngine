@@ -217,6 +217,18 @@ func (this *TextProfile) CustomFilter(doc_ids []u.DocIdInfo, value interface{}, 
 
 }
 
+
+
+
+func (this *TextProfile) CustomFilterInterface(doc_ids []u.DocIdInfo, value interface{}) ([]u.DocIdInfo, error) {
+	
+	
+	return nil, nil
+	
+}
+
+
+
 func (this *TextProfile) GetType() int64 {
 	return this.Type
 }

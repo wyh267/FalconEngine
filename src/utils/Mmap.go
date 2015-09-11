@@ -59,7 +59,7 @@ func NewMmap(file_name string,mode int) (*Mmap,error) {
 		fmt.Printf("ERR:%v", err)
 	}
 	this.FileLen=fi.Size()
-	if mode == MODE_CREATE{
+	if mode == MODE_CREATE || this.FileLen == 0 {
 		syscall.Ftruncate(int(f.Fd()),fi.Size()+APPEND_DATA)
 		this.FileLen=APPEND_DATA
 	}

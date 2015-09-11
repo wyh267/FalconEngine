@@ -46,9 +46,19 @@ type ProfileInterface interface {
 	GetType() int64
 	GetMaxDocId() int64
 	CustomFilter(doc_ids []u.DocIdInfo, value interface{}, r bool, cf func(v1, v2 interface{}) bool) ([]u.DocIdInfo, error)
+	CustomFilterInterface(doc_ids []u.DocIdInfo, value interface{}) ([]u.DocIdInfo, error)
 	WriteToFile() error
 	ReadFromFile() error
 }
+
+
+//自定义接口..用于外部写查询插件
+type CustomInterface interface{
+	CustomeFunction(v1, v2 interface{}) bool
+}
+
+
+
 
 /*****************************************************************************
 *  function name : GetMaxDocId

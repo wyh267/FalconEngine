@@ -193,6 +193,16 @@ func (this *NumberProfile) CustomFilter(doc_ids []u.DocIdInfo, value interface{}
 	return res, nil
 }
 
+
+func (this *NumberProfile) CustomFilterInterface(doc_ids []u.DocIdInfo, value interface{}) ([]u.DocIdInfo, error) {
+	
+	
+
+	return nil, nil
+	
+}
+
+
 func (this *NumberProfile) GetType() int64 {
 	return this.Type
 }

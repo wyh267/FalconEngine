@@ -24,7 +24,7 @@ type FieldInfo struct {
 	IvtNumDic *utils.NumberIdxDic
 	PlfText   *indexer.TextProfile
 	PlfNumber *indexer.NumberProfile
-	PlfByte   *indexer.Detail
+	PlfByte   *indexer.ByteProfile
 }
 
 type DBBuilder struct {
