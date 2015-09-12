@@ -520,6 +520,8 @@ func (this *IndexSet) SearchNumber(query int64) ([]utils.DocIdInfo, bool) {
 ******************************************************************************/
 func (this *IndexSet) SearchFieldByString(query string, field string) ([]utils.DocIdInfo, bool) {
 
+	terms:=this.Segmenter.SegmentByType(content,this.FieldInfo[field].SType,false)
+	/*
 	var terms []string
 
 	switch this.FieldInfo[field].SType {
@@ -530,6 +532,7 @@ func (this *IndexSet) SearchFieldByString(query string, field string) ([]utils.D
 	case 3: //按规定的分隔符进行切词
 		terms = utils.RemoveDuplicatesAndEmpty(strings.Split(query, ","))
 	}
+	*/
 
 	//按照最大切分进行切词
 	//terms := utils.RemoveDuplicatesAndEmpty(this.Segmenter.Segment(query, false))

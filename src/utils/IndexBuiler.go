@@ -63,6 +63,9 @@ func (this *IndexBuilder) BuildTextIndex(doc_id int64, content string, ivt_idx *
 		return nil //errors.New("nothing")
 	}
 
+
+	terms:=this.Segmenter.SegmentByType(content,split_type,true)
+	/*
 	var terms []string
 
 	switch split_type {
@@ -75,7 +78,7 @@ func (this *IndexBuilder) BuildTextIndex(doc_id int64, content string, ivt_idx *
 	case 4: //按规定的分隔符进行切词
 		terms = RemoveDuplicatesAndEmpty(strings.Split(content, "@"))
 	}
-
+*/
 	for _, term := range terms {
 		len := ivt_dic.Length()
 		key_id := ivt_dic.Put(term)
@@ -163,8 +166,9 @@ func (this *IndexBuilder) BuildTextIndexTemp(doc_id int64, content string, ivt_i
 		return nil //errors.New("nothing")
 	}
 
+	terms:=this.Segmenter.SegmentByType(content,split_type,true)
+/*
 	var terms []string
-
 	switch split_type {
 	case 1: //正常切词
 		terms = RemoveDuplicatesAndEmpty(this.Segmenter.Segment(content, true))
@@ -175,7 +179,7 @@ func (this *IndexBuilder) BuildTextIndexTemp(doc_id int64, content string, ivt_i
 	case 4: //按规定的分隔符进行切词
 		terms = RemoveDuplicatesAndEmpty(strings.Split(content, "@"))
 	}
-
+*/
 	for _, term := range terms {
 		//len := ivt_dic.Length()
 		key_id := ivt_dic.Put(term)

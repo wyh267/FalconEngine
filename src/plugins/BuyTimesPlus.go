@@ -62,8 +62,8 @@ func (this *ButTimesPlus) SetRules(rules interface{}) func(value_byte interface{
 			}
 		}
 		if sum > 5 {
-			fmt.Printf("Match .... %v \n", buytimes)
-			fmt.Printf("Rules .... %v \n", rules)
+			//fmt.Printf("Match .... %v \n", buytimes)
+			//fmt.Printf("Rules .... %v \n", rules)
 			return true
 		}
 		//fmt.Printf("Not Match .... \n")

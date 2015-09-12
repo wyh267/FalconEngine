@@ -36,6 +36,7 @@ func NewMmap(file_name string, mode int) (*Mmap, error) {
 	this := &Mmap{MmapBytes: make([]byte, 0), FileName: file_name, FileLen: 0, MapType: 0, FilePointer: 0, FileFd: nil}
 
 	file_mode := os.O_RDWR
+	file_create_mode := os.O_RDWR | os.O_CREATE | os.O_TRUNC
 	if mode == MODE_CREATE {
 		file_mode = os.O_RDWR | os.O_CREATE | os.O_TRUNC
 	}
@@ -43,7 +44,10 @@ func NewMmap(file_name string, mode int) (*Mmap, error) {
 	f, err := os.OpenFile(file_name, file_mode, 0664)
 
 	if err != nil {
-		return nil, err
+		f, err = os.OpenFile(file_name, file_create_mode, 0664)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	fi, err := f.Stat()

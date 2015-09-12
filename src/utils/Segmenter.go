@@ -43,3 +43,22 @@ func (this *Segmenter) Segment(content string, search_mode bool) []string {
 	//fmt.Println("SEGMENT::: ",res)
 	return res
 }
+
+
+
+func (this *Segmenter) SegmentByType(content string, split_type int64,search_mode bool) []string {
+
+
+	switch split_type {
+	case 1: //正常切词
+		terms = RemoveDuplicatesAndEmpty(this.Segment(content, true))
+	case 2: //按单个字符进行切词
+		terms = RemoveDuplicatesAndEmpty(strings.Split(content, ""))
+	case 3: //按规定的分隔符进行切词
+		terms = RemoveDuplicatesAndEmpty(strings.Split(content, ";"))
+	case 4: //按规定的分隔符进行切词
+		terms = RemoveDuplicatesAndEmpty(strings.Split(content, "@"))
+	}
+
+	return terms
+}
