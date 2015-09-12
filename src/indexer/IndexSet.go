@@ -17,6 +17,7 @@ import (
 	"strconv"
 	"strings"
 	"utils"
+	//"plus"
 )
 
 type IndexSet struct {
@@ -230,6 +231,8 @@ func (this *IndexSet) InitIndexSet(fields map[string]string) error {
 				this.FieldInfo[k].FType = "I"
 				pfl := NewByteProfile(k)
 				this.Logger.Info("\t Loading Byte Profile [ %v ] ", k)
+				cumstom:=NewPlus(k)
+				pfl.SetCustomInterface(cumstom)
 				pfl.ReadFromFile()
 				/*
 				var pfl ByteProfile

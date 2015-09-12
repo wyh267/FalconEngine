@@ -49,6 +49,7 @@ type ProfileInterface interface {
 	CustomFilterInterface(doc_ids []u.DocIdInfo, value interface{}) ([]u.DocIdInfo, error)
 	WriteToFile() error
 	ReadFromFile() error
+	SetCustomInterface(inter CustomInterface) error
 }
 
 

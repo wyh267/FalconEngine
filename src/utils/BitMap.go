@@ -44,7 +44,7 @@ func MakeBitmapFile() error {
 	if err != nil {
 		return err
 	}
-	err=syscall.Ftruncate(int(fout.Fd()),int64(size>>3))
+	err=syscall.Ftruncate(int(fout.Fd()),int64(size>>8))
 	if err != nil {
 		fmt.Printf("ftruncate error : %v\n",err)
 		return err

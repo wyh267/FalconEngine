@@ -286,3 +286,8 @@ func (this *NumberProfile) ReadFromFile() error {
 	this.IsSearch=true
 	return nil
 }
+
+
+func (this *NumberProfile)SetCustomInterface(inter CustomInterface) error{
+	return nil
+}

@@ -331,3 +331,8 @@ func (this *TextProfile) ReadFromFile() error {
 	this.IsSearch=true
 	return nil
 }
+
+
+func (this *TextProfile)SetCustomInterface(inter CustomInterface) error{
+	return nil
+}

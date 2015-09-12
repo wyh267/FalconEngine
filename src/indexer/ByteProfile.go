@@ -384,7 +384,11 @@ func (this *ByteProfile) WriteDetailToFile() error {
 
 }
 
-
+func (this *ByteProfile)SetCustomInterface(inter CustomInterface) error{
+	
+	this.customeInter = inter
+	return nil
+}
 
 /*
 type ByteNode struct {
