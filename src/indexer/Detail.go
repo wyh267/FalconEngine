@@ -277,7 +277,6 @@ func (this *Detail) WriteDetailToFile() error {
 
 	fout.Write(buf.Bytes())
 	fdetail_dic_out.Write(buf_detail_dic.Bytes())
-	//utils.WriteToJson(this, "./index/detail.idx.json")
 
 	this.WriteUpDetailFile()
 

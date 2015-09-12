@@ -18,7 +18,6 @@ import (
 	u "utils"
 )
 
-//type ByteProfile Detail
 type ByteProfile struct {
 	*Detail
 	customeInter u.CustomInterface

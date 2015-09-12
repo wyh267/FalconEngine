@@ -314,7 +314,7 @@ func (this *TextProfile) ReadFromFile() error {
 	this.Type = this.textMmap.ReadInt64(8) // int64(binary.LittleEndian.Uint64(MmapBytes[8:16]))
 	var start int64 = 16                   //24 + name_lens
 	var i int64 = 0
-	for i = 1; i < this.Len; i++ {
+	for i = 0; i < this.Len; i++ {
 		value_lens := this.textMmap.ReadInt64(start) //int64(binary.LittleEndian.Uint64(MmapBytes[start : start+8]))
 		start += 8
 		value := this.textMmap.ReadString(start, value_lens) // string(MmapBytes[start : start+value_lens])

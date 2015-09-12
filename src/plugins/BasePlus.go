@@ -30,3 +30,14 @@ func NewBase() *BasePlus {
 func (this *BasePlus) CustomeFunction(v1, v2 interface{}) bool {
 	return true
 }
+
+
+func (this *BasePlus) Init() bool {
+	return true
+}
+
+
+func (this *BasePlus) SetRules(rules interface{}) bool {
+	
+	return true
+}

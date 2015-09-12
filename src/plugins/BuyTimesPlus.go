@@ -35,6 +35,19 @@ func NewBuyTimes() *ButTimesPlus {
 	return this
 }
 
+
+func (this *ButTimesPlus) Init() bool {
+	return true
+}
+
+
+func (this *ButTimesPlus) SetRules(rules interface{}) bool {
+	
+	return true
+}
+
+
+
 func (this *ButTimesPlus) CustomeFunction(v1, v2 interface{}) bool {
 	var err error
 	var buytimes Buytimes
@@ -54,9 +67,9 @@ func (this *ButTimesPlus) CustomeFunction(v1, v2 interface{}) bool {
 		}
 	}
 	if sum > 5 {
-		fmt.Printf("Match .... %v \n", buytimes)
+		//fmt.Printf("Match .... %v \n", buytimes)
 		return true
 	}
-	fmt.Printf("Not Match .... \n")
+	//fmt.Printf("Not Match .... \n")
 	return false
 }

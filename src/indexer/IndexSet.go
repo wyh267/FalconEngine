@@ -215,14 +215,19 @@ func (this *IndexSet) InitIndexSet(fields map[string]string) error {
 				this.FieldInfo[k].FType = "T"
 				pfl := NewTextProfile(k)
 				this.Logger.Info("\t Loading Text Profile [ %v.pfl ] ", k)
+				cumstom := plugins.NewPlus(k)
+				cumstom.Init()
+				pfl.SetCustomInterface(cumstom)
 				pfl.ReadFromFile()
-
 				this.PutProfile(k, pfl)
 
 			} else if l[3] == "N" {
 				this.FieldInfo[k].FType = "N"
 				pfl := NewNumberProfile(k)
 				this.Logger.Info("\t Loading Number Profile [ %v.pfl ] ", k)
+				cumstom := plugins.NewPlus(k)
+				cumstom.Init()
+				pfl.SetCustomInterface(cumstom)
 				pfl.ReadFromFile()
 
 				this.PutProfile(k, pfl)
@@ -231,17 +236,9 @@ func (this *IndexSet) InitIndexSet(fields map[string]string) error {
 				pfl := NewByteProfile(k)
 				this.Logger.Info("\t Loading Byte Profile [ %v ] ", k)
 				cumstom := plugins.NewPlus(k)
+				cumstom.Init()
 				pfl.SetCustomInterface(cumstom)
 				pfl.ReadFromFile()
-				/*
-					var pfl ByteProfile
-					this.Logger.Info("\t Loading Byte Profile [ %v.pfl ] ", pfl_name)
-					err := json.Unmarshal(bpfl, &pfl)
-					if err != nil {
-						this.Logger.Error("Error to unmarshal[%v], %v", k, err)
-						return err
-					}
-				*/
 				this.PutProfile(k, pfl)
 
 			}
@@ -252,20 +249,6 @@ func (this *IndexSet) InitIndexSet(fields map[string]string) error {
 	this.Logger.Info("Loading Detail idx .....")
 	this.Detail = NewDetailWithFile()
 	this.Detail.ReadDetailFromFile()
-	/*
-		bidx, err := utils.ReadFromJson("./index/detail.idx.json")
-		if err != nil {
-			this.Logger.Info("Read Detail Error .....%v ", err)
-			return err
-		}
-		var detail Detail
-		err = json.Unmarshal(bidx, &detail)
-		if err != nil {
-			this.Logger.Info("Loading Detail Error .....%v ", err)
-			return err
-		}
-		this.Detail = &detail
-	*/
 	//保存最大DocId
 	this.MaxDocId = this.PflIndex[this.PrimaryKey].GetMaxDocId()
 
@@ -298,10 +281,8 @@ func (this *IndexSet) SearchByRules(rules /*map[string]interface{}*/ []SearchRul
 		if rule.Field == "query" {
 			sub_res, ok = this.Search(rule.Query)
 		} else {
-			//this.Logger.Info(" Field : %v Query : %v",rule.Field, rule.Query)
-			//fmt.Printf("SearchByRules: %v \n", functime("Start SearchField"))
 			sub_res, ok = this.SearchField(rule.Query, rule.Field)
-			//fmt.Printf("SearchByRules: %v \n", functime("End SearchField"))
+
 		}
 		if !ok {
 			return nil, false
@@ -309,33 +290,28 @@ func (this *IndexSet) SearchByRules(rules /*map[string]interface{}*/ []SearchRul
 		if index == 0 {
 			res = sub_res
 		} else {
-			//fmt.Printf("SearchByRules: %v \n", functime("Start Interaction"))
 			res, ok = utils.Interaction(res, sub_res)
-			//fmt.Printf("SearchByRules: %v \n", functime("End Interaction"))
+
 			if !ok {
 				return nil, false
 			}
 		}
-		//this.Logger.Info(" RES :: %v ", res)
 	}
 
 	//BitMap过滤失效的doc_id
-	//this.Logger.Info(" %v ",res)
-	//fmt.Printf("SearchByRules: %v \n", functime("Start Bitmap"))
 	r := make([]utils.DocIdInfo, len(res))
 	r_index := 0
 	for i, _ := range res {
-		//this.Logger.Info(" %v ",res[i].DocId)
+
 		if this.BitMap.GetBit(uint64(res[i].DocId)) == 0 {
 			r[r_index] = res[i]
 			r_index++
-			//r = append(r,res[i])
+
 		}
 	}
-	//fmt.Printf("SearchByRules: %v \n", functime("End Bitmap"))
+
 
 	//TODO 自定义过滤
-	//fmt.Printf("SearchByRules: %v \n", functime("End SearchByRules"))
 	return r[:r_index], true
 }
 
@@ -650,7 +626,6 @@ func (this *IndexSet) GetDetailsByDocId(doc_ids []utils.DocIdInfo) []interface{}
 		doc_infos = append(doc_infos, info)
 	}
 
-	//this.Logger.Info("%v",doc_infos)
 	return doc_infos
 }
 

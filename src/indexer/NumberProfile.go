@@ -272,7 +272,7 @@ func (this *NumberProfile) ReadFromFile() error {
 	//this.Name = string(MmapBytes[24 : 24+name_lens])
 	var start int64 = 16 //24 + name_lens
 	var i int64 = 0
-	for i = 1; i < this.Len; i++ {
+	for i = 0; i < this.Len; i++ {
 		value := this.numMmap.ReadInt64(start) //int64(binary.LittleEndian.Uint64(MmapBytes[start : start+8]))
 		start += 8
 		this.ProfileList = append(this.ProfileList, value)

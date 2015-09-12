@@ -63,8 +63,6 @@ func NewMmap(file_name string, mode int) (*Mmap, error) {
 	}
 
 	this.FileFd = f
-
-	//defer syscall.Munmap(MmapBytes)
 	return this, nil
 }
 
