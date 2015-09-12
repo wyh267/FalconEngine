@@ -92,7 +92,7 @@ END:
 	result["cost"] = fmt.Sprintf("%v", endTime.Sub(startTime))
 	result["request_url"] = r.RequestURI
 	this.Logger.Info("[LOG_ID:%v] [COST:%v] [URL : %v] ", log_id, result["cost"], result["request_url"])
-	this.Logger.Info("[LOG_ID:%v] BODY : %v",log_id,string(body))
+	this.Logger.Info("[LOG_ID:%v] BODY : %v", log_id, string(body))
 	resStr, _ := this.createJSON(result)
 	io.WriteString(w, resStr)
 	return
@@ -134,22 +134,6 @@ func (this *Router) ParseURL(url string) (int64, error) {
 
 	return -1, errors.New("Error")
 
-	/*
-
-		urlPattern= "update\\?"//this.Configure.GetUrlPattern()
-		urlRegexp, err = regexp.Compile(urlPattern)
-		if err != nil {
-			return -1,err
-		}
-		matchs = urlRegexp.FindStringSubmatch(url)
-		if matchs != nil {
-			return 2,nil
-		}
-
-
-		return -1,errors.New("err")
-
-	*/
 }
 
 func MakeErrorResult(errcode int, errmsg string) string {

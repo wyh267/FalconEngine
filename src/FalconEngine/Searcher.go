@@ -128,12 +128,11 @@ func (this *Searcher) ComputeScore(log_id string, body []byte, params map[string
 		info["score"] = fmt.Sprintf("%v", score)
 		//写入正排文件中
 
-		
 		//inc_info:=make(map[string]string)
 		//inc_info["score"]=info["score"]
 		//inc_info["id"]=info["id"]
 		//this.Logger.Info("write score to profile...\n",inc_info)
-		upinfo := builder.UpdateInfo{info,indexer.PlfUpdate,make(chan error)}
+		upinfo := builder.UpdateInfo{info, indexer.PlfUpdate, make(chan error)}
 
 		this.Data_chan <- upinfo
 		errinfo := <-upinfo.ErrChan
@@ -228,7 +227,7 @@ func (this *Searcher) SimpleSearch(log_id string, body []byte, params map[string
 	//this.Logger.Info("[LOG_ID:%v]Running Searcher ....Time: %v ", log_id, ftime("search fields"))
 	total_doc_ids, _ = this.Indexer.FilterByRules(total_doc_ids, frules)
 	this.Logger.Info("[LOG_ID:%v]Running Searcher ....Time: %v ", log_id, ftime("search fields"))
-	result["COUNT"]=len(total_doc_ids)
+	result["COUNT"] = len(total_doc_ids)
 	var tmp_doc_ids []utils.DocIdInfo
 	if len(total_doc_ids) > 10 {
 		tmp_doc_ids = total_doc_ids[:10]
@@ -445,7 +444,7 @@ func (this *Searcher) ParseSearchInfo(log_id string, params map[string]string, b
 						//FR.Value = from_num*10000
 						//FR.FiltType = indexer.FILT_TYPE_EQUAL
 						//SRs.FR = append(SRs.FR,FR)
-						FR.Value = from_num*100-1
+						FR.Value = from_num*100 - 1
 						FR.FiltType = indexer.FILT_TYPE_ABOVE
 						SRs.FR = append(SRs.FR, FR)
 
@@ -621,12 +620,12 @@ func (this *Searcher) ParseParams(log_id string, params map[string]string) ([]in
 					this.Logger.Error("[LOG_ID:%v] %v %v", log_id, v, err)
 					continue
 				}
-				if stype == 0{
+				if stype == 0 {
 					frules = append(frules, indexer.FilterRule{k[1:], true, 3, v_n})
-				}else{
+				} else {
 					frules = append(frules, indexer.FilterRule{k[1:], false, 3, v_n})
 				}
-				
+
 			}
 
 			continue

@@ -21,10 +21,10 @@ const (
 )
 
 type Profile struct {
-	Name   string
-	Type   int64
-	Len    int64
-	IsMmap bool
+	Name     string
+	Type     int64
+	Len      int64
+	IsMmap   bool
 	IsSearch bool
 }
 
@@ -49,17 +49,8 @@ type ProfileInterface interface {
 	CustomFilterInterface(doc_ids []u.DocIdInfo, value interface{}) ([]u.DocIdInfo, error)
 	WriteToFile() error
 	ReadFromFile() error
-	SetCustomInterface(inter CustomInterface) error
+	SetCustomInterface(inter u.CustomInterface) error
 }
-
-
-//自定义接口..用于外部写查询插件
-type CustomInterface interface{
-	CustomeFunction(v1, v2 interface{}) bool
-}
-
-
-
 
 /*****************************************************************************
 *  function name : GetMaxDocId

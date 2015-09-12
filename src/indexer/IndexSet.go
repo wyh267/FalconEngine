@@ -10,14 +10,13 @@
 package indexer
 
 import (
-	//"encoding/json"
 	"errors"
 	"fmt"
 	"github.com/outmana/log4jzl"
+	"plugins"
 	"strconv"
 	"strings"
 	"utils"
-	//"plus"
 )
 
 type IndexSet struct {
@@ -231,17 +230,17 @@ func (this *IndexSet) InitIndexSet(fields map[string]string) error {
 				this.FieldInfo[k].FType = "I"
 				pfl := NewByteProfile(k)
 				this.Logger.Info("\t Loading Byte Profile [ %v ] ", k)
-				cumstom:=NewPlus(k)
+				cumstom := plugins.NewPlus(k)
 				pfl.SetCustomInterface(cumstom)
 				pfl.ReadFromFile()
 				/*
-				var pfl ByteProfile
-				this.Logger.Info("\t Loading Byte Profile [ %v.pfl ] ", pfl_name)
-				err := json.Unmarshal(bpfl, &pfl)
-				if err != nil {
-					this.Logger.Error("Error to unmarshal[%v], %v", k, err)
-					return err
-				}
+					var pfl ByteProfile
+					this.Logger.Info("\t Loading Byte Profile [ %v.pfl ] ", pfl_name)
+					err := json.Unmarshal(bpfl, &pfl)
+					if err != nil {
+						this.Logger.Error("Error to unmarshal[%v], %v", k, err)
+						return err
+					}
 				*/
 				this.PutProfile(k, pfl)
 
@@ -251,21 +250,21 @@ func (this *IndexSet) InitIndexSet(fields map[string]string) error {
 
 	//读取detail文件
 	this.Logger.Info("Loading Detail idx .....")
-	this.Detail= NewDetailWithFile()
+	this.Detail = NewDetailWithFile()
 	this.Detail.ReadDetailFromFile()
 	/*
-	bidx, err := utils.ReadFromJson("./index/detail.idx.json")
-	if err != nil {
-		this.Logger.Info("Read Detail Error .....%v ", err)
-		return err
-	}
-	var detail Detail
-	err = json.Unmarshal(bidx, &detail)
-	if err != nil {
-		this.Logger.Info("Loading Detail Error .....%v ", err)
-		return err
-	}
-	this.Detail = &detail
+		bidx, err := utils.ReadFromJson("./index/detail.idx.json")
+		if err != nil {
+			this.Logger.Info("Read Detail Error .....%v ", err)
+			return err
+		}
+		var detail Detail
+		err = json.Unmarshal(bidx, &detail)
+		if err != nil {
+			this.Logger.Info("Loading Detail Error .....%v ", err)
+			return err
+		}
+		this.Detail = &detail
 	*/
 	//保存最大DocId
 	this.MaxDocId = this.PflIndex[this.PrimaryKey].GetMaxDocId()

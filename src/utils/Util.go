@@ -143,5 +143,7 @@ func InitTime() func(string) string {
 
 }
 
-
-
+//自定义接口..用于外部写查询插件
+type CustomInterface interface {
+	CustomeFunction(v1, v2 interface{}) bool
+}

@@ -65,8 +65,7 @@ func (this *Updater) Process(log_id string, body []byte, params map[string]strin
 	} else {
 		this.Logger.Info("Update success....")
 	}
-	
-	
+
 	info["id"] = "1564"
 	info["name"] = "吴yyuu坚"
 	updateInfo.Info = info
@@ -79,9 +78,8 @@ func (this *Updater) Process(log_id string, body []byte, params map[string]strin
 	} else {
 		this.Logger.Info("Update success....")
 	}
-	
-	
-	for i:=0;i<10;i++{
+
+	for i := 0; i < 10; i++ {
 		info["id"] = "1594"
 		info["cid"] = "999"
 		updateInfo.Info = info
@@ -94,13 +92,9 @@ func (this *Updater) Process(log_id string, body []byte, params map[string]strin
 		} else {
 			this.Logger.Info("Update success....")
 		}
-	
+
 	}
-	
-	
-	
-	
-	
+
 	//this.Indexer.UpdateRecord(info,false)
 	//this.Indexer.Display()
 	return nil
