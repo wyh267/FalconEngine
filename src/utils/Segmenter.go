@@ -13,6 +13,7 @@ package utils
 import (
 	//"fmt"
 	"github.com/huichen/sego"
+	"strings"
 )
 
 type Segmenter struct {
@@ -48,7 +49,7 @@ func (this *Segmenter) Segment(content string, search_mode bool) []string {
 
 func (this *Segmenter) SegmentByType(content string, split_type int64,search_mode bool) []string {
 
-
+	var terms []string
 	switch split_type {
 	case 1: //正常切词
 		terms = RemoveDuplicatesAndEmpty(this.Segment(content, true))

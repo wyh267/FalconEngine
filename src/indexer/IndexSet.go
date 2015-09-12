@@ -520,7 +520,7 @@ func (this *IndexSet) SearchNumber(query int64) ([]utils.DocIdInfo, bool) {
 ******************************************************************************/
 func (this *IndexSet) SearchFieldByString(query string, field string) ([]utils.DocIdInfo, bool) {
 
-	terms:=this.Segmenter.SegmentByType(content,this.FieldInfo[field].SType,false)
+	terms:=this.Segmenter.SegmentByType(query,this.FieldInfo[field].SType,false)
 	/*
 	var terms []string
 
