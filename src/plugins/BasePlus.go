@@ -37,7 +37,14 @@ func (this *BasePlus) Init() bool {
 }
 
 
-func (this *BasePlus) SetRules(rules interface{}) bool {
+func (this *BasePlus) SetRules(rules interface{}) func(value_byte interface{}) bool {
 	
-	return true
+	
+	
+	return func(value_byte interface{}) bool{
+		fmt.Printf("Rules : %v \n",rules)
+		fmt.Printf("value_byte : %v \n",value_byte)
+		return true
+		
+	}
 }

@@ -117,12 +117,14 @@ func (this *ByteProfile) CustomFilter(doc_ids []u.DocIdInfo, value interface{}, 
 func (this *ByteProfile) CustomFilterInterface(doc_ids []u.DocIdInfo, value interface{}) ([]u.DocIdInfo, error) {
 
 	res := make([]u.DocIdInfo, 0, 1000)
+	filterFunction := this.customeInter.SetRules(value)
 	for _, doc_id := range doc_ids {
 		pfl_value, err := this.GetDocInfoByte(doc_id.DocId)
 		if err != nil {
 			continue
 		}
-		if this.customeInter.CustomeFunction(value, pfl_value) == true {
+		if filterFunction(pfl_value) == true {
+		//if this.customeInter.CustomeFunction(value, pfl_value) == true {
 			res = append(res, doc_id)
 		}
 	}

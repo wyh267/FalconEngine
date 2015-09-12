@@ -375,6 +375,7 @@ type FilterRule struct {
 	IsForward bool
 	FiltType  int64
 	Value     interface{}
+	
 }
 
 /*****************************************************************************

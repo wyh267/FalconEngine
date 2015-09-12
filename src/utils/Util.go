@@ -147,5 +147,5 @@ func InitTime() func(string) string {
 type CustomInterface interface {
 	CustomeFunction(v1, v2 interface{}) bool
 	Init() bool 
-	SetRules(rules interface{}) bool
+	SetRules(rules interface{}) func(value_byte interface{}) bool
 }

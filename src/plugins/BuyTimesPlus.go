@@ -41,9 +41,34 @@ func (this *ButTimesPlus) Init() bool {
 }
 
 
-func (this *ButTimesPlus) SetRules(rules interface{}) bool {
+func (this *ButTimesPlus) SetRules(rules interface{}) func(value_byte interface{}) bool {
 	
-	return true
+	return func(value_byte interface{}) bool{
+		var err error
+		var buytimes Buytimes
+		body, ok := value_byte.([]byte)
+		if !ok {
+			fmt.Printf("Byte Error ...\n")
+		}
+		err = json.Unmarshal(body, &buytimes)
+		if err != nil {
+			fmt.Printf("Unmarshal Error ...\n")
+			return false
+		}
+		var sum int64 = 0
+		for i, _ := range buytimes.BuyDetail {
+			if buytimes.BuyDetail[i].DateTime > "2015-03-05" {
+				sum = sum + buytimes.BuyDetail[i].Count
+			}
+		}
+		if sum > 5 {
+			fmt.Printf("Match .... %v \n", buytimes)
+			fmt.Printf("Rules .... %v \n", rules)
+			return true
+		}
+		//fmt.Printf("Not Match .... \n")
+		return false
+	}
 }
 
 
