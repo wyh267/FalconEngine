@@ -133,22 +133,6 @@ func (this *Router) ParseURL(url string) (int64, error) {
 
 	return -1, errors.New("Error")
 
-	/*
-
-		urlPattern= "update\\?"//this.Configure.GetUrlPattern()
-		urlRegexp, err = regexp.Compile(urlPattern)
-		if err != nil {
-			return -1,err
-		}
-		matchs = urlRegexp.FindStringSubmatch(url)
-		if matchs != nil {
-			return 2,nil
-		}
-
-
-		return -1,errors.New("err")
-
-	*/
 }
 
 func MakeErrorResult(errcode int, errmsg string) string {

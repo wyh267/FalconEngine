@@ -38,16 +38,6 @@ type NumberIdxDic struct {
 func NewNumberIdxDic(name string) *NumberIdxDic {
 
 	this := &NumberIdxDic{IntMap: make(map[string]int64), Lens: 0, Index: 1, Name: name, mmap: nil, isSearch: false}
-	/*
-		file_name := fmt.Sprintf("./index/%v.dic", this.Name)
-
-		var err error
-		this.mmap,err = NewMmap(file_name,MODE_CREATE)
-		if err !=nil {
-			fmt.Printf("mmap error : %v \n",err)
-			return this
-		}
-	*/
 	return this
 }
 

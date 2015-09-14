@@ -10,9 +10,9 @@
 package indexer
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
+	"plugins"
 	"strconv"
 	"strings"
 	"utils"
@@ -198,7 +198,7 @@ func (this *IndexSet) InitIndexSet(fields map[string]string) error {
 				dic := utils.NewNumberIdxDic(k)
 				this.Logger.Info("\t Loading Invert Index Dictionary [ %v.dic ] ", k)
 				dic.ReadFromFile()
-				dic.Display()
+				//dic.Display()
 				index := NewNumberIndex(k, idx, dic)
 				this.PutIndex(k, index)
 			}
@@ -207,34 +207,36 @@ func (this *IndexSet) InitIndexSet(fields map[string]string) error {
 
 		if l[2] == "1" {
 			this.FieldInfo[k].IsPlf = true
-			pfl_name := fmt.Sprintf("./index/%v_pfl.json", k)
-			bpfl, _ := utils.ReadFromJson(pfl_name)
 
 			if l[3] == "T" {
 				this.FieldInfo[k].FType = "T"
 				pfl := NewTextProfile(k)
 				this.Logger.Info("\t Loading Text Profile [ %v.pfl ] ", k)
+				cumstom := plugins.NewPlus(k)
+				cumstom.Init()
+				pfl.SetCustomInterface(cumstom)
 				pfl.ReadFromFile()
-
 				this.PutProfile(k, pfl)
 
 			} else if l[3] == "N" {
 				this.FieldInfo[k].FType = "N"
 				pfl := NewNumberProfile(k)
 				this.Logger.Info("\t Loading Number Profile [ %v.pfl ] ", k)
+				cumstom := plugins.NewPlus(k)
+				cumstom.Init()
+				pfl.SetCustomInterface(cumstom)
 				pfl.ReadFromFile()
 
 				this.PutProfile(k, pfl)
 			} else if l[3] == "I" {
 				this.FieldInfo[k].FType = "I"
-				var pfl ByteProfile
-				this.Logger.Info("\t Loading Byte Profile [ %v.pfl ] ", pfl_name)
-				err := json.Unmarshal(bpfl, &pfl)
-				if err != nil {
-					this.Logger.Error("Error to unmarshal[%v], %v", k, err)
-					return err
-				}
-				this.PutProfile(k, &pfl)
+				pfl := NewByteProfile(k)
+				this.Logger.Info("\t Loading Byte Profile [ %v ] ", k)
+				cumstom := plugins.NewPlus(k)
+				cumstom.Init()
+				pfl.SetCustomInterface(cumstom)
+				pfl.ReadFromFile()
+				this.PutProfile(k, pfl)
 
 			}
 		}
@@ -244,20 +246,6 @@ func (this *IndexSet) InitIndexSet(fields map[string]string) error {
 	this.Logger.Info("Loading Detail idx .....")
 	this.Detail = NewDetailWithFile()
 	this.Detail.ReadDetailFromFile()
-	/*
-		bidx, err := utils.ReadFromJson("./index/detail.idx.json")
-		if err != nil {
-			this.Logger.Info("Read Detail Error .....%v ", err)
-			return err
-		}
-		var detail Detail
-		err = json.Unmarshal(bidx, &detail)
-		if err != nil {
-			this.Logger.Info("Loading Detail Error .....%v ", err)
-			return err
-		}
-		this.Detail = &detail
-	*/
 	//保存最大DocId
 	this.MaxDocId = this.PflIndex[this.PrimaryKey].GetMaxDocId()
 
@@ -298,30 +286,26 @@ func (this *IndexSet) SearchByRules(rules /*map[string]interface{}*/ []SearchRul
 		if index == 0 {
 			res = sub_res
 		} else {
-			//fmt.Printf("SearchByRules: %v \n", functime("Start Interaction"))
 			res, ok = utils.Interaction(res, sub_res)
-			//fmt.Printf("SearchByRules: %v \n", functime("End Interaction"))
+
 			if !ok {
 				return nil, false
 			}
 		}
-		//this.Logger.Info(" RES :: %v ", res)
 	}
 
 	//BitMap过滤失效的doc_id
-	//this.Logger.Info(" %v ",res)
 	r := make([]utils.DocIdInfo, len(res))
 	r_index := 0
 	for i, _ := range res {
-		//this.Logger.Info(" %v ",res[i].DocId)
+
 		if this.BitMap.GetBit(uint64(res[i].DocId)) == 0 {
 			r[r_index] = res[i]
 			r_index++
-			//r = append(r,res[i])
+
 		}
 	}
 	//TODO 自定义过滤
-	//fmt.Printf("SearchByRules: %v \n", functime("End SearchByRules"))
 	return r[:r_index], true
 }
 
@@ -385,6 +369,7 @@ type FilterRule struct {
 	IsForward bool
 	FiltType  int64
 	Value     interface{}
+	
 }
 
 /*****************************************************************************
@@ -528,6 +513,8 @@ func (this *IndexSet) SearchNumber(query int64) ([]utils.DocIdInfo, bool) {
 ******************************************************************************/
 func (this *IndexSet) SearchFieldByString(query string, field string) ([]utils.DocIdInfo, bool) {
 
+	terms:=this.Segmenter.SegmentByType(query,this.FieldInfo[field].SType,false)
+	/*
 	var terms []string
 
 	switch this.FieldInfo[field].SType {
@@ -538,6 +525,7 @@ func (this *IndexSet) SearchFieldByString(query string, field string) ([]utils.D
 	case 3: //按规定的分隔符进行切词
 		terms = utils.RemoveDuplicatesAndEmpty(strings.Split(query, ","))
 	}
+	*/
 
 	//按照最大切分进行切词
 	//terms := utils.RemoveDuplicatesAndEmpty(this.Segmenter.Segment(query, false))
@@ -634,7 +622,6 @@ func (this *IndexSet) GetDetailsByDocId(doc_ids []utils.DocIdInfo) []interface{}
 		doc_infos = append(doc_infos, info)
 	}
 
-	//this.Logger.Info("%v",doc_infos)
 	return doc_infos
 }
 

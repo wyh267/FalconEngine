@@ -43,8 +43,9 @@ func (this *NumberProfile) Display() {
 }
 
 func (this *NumberProfile) PutProfile(doc_id, value int64) error {
-	//fmt.Printf(" ========== [ NAME : %v ] [ LEN : %v ] [ DOC_ID : %v ]============\n", this.Name, this.Len,doc_id)
+
 	if doc_id > this.Len || doc_id < 1 {
+		//fmt.Printf(" ========== [ NAME : %v ] [ LEN : %v ] [ DOC_ID : %v ]============\n", this.Name, this.Len, doc_id)
 		return errors.New("docid is wrong")
 	}
 
@@ -156,27 +157,39 @@ func (this *NumberProfile) Filter(doc_ids []u.DocIdInfo, value interface{}, is_f
 		return nil, nil
 	}
 
-	value_str, ok := value.(string)
-	if ok {
-		v, err := strconv.ParseInt(value_str, 0, 0)
-		if err != nil {
-			fmt.Printf("Error %v \n", value)
-			return doc_ids, nil
+
+	if is_forward == true {
+		value_str, ok := value.(string)
+		if ok {
+			v, err := strconv.ParseInt(value_str, 0, 0)
+			if err != nil {
+				fmt.Printf("Error %v \n", value)
+				return doc_ids, nil
+			}
+			return this.FilterValue(doc_ids, v, is_forward, filt_type)
 		}
-		return this.FilterValue(doc_ids, v, is_forward, filt_type)
+	
+		value_num, ok := value.(int64)
+		if ok {
+			return this.FilterValue(doc_ids, value_num, is_forward, filt_type)
+		}
+	
+		value_num_float, ok := value.(float64)
+		if ok {
+			return this.FilterValue(doc_ids, int64(value_num_float), is_forward, filt_type)
+		}
+
+		return doc_ids, nil
+	} else {
+
+		return this.CustomFilterInterface(doc_ids, value)
+
 	}
 
-	value_num, ok := value.(int64)
-	if ok {
-		return this.FilterValue(doc_ids, value_num, is_forward, filt_type)
-	}
 
-	value_num_float, ok := value.(float64)
-	if ok {
-		return this.FilterValue(doc_ids, int64(value_num_float), is_forward, filt_type)
-	}
 
-	return doc_ids, nil
+
+	
 
 }
 
@@ -192,13 +205,19 @@ func (this *NumberProfile) CustomFilter(doc_ids []u.DocIdInfo, value interface{}
 	return res, nil
 }
 
+func (this *NumberProfile) CustomFilterInterface(doc_ids []u.DocIdInfo, value interface{}) ([]u.DocIdInfo, error) {
+
+	return nil, nil
+
+}
+
 func (this *NumberProfile) GetType() int64 {
 	return this.Type
 }
 
 func (this *NumberProfile) WriteToFile() error {
 
-	file_name := fmt.Sprintf("./index/%v.plf", this.Name)
+	file_name := fmt.Sprintf("./index/%v.pfl", this.Name)
 	fout, err := os.Create(file_name)
 	defer fout.Close()
 	if err != nil {
@@ -214,16 +233,7 @@ func (this *NumberProfile) WriteToFile() error {
 	if err != nil {
 		fmt.Printf("Type ERROR :%v \n", err)
 	}
-	/*
-		err = binary.Write(buf, binary.LittleEndian, int64(len(this.Name)))
-		if err != nil {
-			fmt.Printf("Write Name Lens Error :%v \n", err)
-		}
-		err = binary.Write(buf, binary.LittleEndian, []byte(this.Name))
-		if err != nil {
-			fmt.Printf("Write Name Error :%v \n", err)
-		}
-	*/
+
 	for _, value := range this.ProfileList {
 		err := binary.Write(buf, binary.LittleEndian, value)
 		if err != nil {
@@ -238,48 +248,30 @@ func (this *NumberProfile) WriteToFile() error {
 func (this *NumberProfile) ReadFromFile() error {
 
 	var err error
-	file_name := fmt.Sprintf("./index/%v.plf", this.Name)
+	file_name := fmt.Sprintf("./index/%v.pfl", this.Name)
 	this.numMmap, err = u.NewMmap(file_name, u.MODE_APPEND)
 	if err != nil {
 		fmt.Printf("mmap error : %v \n", err)
 		return err
 	}
 
-	/*
-		f, err := os.Open(file_name)
-		defer f.Close()
-		if err != nil {
-			return err
-		}
 
-		fi, err := f.Stat()
-		if err != nil {
-			fmt.Printf("ERR:%v", err)
-		}
-
-		MmapBytes, err := syscall.Mmap(int(f.Fd()), 0, int(fi.Size()), syscall.PROT_READ, syscall.MAP_PRIVATE)
-
-		if err != nil {
-			fmt.Printf("MAPPING ERROR  %v \n", err)
-			return nil
-		}
-
-		defer syscall.Munmap(MmapBytes)
-	*/
 
 	this.ProfileList = make([]int64, 0)
-	this.Len = this.numMmap.ReadInt64(0)  //int64(binary.LittleEndian.Uint64(MmapBytes[:8]))
-	this.Type = this.numMmap.ReadInt64(8) // int64(binary.LittleEndian.Uint64(MmapBytes[8:16]))
-	//name_lens := int64(binary.LittleEndian.Uint64(MmapBytes[16:24]))
-	//this.Name = string(MmapBytes[24 : 24+name_lens])
-	var start int64 = 16 //24 + name_lens
+	this.Len = this.numMmap.ReadInt64(0)  
+	this.Type = this.numMmap.ReadInt64(8) 
+	var start int64 = 16 
 	var i int64 = 0
-	for i = 1; i < this.Len; i++ {
-		value := this.numMmap.ReadInt64(start) //int64(binary.LittleEndian.Uint64(MmapBytes[start : start+8]))
+	for i = 0; i < this.Len; i++ {
+		value := this.numMmap.ReadInt64(start) 
 		start += 8
 		this.ProfileList = append(this.ProfileList, value)
 	}
 	this.numMmap.SetFileEnd(start)
 	this.IsSearch = true
+	return nil
+}
+
+func (this *NumberProfile) SetCustomInterface(inter u.CustomInterface) error {
 	return nil
 }

@@ -63,6 +63,9 @@ func (this *IndexBuilder) BuildTextIndex(doc_id int64, content string, ivt_idx *
 		return nil //errors.New("nothing")
 	}
 
+
+	terms:=this.Segmenter.SegmentByType(content,split_type,true)
+	/*
 	var terms []string
 
 	switch split_type {
@@ -75,7 +78,7 @@ func (this *IndexBuilder) BuildTextIndex(doc_id int64, content string, ivt_idx *
 	case 4: //按规定的分隔符进行切词
 		terms = RemoveDuplicatesAndEmpty(strings.Split(content, "@"))
 	}
-
+*/
 	for _, term := range terms {
 		len := ivt_dic.Length()
 		key_id := ivt_dic.Put(term)
@@ -115,8 +118,6 @@ func (this *IndexBuilder) BuildTextIndex(doc_id int64, content string, ivt_idx *
 func (this *IndexBuilder) BuildNumberIndex(doc_id int64, content int64, ivt_idx *InvertIdx, ivt_dic *NumberIdxDic, is_inc bool) error {
 
 	len := ivt_dic.Length()
-	//fmt.Println("len ",len)
-	//fmt.Printf("doc_id : %v  content : %v \n",doc_id,content)
 	key_id := ivt_dic.Put(content)
 	if key_id == -1 {
 		//fmt.Println("Bukent full")
@@ -136,20 +137,9 @@ func (this *IndexBuilder) BuildNumberIndex(doc_id int64, content int64, ivt_idx 
 
 	} else {
 		ivt_idx.UpdateInvert(key_id, doc_id)
-		/*
-			if key_id > len {
-				invertList := NewInvertDocIdList(content)
-				invertList.IncDocIdList = append(invertList.IncDocIdList, DocIdInfo{DocId: doc_id})
-				ivt_idx.KeyInvertList = append(ivt_idx.KeyInvertList, *invertList)
-				ivt_idx.IdxLen++
-			} else { //更新
-				ivt_idx.KeyInvertList[key_id].IncDocIdList = append(ivt_idx.KeyInvertList[key_id].IncDocIdList, DocIdInfo{DocId: doc_id})
-			}
-		*/
+
 	}
 
-	//ivt_idx.Display()
-	//ivt_dic.Display()
 	return nil
 }
 
@@ -163,8 +153,9 @@ func (this *IndexBuilder) BuildTextIndexTemp(doc_id int64, content string, ivt_i
 		return nil //errors.New("nothing")
 	}
 
+	terms:=this.Segmenter.SegmentByType(content,split_type,true)
+/*
 	var terms []string
-
 	switch split_type {
 	case 1: //正常切词
 		terms = RemoveDuplicatesAndEmpty(this.Segmenter.Segment(content, true))
@@ -175,7 +166,7 @@ func (this *IndexBuilder) BuildTextIndexTemp(doc_id int64, content string, ivt_i
 	case 4: //按规定的分隔符进行切词
 		terms = RemoveDuplicatesAndEmpty(strings.Split(content, "@"))
 	}
-
+*/
 	for _, term := range terms {
 		//len := ivt_dic.Length()
 		key_id := ivt_dic.Put(term)
@@ -194,12 +185,9 @@ func (this *IndexBuilder) BuildTextIndexTemp(doc_id int64, content string, ivt_i
 
 func (this *IndexBuilder) BuildNumberIndexTemp(doc_id int64, content int64, ivt_idx *InvertIdx, ivt_dic *NumberIdxDic, index_name string) error {
 
-	//len := ivt_dic.Length()
-	//fmt.Println("len ",len)
-	//fmt.Printf("doc_id : %v  content : %v \n",doc_id,content)
 	key_id := ivt_dic.Put(content)
 	if key_id == -1 {
-		//fmt.Println("Bukent full")
+
 		return errors.New("Number Bukets full")
 	}
 
@@ -208,7 +196,7 @@ func (this *IndexBuilder) BuildNumberIndexTemp(doc_id int64, content int64, ivt_
 		return err
 	}
 
-	//ivt_dic.Display()
+
 	return nil
 }
 
@@ -235,8 +223,7 @@ func (this *IndexBuilder) writeTempIndexToFile(index_name string) error {
 			fmt.Printf("Write Error ..%v\n", err)
 		}
 	}
-	//fmt.Printf("%x\n", buf.Bytes())
-	//fmt.Printf("%v\n", this.TempIndex[index_name])
+
 	fout, err := os.Create(file_name)
 	defer fout.Close()
 	if err != nil {

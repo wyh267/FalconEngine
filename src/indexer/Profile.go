@@ -46,8 +46,10 @@ type ProfileInterface interface {
 	GetType() int64
 	GetMaxDocId() int64
 	CustomFilter(doc_ids []u.DocIdInfo, value interface{}, r bool, cf func(v1, v2 interface{}) bool) ([]u.DocIdInfo, error)
+	CustomFilterInterface(doc_ids []u.DocIdInfo, value interface{}) ([]u.DocIdInfo, error)
 	WriteToFile() error
 	ReadFromFile() error
+	SetCustomInterface(inter u.CustomInterface) error
 }
 
 /*****************************************************************************
