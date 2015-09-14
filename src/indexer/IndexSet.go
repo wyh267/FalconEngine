@@ -208,8 +208,6 @@ func (this *IndexSet) InitIndexSet(fields map[string]string) error {
 
 		if l[2] == "1" {
 			this.FieldInfo[k].IsPlf = true
-			//pfl_name := fmt.Sprintf("./index/%v_pfl.json", k)
-			//bpfl, _ := utils.ReadFromJson(pfl_name)
 
 			if l[3] == "T" {
 				this.FieldInfo[k].FType = "T"

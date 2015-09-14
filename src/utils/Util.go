@@ -121,14 +121,6 @@ func Interaction(a []DocIdInfo, b []DocIdInfo) ([]DocIdInfo, bool) {
 
 }
 
-/*
-func InitCount() (func(int64) CountInfo) {
-	var searchCount int64 = 0
-	var updateCount int64 = 0
-	var pvCount		int64 = 0
-
-}
-*/
 
 func InitTime() func(string) string {
 	init_time := time.Now()
@@ -148,4 +140,13 @@ type CustomInterface interface {
 	CustomeFunction(v1, v2 interface{}) bool
 	Init() bool 
 	SetRules(rules interface{}) func(value_byte interface{}) bool
+}
+
+
+type Condition struct {
+	Key   string `json:"key"`
+	Op    string `json:"operate"`
+	Value string `json:"value"`
+	Desc  string `json:"desc"`
+	Range string `json:"range"`
 }

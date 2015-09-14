@@ -16,12 +16,6 @@ import (
 	"strings"
 )
 
-type Condition struct {
-	Key   string `json:"key"`
-	Op    string `json:"operate"`
-	Value string `json:"value"`
-	Desc  string `json:"desc"`
-}
 
 type CommonStruct struct {
 	Childs []Condition `json:"childs"`

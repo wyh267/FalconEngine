@@ -169,21 +169,6 @@ func (this *DBBuilder) ScanInc(Data_chan chan UpdateInfo) error {
 
 			}
 
-			//判断是否是删除操作
-			/*
-				if new_values["is_delete"] == "1" {
-					this.Logger.Info("Update Status : Delete doc  ")
-					upinfo := UpdateInfo{new_values, indexer.Delete, make(chan error)}
-					Data_chan <- upinfo
-					errinfo := <-upinfo.ErrChan
-					if errinfo != nil {
-						this.Logger.Info("Update Fail.... %v ", errinfo)
-					} else {
-						this.Logger.Info("Update Success.... ")
-					}
-					continue
-				}
-			*/
 
 			pk, err := strconv.ParseInt(new_values["id"], 0, 0)
 			if err != nil {

@@ -195,12 +195,21 @@ func (this *TextProfile) Filter(doc_ids []u.DocIdInfo, value interface{}, is_for
 		return nil, nil
 	}
 
-	value_str, ok := value.(string)
-	if !ok {
-		return doc_ids, nil
+
+	if is_forward == true {
+		value_str, ok := value.(string)
+		if !ok {
+			return doc_ids, nil
+		}
+	
+		return this.FilterValue(doc_ids, value_str, is_forward, filt_type)
+	} else {
+
+		return this.CustomFilterInterface(doc_ids, value)
+
 	}
 
-	return this.FilterValue(doc_ids, value_str, is_forward, filt_type)
+
 
 }
 
@@ -287,37 +296,15 @@ func (this *TextProfile) ReadFromFile() error {
 		return err
 	}
 
-	/*
-		file_name := fmt.Sprintf("./index/%v.pfl", this.Name)
-		f, err := os.Open(file_name)
-		defer f.Close()
-		if err != nil {
-			return err
-		}
-
-		fi, err := f.Stat()
-		if err != nil {
-			fmt.Printf("ERR:%v", err)
-		}
-
-		MmapBytes, err := syscall.Mmap(int(f.Fd()), 0, int(fi.Size()), syscall.PROT_READ, syscall.MAP_PRIVATE)
-
-		if err != nil {
-			fmt.Printf("MAPPING ERROR  %v \n", err)
-			return nil
-		}
-
-		defer syscall.Munmap(MmapBytes)
-	*/
 	this.ProfileList = make([]string, 0)
-	this.Len = this.textMmap.ReadInt64(0)  //int64(binary.LittleEndian.Uint64(MmapBytes[:8]))
-	this.Type = this.textMmap.ReadInt64(8) // int64(binary.LittleEndian.Uint64(MmapBytes[8:16]))
-	var start int64 = 16                   //24 + name_lens
+	this.Len = this.textMmap.ReadInt64(0)  
+	this.Type = this.textMmap.ReadInt64(8) 
+	var start int64 = 16                   
 	var i int64 = 0
 	for i = 0; i < this.Len; i++ {
-		value_lens := this.textMmap.ReadInt64(start) //int64(binary.LittleEndian.Uint64(MmapBytes[start : start+8]))
+		value_lens := this.textMmap.ReadInt64(start) 
 		start += 8
-		value := this.textMmap.ReadString(start, value_lens) // string(MmapBytes[start : start+value_lens])
+		value := this.textMmap.ReadString(start, value_lens) 
 		start += this.fieldLen
 		this.ProfileList = append(this.ProfileList, value)
 	}

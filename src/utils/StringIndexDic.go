@@ -15,7 +15,6 @@ import (
 	"encoding/binary"
 	"fmt"
 	"os"
-	//"syscall"
 )
 
 type StringIdxDic struct {
@@ -63,7 +62,6 @@ func (this *StringIdxDic) Put(key string) int64 {
 	this.Lens++
 
 	if this.isSearch {
-		//fmt.Printf("updating key_value : %v index:%v lens:%v \n",this.IntMap[key_str],this.Index,this.Lens)
 		this.mmap.WriteInt64(0, this.Lens)
 		this.mmap.WriteInt64(8, this.Index)
 		this.mmap.AppendStringWithLen(key)

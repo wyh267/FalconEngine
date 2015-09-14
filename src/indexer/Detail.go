@@ -181,11 +181,11 @@ func (this *Detail) ReadDetailFromFile() error {
 	var start int64 = 16
 	var i int64 = 0
 	for i = 0; i <= this.MaxDocId; i++ {
-		start_pos := this.dicMmap.ReadInt64(start) //int64(binary.LittleEndian.Uint64(MmapBytes[start : start+8]))
+		start_pos := this.dicMmap.ReadInt64(start) 
 		start += 8
-		byte_len := this.dicMmap.ReadInt64(start) //int64(binary.LittleEndian.Uint64(MmapBytes[start : start+8]))
+		byte_len := this.dicMmap.ReadInt64(start) 
 		start += 8
-		in_inc := this.dicMmap.ReadInt64(start) //int64(binary.LittleEndian.Uint64(MmapBytes[start : start+8]))
+		in_inc := this.dicMmap.ReadInt64(start) 
 		start += 8
 		this.DetailList = append(this.DetailList, DetailInfo{nil, start_pos, byte_len, in_inc, false})
 	}

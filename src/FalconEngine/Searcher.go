@@ -279,15 +279,10 @@ func (this *Searcher) Process(log_id string, body []byte, params map[string]stri
 
 }
 
-type Condition struct {
-	Key   string `json:"key"`
-	Op    string `json:"operate"`
-	Value string `json:"value"`
-	Desc  string `json:"desc"`
-}
+
 
 type CommonStruct struct {
-	Childs []Condition `json:"childs"`
+	Childs []utils.Condition `json:"childs"`
 	Score  int64       `json:"score"`
 }
 
@@ -499,14 +494,10 @@ func (this *Searcher) ParseSearchInfo(log_id string, params map[string]string, b
 
 				if vv.Key == "buys" {
 					var FR indexer.FilterRule
-					FR.Field = vv.Key
-					FR.IsForward = true
-					if vv.Op == "less" {
-						FR.FiltType = indexer.FILT_TYPE_LESS_DATERANGE
-					} else {
-						FR.FiltType = indexer.FILT_TYPE_ABOVE_DATERANGE
-					}
-					FR.Value = vv.Value
+					FR.Field = "buy_times"
+					FR.IsForward = false
+					FR.Value = vv
+					fmt.Printf("vv: %v\n",FR.Value)
 					SRs.FR = append(SRs.FR, FR)
 					continue
 
