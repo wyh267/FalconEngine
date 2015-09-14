@@ -7,15 +7,33 @@
 
 我的这个搜索引擎原始数据是MySql数据库的，大家可以根据需要进行二次开发，用来支持其他数据库或者本地文件，Detail文件是存储在Redis数据库中，同样这部分也可以根据自己的需要二次开发，使用本地文件或者其他数据库，倒排索引和正排索引本地存储的时候使用的json格式，比较耗磁盘，第一版暂时这样了吧，后续再做优化。
 
-## 性能测试
+## 更新列表
+  - 去掉Redis,使用本地文件存储所有数据
+  - 使用mmap形式进行数据存储
+  - 去掉json格式，太慢了，使用二进制方式存储所有索引和正排文件
+  - 可以持久化增量更新，服务挂掉以后数据可以持久化保持
+  - 使用go语言自带的map代替我自己实现的hashmap
+  - Bitmap可以持久化到本地磁盘，也使用mmap的形式进行加载
+  - 正排字段的判断使用插件的形式进行开发，可以自定义正排字段的判断方法
+  
+## TODO列表
+  - 索引不需要先生成一份全量数据，可以启动以后随时更新数据，类似ES
+  - 增加选项，可以一次性将所有数据加载进内存
+  - 修改配置文件格式为json格式，方便阅读
+  - 索引分片
+  - 分布式部署，保存多个副本
+  - 集群化搜索引擎
+  - 增加排序模块，按照相关性进行排序
 
+## 性能测试
+  - 暂无
 
 ## 使用方法
 ### 依赖以下几个库
 - [github.com/apsdehal/go-logger](https://github.com/apsdehal/go-logger) log文件
 - [github.com/ewangplay/config](https://github.com/ewangplay/config) 配置文件解析
 - [github.com/go-sql-driver/mysql](https://github.com/go-sql-driver/mysql) mysql驱动
-- [github.com/garyburd/redigo/redis](https://github.com/garyburd/redigo/redis) Redis驱动
+- [github.com/garyburd/redigo/redis](https://github.com/garyburd/redigo/redis) Redis驱动（已经不用了）
 - [github.com/huichen/sego](https://github.com/huichen/sego) 分词器，作者[主页](https://github.com/huichen)非常感谢他的分析器，他主页上也有个搜索引擎，没看具体实现，大家感兴趣可以去看看。
 
 ### 编译
