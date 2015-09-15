@@ -715,6 +715,7 @@ func (this *IndexSet) checkDetail(doc_id int64,info map[string]string) int {
 		if (v != info[k]) && k != this.IncField {
 			res = PlfUpdate
 			if this.FieldInfo[k].IsIvt == true {
+				this.Logger.Info("checkDetail IsIvt: %v  old:%v new:%v ",k,info[k],v)
 				res = IvtUpdate
 				break
 			}

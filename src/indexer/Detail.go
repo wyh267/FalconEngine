@@ -158,7 +158,10 @@ func (this *Detail) SetNewValue(doc_id int64, info map[string]string) error {
 		this.dicMmap.WriteInt64(start_pos, 1)
 	}
 
-	this.DetailList[doc_id].IsInc = true
+	this.DetailList[doc_id].InInc = 1
+	this.DetailList[doc_id].ByteStart=info_start
+	this.DetailList[doc_id].ByteLen=info_lens
+	this.DetailList[doc_id].IsInc=false
 	return nil
 
 }

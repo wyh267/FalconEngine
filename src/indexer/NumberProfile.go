@@ -80,8 +80,9 @@ func (this *NumberProfile) FindValue(doc_id int64) (int64, error) {
 func (this *NumberProfile) FilterValue(doc_ids []u.DocIdInfo, value int64, is_forward bool, filt_type int64) ([]u.DocIdInfo, error) {
 
 	res := make([]u.DocIdInfo, 0, 1000)
-
+	
 	switch filt_type {
+		
 	case FILT_TYPE_LESS:
 
 		for i, _ := range doc_ids {
@@ -98,6 +99,7 @@ func (this *NumberProfile) FilterValue(doc_ids []u.DocIdInfo, value int64, is_fo
 		}
 	case FILT_TYPE_EQUAL:
 		for i, _ := range doc_ids {
+			//fmt.Printf("DOC_ID:%v\n",doc_ids[i].DocId)
 			if this.ProfileList[doc_ids[i].DocId] == value {
 				res = append(res, doc_ids[i])
 			}
