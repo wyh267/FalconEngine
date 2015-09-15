@@ -331,7 +331,9 @@ func (this *InvertIdx) WriteToIndexPosFile() error {
 
 func (this *InvertIdx) WriteToIndexFile() error {
 
+	fmt.Printf("file:name :%v\n",this.IdxName)
 	file_name := fmt.Sprintf("./index/%v.idx", this.IdxName)
+	
 	fmt.Printf("Write index[%v] to File [%v]...\n", file_name, file_name)
 	buf := new(bytes.Buffer)
 	var start_pos int64 = 0

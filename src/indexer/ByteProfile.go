@@ -348,3 +348,8 @@ func (this *ByteProfile) SetCustomInterface(inter u.CustomInterface) error {
 	this.customeInter = inter
 	return nil
 }
+
+
+func (this *ByteProfile) GetCustomInterface() u.CustomInterface {
+	return this.customeInter
+}

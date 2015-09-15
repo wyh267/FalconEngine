@@ -71,8 +71,10 @@ func (this *TextProfile) PutProfile(doc_id int64, value string) error {
 
 	this.ProfileList[doc_id] = value
 	if this.IsSearch == true {
+		
 		pos := 16 + doc_id*(this.fieldLen+8)
 		this.textMmap.WriteInt64(pos, lens)
+		fmt.Printf("pos: %v doc_id : %v , lens : %v ,str_byte %v , field_len : %v\n",pos,doc_id,lens,string(str_bytes),this.fieldLen)
 		this.textMmap.WriteBytes(pos+8, str_bytes)
 	}
 
@@ -314,5 +316,11 @@ func (this *TextProfile) ReadFromFile() error {
 }
 
 func (this *TextProfile) SetCustomInterface(inter u.CustomInterface) error {
+	this.customeInter=inter
 	return nil
+}
+
+
+func (this *TextProfile) GetCustomInterface() u.CustomInterface {
+	return this.customeInter
 }

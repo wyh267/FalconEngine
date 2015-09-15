@@ -53,7 +53,7 @@ type IndexBuilder struct {
 const RULE_EN int64 = 1
 const RULE_CHN int64 = 2
 
-func (this *IndexBuilder) BuildTextIndex(doc_id int64, content string, ivt_idx *InvertIdx, ivt_dic *StringIdxDic, split_type int64, is_inc bool) error {
+func (this *IndexBuilder) BuildTextIndex(doc_id int64, content string, ivt_idx *InvertIdx, ivt_dic *StringIdxDic, split_type int64, is_inc bool,cumstomInter CustomInterface) error {
 
 	if ivt_idx.IdxType != TYPE_TEXT {
 		return errors.New("Wrong Type")
@@ -63,8 +63,13 @@ func (this *IndexBuilder) BuildTextIndex(doc_id int64, content string, ivt_idx *
 		return nil //errors.New("nothing")
 	}
 
-
-	terms:=this.Segmenter.SegmentByType(content,split_type,true)
+	var terms []string
+	if split_type == 9 {
+		terms = cumstomInter.SegmentFunc(content,false)
+	}else{
+		terms=this.Segmenter.SegmentByType(content,split_type,true)
+	}
+	fmt.Printf("Terms : %v \n",terms)
 	/*
 	var terms []string
 
@@ -115,10 +120,18 @@ func (this *IndexBuilder) BuildTextIndex(doc_id int64, content string, ivt_idx *
 	return nil
 }
 
-func (this *IndexBuilder) BuildNumberIndex(doc_id int64, content int64, ivt_idx *InvertIdx, ivt_dic *NumberIdxDic, is_inc bool) error {
+func (this *IndexBuilder) BuildNumberIndex(doc_id int64, content int64, ivt_idx *InvertIdx, ivt_dic *NumberIdxDic, split_type int64, is_inc bool,cumstomInter CustomInterface) error {
+
+
+	var new_content int64
+	if split_type == 9 {
+		new_content = cumstomInter.SplitNum(content)
+	}else{
+		new_content=content
+	}
 
 	len := ivt_dic.Length()
-	key_id := ivt_dic.Put(content)
+	key_id := ivt_dic.Put(new_content)
 	if key_id == -1 {
 		//fmt.Println("Bukent full")
 		return errors.New("Number Bukets full")
@@ -126,7 +139,7 @@ func (this *IndexBuilder) BuildNumberIndex(doc_id int64, content int64, ivt_idx 
 	//新增
 	if is_inc == false {
 		if key_id > len {
-			invertList := NewInvertDocIdList(content)
+			invertList := NewInvertDocIdList(new_content)
 			invertList.DocIdList = append(invertList.DocIdList, DocIdInfo{DocId: doc_id})
 			ivt_idx.KeyInvertList = append(ivt_idx.KeyInvertList, *invertList)
 			ivt_idx.IdxLen++

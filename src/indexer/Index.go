@@ -17,6 +17,7 @@ type Index struct {
 	Name     string       `json:"name"`
 	Type     int64        //1表示文本索引，2表示数字索引
 	ivtIndex *u.InvertIdx `json:"ivtIndex"`
+	customeInter u.CustomInterface
 }
 
 type IndexInterface interface {
@@ -26,4 +27,6 @@ type IndexInterface interface {
 	GetIvtIndex() *u.InvertIdx
 	GetNumDic() *u.NumberIdxDic
 	GetStrDic() *u.StringIdxDic
+	SetCustomInterface(inter u.CustomInterface) error
+	GetCustomInterface() u.CustomInterface
 }

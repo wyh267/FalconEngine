@@ -128,7 +128,7 @@ func (this *Router) ParseURL(url string) (int64, error) {
 	if resource == "update" {
 		return 2, nil
 	}
-	if resource == "update" {
+	if resource == "contrl" {
 		return 3, nil
 	}
 
@@ -156,7 +156,7 @@ func (this *Router) parseArgs(r *http.Request) (map[string]string, error) {
 
 	//每次都重新生成一个新的map，否则之前请求的参数会保留其中
 	res := make(map[string]string)
-	fmt.Printf("Form :: %v ", r.Form)
+	//fmt.Printf("Form :: %v ", r.Form)
 	for k, v := range r.Form {
 		res[k] = v[0]
 	}

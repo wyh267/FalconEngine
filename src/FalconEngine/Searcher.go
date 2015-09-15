@@ -436,9 +436,6 @@ func (this *Searcher) ParseSearchInfo(log_id string, params map[string]string, b
 					FR.IsForward = true
 
 					if from_num < 1000 {
-						//FR.Value = from_num*10000
-						//FR.FiltType = indexer.FILT_TYPE_EQUAL
-						//SRs.FR = append(SRs.FR,FR)
 						FR.Value = from_num*100 - 1
 						FR.FiltType = indexer.FILT_TYPE_ABOVE
 						SRs.FR = append(SRs.FR, FR)
@@ -497,7 +494,7 @@ func (this *Searcher) ParseSearchInfo(log_id string, params map[string]string, b
 					FR.Field = "buy_times"
 					FR.IsForward = false
 					FR.Value = vv
-					fmt.Printf("vv: %v\n",FR.Value)
+					//fmt.Printf("vv: %v\n",FR.Value)
 					SRs.FR = append(SRs.FR, FR)
 					continue
 

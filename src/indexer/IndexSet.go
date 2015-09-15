@@ -17,6 +17,7 @@ import (
 	"strconv"
 	"strings"
 	"utils"
+	"encoding/json"
 )
 
 type IndexSet struct {
@@ -27,24 +28,26 @@ type IndexSet struct {
 	Segmenter  *utils.Segmenter
 	MaxDocId   int64
 	PrimaryKey string
+	IncField  string
 	FieldInfo  map[string]*IndexFieldInfo
 	IncBuilder *utils.IndexBuilder
 	BitMap     *utils.Bitmap
 }
 
 type IndexFieldInfo struct {
-	IsPK  bool   `json:"Is PK"`
-	IsIvt bool   `json:"Is Invert"`
-	IsPlf bool   `json:"Is Profile"`
-	FType string `json:"Field Type"`
-	Name  string `json:"Field Name"`
-	SType int64  `json:"Search Type"`
+	IsPK  bool   `json:"is_pk"`
+	IsIvt bool   `json:"is_ivt"`
+	IsPlf bool   `json:"is_pro"`
+	FType string `json:"field_type"`
+	Name  string `json:"name"`
+	SType int64  `json:"split"`
 }
 
 const (
 	PlfUpdate = iota
 	IvtUpdate
 	Delete
+	NoChange
 )
 
 /*****************************************************************************
@@ -58,7 +61,7 @@ const (
 func NewIndexSet(bitmap *utils.Bitmap, logger *log4jzl.Log4jzl) *IndexSet {
 	segment := utils.NewSegmenter("./data/dictionary.txt")
 	builder := &utils.IndexBuilder{Segmenter: segment, TempIndex: make(map[string][]utils.TmpIdx), TempIndexNum: make(map[string]int64)}
-	this := &IndexSet{BitMap: bitmap, IncBuilder: builder, FieldInfo: make(map[string]*IndexFieldInfo), MaxDocId: 0, PrimaryKey: "PK", Segmenter: segment, IvtIndex: make(map[string]IndexInterface), Logger: logger, PflIndex: make(map[string]ProfileInterface)}
+	this := &IndexSet{IncField:"last_modify_time",BitMap: bitmap, IncBuilder: builder, FieldInfo: make(map[string]*IndexFieldInfo), MaxDocId: 0, PrimaryKey: "PK", Segmenter: segment, IvtIndex: make(map[string]IndexInterface), Logger: logger, PflIndex: make(map[string]ProfileInterface)}
 	return this
 
 }
@@ -153,88 +156,80 @@ func (this *IndexSet) GetIdxType(field string) int64 {
 *  description : 根据配置文件初始化建立索引和正排的字段并读入内存中
 *
 ******************************************************************************/
-func (this *IndexSet) InitIndexSet(fields map[string]string) error {
+func (this *IndexSet) InitIndexSet(fields map[string]string,inc_field string) error {
 
+	this.IncField=inc_field
 	for k, v := range fields {
-		//this.Logger.Info(" KEY:%v  VALUE:%v\n",k,v)
-		l := strings.Split(v, ",")
-		if len(l) != 5 {
-			this.Logger.Error("%v", errors.New("Wrong config file"))
-			return errors.New("Wrong configure for index")
-		}
-		this.FieldInfo[k] = &IndexFieldInfo{false, false, false, "N", k, 0}
-		stype, err := strconv.ParseInt(l[4], 0, 0)
+		
+		var fi IndexFieldInfo
+		err := json.Unmarshal([]byte(v), &fi)
 		if err != nil {
-			this.Logger.Error("Error to ParseInt[%v], %v", l[4], err)
+			fmt.Printf("Unmarshal Error ...\n")
 			return err
 		}
-
-		this.FieldInfo[k].SType = stype
-
-		if l[0] == "1" {
+		fi.Name=k
+		this.FieldInfo[k] = &fi
+		if this.FieldInfo[k].IsPK == true {
 			this.PrimaryKey = k
-			this.FieldInfo[k].IsPK = true
 		}
-
+		cumstom := plugins.NewPlus(k)
+		cumstom.Init()
 		this.Logger.Info("========= Loading Index/Dictionary and Profile [ %v ] =========", k)
-		if l[1] == "1" {
-			this.FieldInfo[k].IsIvt = true
+		if this.FieldInfo[k].IsIvt == true {
 			idx := utils.NewInvertIdxWithName(k)
 			this.Logger.Info("\t Loading Invert Index [ %v.idx.dic ] ", k)
 
 			idx.ReadFromFile()
-			if l[3] == "T" { //text ivt
+			if this.FieldInfo[k].FType == "T" || this.FieldInfo[k].FType == "I"{ //text ivt
 
-				this.FieldInfo[k].FType = "T"
+				
 				dic := utils.NewStringIdxDic(k)
 				this.Logger.Info("\t Loading Invert Index Dictionary [ %v.dic ] ", k)
 				dic.ReadFromFile()
 
 				index := NewTextIndex(k, idx, dic)
+				index.SetCustomInterface(cumstom)
 				this.PutIndex(k, index)
 
-			} else { //number ivt
+			} else if this.FieldInfo[k].FType == "N"{ //number ivt
 
-				this.FieldInfo[k].FType = "N"
 				dic := utils.NewNumberIdxDic(k)
 				this.Logger.Info("\t Loading Invert Index Dictionary [ %v.dic ] ", k)
 				dic.ReadFromFile()
 				//dic.Display()
 				index := NewNumberIndex(k, idx, dic)
+				index.SetCustomInterface(cumstom)
 				this.PutIndex(k, index)
 			}
 
 		}
 
-		if l[2] == "1" {
-			this.FieldInfo[k].IsPlf = true
+		if this.FieldInfo[k].IsPlf == true {
+			
 
-			if l[3] == "T" {
-				this.FieldInfo[k].FType = "T"
+			if this.FieldInfo[k].FType == "T" {
+				
 				pfl := NewTextProfile(k)
 				this.Logger.Info("\t Loading Text Profile [ %v.pfl ] ", k)
-				cumstom := plugins.NewPlus(k)
-				cumstom.Init()
+				
 				pfl.SetCustomInterface(cumstom)
 				pfl.ReadFromFile()
 				this.PutProfile(k, pfl)
 
-			} else if l[3] == "N" {
-				this.FieldInfo[k].FType = "N"
+			} else if this.FieldInfo[k].FType == "N" {
+				
 				pfl := NewNumberProfile(k)
 				this.Logger.Info("\t Loading Number Profile [ %v.pfl ] ", k)
-				cumstom := plugins.NewPlus(k)
-				cumstom.Init()
+				
 				pfl.SetCustomInterface(cumstom)
 				pfl.ReadFromFile()
 
 				this.PutProfile(k, pfl)
-			} else if l[3] == "I" {
-				this.FieldInfo[k].FType = "I"
+			} else if this.FieldInfo[k].FType == "I" {
+				
 				pfl := NewByteProfile(k)
 				this.Logger.Info("\t Loading Byte Profile [ %v ] ", k)
-				cumstom := plugins.NewPlus(k)
-				cumstom.Init()
+				
 				pfl.SetCustomInterface(cumstom)
 				pfl.ReadFromFile()
 				this.PutProfile(k, pfl)
@@ -518,7 +513,15 @@ func (this *IndexSet) SearchNumber(query int64) ([]utils.DocIdInfo, bool) {
 ******************************************************************************/
 func (this *IndexSet) SearchFieldByString(query string, field string) ([]utils.DocIdInfo, bool) {
 
-	terms:=this.Segmenter.SegmentByType(query,this.FieldInfo[field].SType,false)
+	var terms []string
+	if this.FieldInfo[field].SType == 9 {
+		terms=this.IvtIndex[field].GetCustomInterface().SegmentFunc(query,true)
+	}else{
+		terms=this.Segmenter.SegmentByType(query,this.FieldInfo[field].SType,false)
+	}
+
+	
+	fmt.Printf("terms : %v \n",terms)
 	/*
 	var terms []string
 
@@ -660,6 +663,68 @@ func (this *IndexSet) GetDetails(doc_ids []utils.DocIdInfo) ([]int64, []string) 
 
 //func (this *IndexSet) AddRecord()
 
+
+func (this *IndexSet) DeleteRecord(promary_id int64) error {
+	Doc_id, has_key := this.SearchField(promary_id, this.PrimaryKey)
+	if has_key {
+		for index, _ := range Doc_id {
+			this.Logger.Info("Delete Doc_id : %v ", Doc_id[index].DocId)
+			this.BitMap.SetBit(uint64(Doc_id[index].DocId), 1)
+		}
+		return nil
+	} else {
+		this.Logger.Info("No record to Delete , can not find promary key[%v] in index  ", promary_id)
+		return errors.New("No record to Delete , can not find promary key")
+	}
+	
+}
+
+
+func (this *IndexSet) FindPromaryKey(promary_id int64) (int64,bool){
+	Doc_ids, has_key := this.SearchField(promary_id, this.PrimaryKey)
+	if has_key {
+		for index,_ := range Doc_ids{
+			if this.BitMap.GetBit(uint64(Doc_ids[index].DocId)) == 0 {
+				return Doc_ids[index].DocId,true
+			}
+		}
+		return 0,false
+	}else{
+		return 0,false
+	}
+	
+	
+}
+
+
+
+func (this *IndexSet) checkDetail(doc_id int64,info map[string]string) int {
+	res := NoChange
+	detail_map, err := this.Detail.GetDocInfo(doc_id)
+	if err != nil {
+		this.Logger.Error("Read Detail error...%v", err)
+		return res
+	}
+	
+	for k, v := range detail_map {
+		_, ok := info[k]
+		if !ok {
+			this.Logger.Info("miss field , use defualt ...")
+			info[k] = v
+		}
+		if (v != info[k]) && k != this.IncField {
+			res = PlfUpdate
+			if this.FieldInfo[k].IsIvt == true {
+				res = IvtUpdate
+				break
+			}
+		}
+	}
+	this.Logger.Info("checkDetail : %v  ",res)
+	return res
+}
+
+
 func (this *IndexSet) UpdateRecord(info map[string]string, UpdateType int) error {
 
 	//检查是否有PrimaryKey字段，如果没有的话，不允许更新
@@ -673,7 +738,58 @@ func (this *IndexSet) UpdateRecord(info map[string]string, UpdateType int) error
 		this.Logger.Error("No Primary Key,Update is not allow  %v", err)
 		return err
 	}
-
+	
+	
+	if UpdateType == Delete {
+		return this.DeleteRecord(pk)
+	}
+	
+	
+	doc_id,has_key := this.FindPromaryKey(pk)
+	this.Logger.Info("FindPromaryKey : %v doc_id : %v , has_key : %v  ",pk,doc_id,has_key)
+	
+	if has_key {
+		switch this.checkDetail(doc_id,info) {
+			case NoChange:
+				this.Logger.Info("No Update ....")
+				return nil
+			case PlfUpdate:
+				this.Logger.Info("PlfUpdate .... ")
+				for k, v := range info {
+					this.UpdateProfile(k, v, doc_id)
+				}
+			case IvtUpdate:
+				this.Logger.Info("IvtUpdate .... ")
+				this.DeleteRecord(pk)
+				doc_id = this.MaxDocId + 1
+				for k, v := range info {
+					this.UpdateInvert(k, v, doc_id)
+					this.UpdateProfile(k, v, doc_id)
+				}
+				this.MaxDocId++
+			default:
+				this.Logger.Info("No Update ....")
+				return nil
+		}
+	}else{
+		this.Logger.Info("Insert record .... ")
+		doc_id = this.MaxDocId + 1
+		for k, v := range info {
+			this.UpdateInvert(k, v, doc_id)
+			this.UpdateProfile(k, v, doc_id)
+		}
+		this.MaxDocId++
+	}
+	
+	//更新detail
+	err = this.Detail.SetNewValue(doc_id, info)
+	if err != nil {
+		this.Logger.Error("Update Detail Error : %v ", err)
+	}
+	return nil
+	
+	
+/*
 	Doc_id, has_key := this.SearchField(pk, this.PrimaryKey)
 	var doc_id int64
 
@@ -689,6 +805,54 @@ func (this *IndexSet) UpdateRecord(info map[string]string, UpdateType int) error
 			this.Logger.Info("No record to Delete , can not find promary key[%v] in index  ", pk)
 		}
 		return nil
+	}else{
+		
+		//更新操作
+		if has_key {
+			update := false
+			justProfile := true
+			for index,_ := range Doc_id{
+				if this.BitMap.GetBit(uint64(Doc_id[index].DocId)) == 0 {
+					doc_id = Doc_id[index].DocId)
+				}
+			}
+			detail_map, err := this.Detail.GetDocInfo(doc_id)
+			if err != nil {
+				this.Logger.Error("Read Detail error...%v", err)
+				continue
+			}
+			for k, v := range detail_map {
+				vv, ok := info[k]
+				if !ok {
+					this.Logger.Info("miss field , use defualt ...")
+					info[k] = v
+				}
+				if (v != info[k]) && k != this.IncField {
+					update=true
+					if this.FieldInfo[k].IsIvt == true {
+						justProfile = false
+						break
+					}
+				}
+			}
+			
+			if update==true {
+				if justProfile == true {
+					this.UpdateProfile(k, v, doc_id)
+				}else{
+					
+				}
+			}
+			
+			
+			
+			
+			
+		}else{ //新增操作
+			
+		}
+		
+		
 	}
 
 	//如果仅更新正排文件，不需要新建doc_id，直接更新
@@ -721,6 +885,7 @@ func (this *IndexSet) UpdateRecord(info map[string]string, UpdateType int) error
 
 		this.MaxDocId++
 	}
+
 	//更新detail
 	err = this.Detail.SetNewValue(doc_id, info)
 	if err != nil {
@@ -728,7 +893,7 @@ func (this *IndexSet) UpdateRecord(info map[string]string, UpdateType int) error
 	}
 
 	return nil
-
+*/
 }
 
 func (this *IndexSet) UpdateInvert(k, v string, doc_id int64) {
@@ -742,7 +907,7 @@ func (this *IndexSet) UpdateInvert(k, v string, doc_id int64) {
 	if field_info.IsIvt {
 
 		if field_info.FType == "T" {
-			err := this.IncBuilder.BuildTextIndex(doc_id, v, this.IvtIndex[k].GetIvtIndex(), this.IvtIndex[k].GetStrDic(), field_info.SType, true)
+			err := this.IncBuilder.BuildTextIndex(doc_id, v, this.IvtIndex[k].GetIvtIndex(), this.IvtIndex[k].GetStrDic(), field_info.SType, true,this.IvtIndex[k].GetCustomInterface())
 			if err != nil {
 				this.Logger.Error("ERROR : %v", err)
 			}
@@ -755,7 +920,7 @@ func (this *IndexSet) UpdateInvert(k, v string, doc_id int64) {
 				this.Logger.Error("ERROR : %v", err)
 			}
 
-			err = this.IncBuilder.BuildNumberIndex(doc_id, v_num, this.IvtIndex[k].GetIvtIndex(), this.IvtIndex[k].GetNumDic(), true)
+			err = this.IncBuilder.BuildNumberIndex(doc_id, v_num, this.IvtIndex[k].GetIvtIndex(), this.IvtIndex[k].GetNumDic(), field_info.SType,true,this.IvtIndex[k].GetCustomInterface())
 			if err != nil {
 				this.Logger.Error("ERROR : %v", err)
 			}
@@ -771,7 +936,7 @@ func (this *IndexSet) UpdateProfile(k, v string, doc_id int64) {
 		this.Logger.Error("UpdateProfile  ")
 		return
 	}
-
+	//this.Logger.Info("update field : %v  value : %v  doc_id : %v ",k,v,doc_id)
 	if field_info.IsPlf {
 
 		if field_info.FType == "T" {
@@ -780,7 +945,7 @@ func (this *IndexSet) UpdateProfile(k, v string, doc_id int64) {
 				vl := strings.Split(v, " ")
 				v = vl[0]
 			}
-
+			//this.Logger.Info("update text field : %v  value : %v  doc_id : %v ",k,v,doc_id)
 			err := this.PflIndex[k].Put(doc_id, v)
 			if err != nil {
 				this.Logger.Error("ERROR : %v  Key : %v", err, k)
@@ -793,6 +958,7 @@ func (this *IndexSet) UpdateProfile(k, v string, doc_id int64) {
 				v_num = 0
 				this.Logger.Error("ERROR : %v  Key : %v", err, k)
 			}
+			//this.Logger.Info("update text field : %v  value : %v  doc_id : %v ",k,v_num,doc_id)
 			err = this.PflIndex[k].Put(doc_id, v_num)
 			if err != nil {
 				this.Logger.Error("ERROR : %v Key : %v ", err, k)
@@ -800,7 +966,7 @@ func (this *IndexSet) UpdateProfile(k, v string, doc_id int64) {
 		}
 
 		if field_info.FType == "I" {
-
+			//this.Logger.Info("update text field : %v  value : %v  doc_id : %v ",k,v,doc_id)
 			err := this.PflIndex[k].Put(doc_id, []byte(v))
 			if err != nil {
 				this.Logger.Error("ERROR : %v Key : %v ", err, k)

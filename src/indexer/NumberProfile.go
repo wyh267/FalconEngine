@@ -272,5 +272,12 @@ func (this *NumberProfile) ReadFromFile() error {
 }
 
 func (this *NumberProfile) SetCustomInterface(inter u.CustomInterface) error {
+	this.customeInter=inter
 	return nil
+}
+
+
+
+func (this *NumberProfile) GetCustomInterface() u.CustomInterface {
+	return this.customeInter
 }

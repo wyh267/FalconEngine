@@ -15,6 +15,8 @@ import (
 	//"fmt"
 	//"errors"
 	"builder"
+	//"encoding/json"
+	//"fmt"
 )
 
 type Updater struct {
@@ -44,7 +46,26 @@ last_modify_time = 0,1,1,T
 
 func (this *Updater) Process(log_id string, body []byte, params map[string]string, result map[string]interface{}, ftime func(string) string) error {
 
-	this.Logger.Info("Update...")
+	//this.Logger.Info("Update...")
+	var updateInfo builder.UpdateInfo
+	/*info := make(map[string]string)
+	fmt.Printf("BODY : %v \n",body)
+	err := json.Unmarshal(body, info)
+	if err != nil {
+		fmt.Printf("Unmarshal Error ...\n")
+		return err
+	}*/
+	updateInfo.Info=params
+	updateInfo.UpdateType = 0
+	updateInfo.ErrChan = make(chan error)
+	this.Data_chan <- updateInfo
+	errinfo := <-updateInfo.ErrChan
+	if errinfo != nil {
+		this.Logger.Info("Update Fail.... %v ", errinfo)
+	} else {
+		this.Logger.Info("Update success....")
+	}
+	/*
 	var updateInfo builder.UpdateInfo
 	info := make(map[string]string)
 	info["id"] = "154"
@@ -94,7 +115,7 @@ func (this *Updater) Process(log_id string, body []byte, params map[string]strin
 		}
 
 	}
-
+	*/
 	//this.Indexer.UpdateRecord(info,false)
 	//this.Indexer.Display()
 	return nil

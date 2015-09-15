@@ -26,6 +26,7 @@ type Profile struct {
 	Len      int64
 	IsMmap   bool
 	IsSearch bool
+	customeInter u.CustomInterface
 }
 
 const FILT_TYPE_LESS int64 = 1
@@ -50,6 +51,7 @@ type ProfileInterface interface {
 	WriteToFile() error
 	ReadFromFile() error
 	SetCustomInterface(inter u.CustomInterface) error
+	GetCustomInterface() u.CustomInterface
 }
 
 /*****************************************************************************

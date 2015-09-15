@@ -198,7 +198,7 @@ func (this *Mmap) AppendBytes(value []byte) error {
 
 func (this *Mmap) WriteBytes(start int64, value []byte) error {
 	lens := int64(len(value))
-	dst := this.MmapBytes[start : this.FilePointer+lens]
+	dst := this.MmapBytes[start : start+lens]
 	copy(dst, value)
 	return nil
 }

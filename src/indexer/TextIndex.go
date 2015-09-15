@@ -21,7 +21,7 @@ type TextIndex struct {
 }
 
 func NewTextIndex(name string, ivt *u.InvertIdx, dic *u.StringIdxDic) *TextIndex {
-	index := &Index{name, 1, ivt}
+	index := &Index{Name:name, Type:1, ivtIndex:ivt}
 	this := &TextIndex{index, dic}
 	return this
 
@@ -66,4 +66,15 @@ func (this *TextIndex) GetNumDic() *u.NumberIdxDic {
 }
 func (this *TextIndex) GetStrDic() *u.StringIdxDic {
 	return this.dicIndex
+}
+
+
+func (this *TextIndex) SetCustomInterface(inter u.CustomInterface) error {
+	this.customeInter=inter
+	return nil
+}
+
+
+func (this *TextIndex) GetCustomInterface() u.CustomInterface {
+	return this.customeInter
 }

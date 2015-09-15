@@ -140,6 +140,16 @@ type CustomInterface interface {
 	CustomeFunction(v1, v2 interface{}) bool
 	Init() bool 
 	SetRules(rules interface{}) func(value_byte interface{}) bool
+	//插件分词函数,返回string数组,bool参数表示是建立索引的时候还是查询的调用,STYPE = 9 调用
+	SegmentFunc(value interface{},isSearch bool) []string
+	//数字分词函数,返回string数组,bool参数表示是建立索引的时候还是查询的调用,STYPE = 9 调用
+	SplitNum(value interface{}) int64
+	//插件正排处理函数，建立索引的时候调用，stype =9 调用 ,返回byte数组
+	BuildByteProfile(value []byte) []byte 
+	//插件正排处理函数，建立索引的时候调用，stype =9 调用 ,返回string,定长！！！！
+	BuildStringProfile(value interface{}) string
+	//插件正排处理函数，建立索引的时候调用，stype =9 调用 ,返回int64
+	BuildIntProfile(value interface{}) int64
 }
 
 

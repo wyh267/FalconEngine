@@ -111,3 +111,65 @@ func (this *ButTimesPlus) CustomeFunction(v1, v2 interface{}) bool {
 	*/
 	return false
 }
+
+
+
+//插件分词函数,返回string数组,bool参数表示是建立索引的时候还是查询的调用,STYPE = 9 调用
+func (this *ButTimesPlus) SegmentFunc(value interface{},isSearch bool) []string{
+	res := make([]string,0)
+	if isSearch == true{
+		res=append(res,fmt.Sprintf("%v",value))
+		return res
+	}
+	
+	
+	fmt.Printf("SegmentFunc...\n")
+	buytimes := make(map[string]Order)
+	body, ok := value.(string)
+	if !ok {
+		fmt.Printf("Byte Error ...\n")
+	}
+	err := json.Unmarshal([]byte(body), &buytimes)
+	if err != nil {
+		fmt.Printf("Unmarshal Error ...\n")
+		return nil
+	}
+	
+	for date,value := range buytimes{
+		fmt.Printf("date : %v  value  : %v \n",date,value)
+		res=append(res,date)
+		
+	} 
+	fmt.Printf("res : %v \n",res)
+	return res
+}
+
+
+//数字分词函数,返回string数组,bool参数表示是建立索引的时候还是查询的调用,STYPE = 9 调用
+func (this *ButTimesPlus) SplitNum(value interface{}) int64{
+	
+	return 0
+}
+
+
+
+
+//插件正排处理函数，建立索引的时候调用，stype =9 调用 ,返回byte数组
+func (this *ButTimesPlus) BuildByteProfile(value []byte) []byte {
+	
+	return value
+}
+
+//插件正排处理函数，建立索引的时候调用，stype =9 调用 ,返回string,定长！！！！
+func (this *ButTimesPlus) BuildStringProfile(value interface{}) string{
+	
+	return "nil"
+} 
+
+
+
+//插件正排处理函数，建立索引的时候调用，stype =9 调用 ,返回int64
+func (this *ButTimesPlus) BuildIntProfile(value interface{}) int64{
+	
+	return 0
+}
