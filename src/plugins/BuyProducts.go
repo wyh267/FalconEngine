@@ -93,6 +93,7 @@ func (this *BuyProducts) SegmentFunc(value interface{},isSearch bool) []string{
 	body, ok := value.(string)
 	if !ok {
 		fmt.Printf("Byte Error ...\n")
+		return nil
 	}
 	err := json.Unmarshal([]byte(body), &productsInfo)
 	if err != nil {

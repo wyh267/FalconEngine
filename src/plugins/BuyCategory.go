@@ -1,11 +1,11 @@
 package plugins
 
 import (
-	//"encoding/json"
-	//"fmt"
+	"encoding/json"
+	"fmt"
 	//"strconv"
-	//"strings"
-	//"utils"
+	"strings"
+	"utils"
 )
 
 type BuyCategory struct {
@@ -26,17 +26,85 @@ func (this *BuyCategory) Init() bool {
 
 func (this *BuyCategory) SetRules(rules interface{}) func(value_byte interface{}) bool {
 	
-	//fmt.Printf("total : %v start : %v end : %v \n",total,start,end)
+	rule,ok:=rules.(utils.Condition)
+	if !ok {
+		fmt.Printf("Error rules\n")
+	}
+	var start,end string
+	date_range := strings.Split(rule.Range,",")
+	if len(date_range) != 2{
+		start= "2015-01-01"
+		end = "2015-12-31"
+	}
+	start = date_range[0]
+	end = date_range[1]
+	categorys := utils.RemoveDuplicatesAndEmpty(strings.Split(rule.Value, ";"))
+
+
+
 	return func(value_byte interface{}) bool{
 		
+		categorysInfo := make(map[string][]string)
+		body, ok := value_byte.([]byte)
+		if !ok {
+			fmt.Printf("Byte Error ...\n")
+			return false 
+		}
+		err := json.Unmarshal(body, &categorysInfo)
+		if err != nil {
+			fmt.Printf("Unmarshal Error ...\n")
+			return false
+		}
+		list :=make([]string,0)
+		for k,v := range categorysInfo{
+			
+			if k>end || k < start {
+				continue
+			}
+			list = append(list,v...)
+		}
+		
+		for _,p := range categorys {
+			if StringInList(p,list) == false{
+				return false 
+			}
+		}
+		
 		return true
+		
 	}
 }
 
 
 //插件分词函数,返回string数组,bool参数表示是建立索引的时候还是查询的调用,STYPE = 9 调用
 func (this *BuyCategory) SegmentFunc(value interface{},isSearch bool) []string{
-	return nil
+	
+	res := make([]string,0)
+	if isSearch == true{
+		return utils.RemoveDuplicatesAndEmpty(strings.Split(fmt.Sprintf("%v",value), ";"))
+	}
+	
+	
+	categorysInfo := make(map[string][]string)
+	body, ok := value.(string)
+	if !ok {
+		fmt.Printf("Byte Error ...\n")
+		return nil
+	}
+	err := json.Unmarshal([]byte(body), &categorysInfo)
+	if err != nil {
+		fmt.Printf("Unmarshal Error ...\n")
+		return nil
+	}
+	
+	for _,value := range categorysInfo{
+		//fmt.Printf("date : %v  value  : %v \n",date,value)
+		res=append(res,value...)
+		
+	} 
+	//fmt.Printf("BuyProducts SegmentFunc res : %v \n",res)
+	
+	return res
 }
 
 

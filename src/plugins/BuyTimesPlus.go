@@ -47,10 +47,21 @@ func (this *ButTimesPlus) SetRules(rules interface{}) func(value_byte interface{
 	}
 	start := strings.Split(rule.Range,",")[0]
 	end := strings.Split(rule.Range,",")[1]
-	total, err := strconv.ParseInt(rule.Value, 0, 0)
-	if err != nil {
-		fmt.Printf("Error %v \n", rule.Value)
+	var total_count int64
+	var total_amount float64
+	var err error
+	if rule.Key == "buy_count"{
+		total_count, err = strconv.ParseInt(rule.Value, 0, 0)
+		if err != nil {
+			fmt.Printf("Error %v \n", rule.Value)
+		}
+	}else{
+		total_amount, err = strconv.ParseFloat(rule.Value,0)
+		if err != nil {
+			fmt.Printf("Error %v \n", rule.Value)
+		}		
 	}
+	
 	//fmt.Printf("total : %v start : %v end : %v \n",total,start,end)
 	return func(value_byte interface{}) bool{
 		var err error
@@ -66,15 +77,16 @@ func (this *ButTimesPlus) SetRules(rules interface{}) func(value_byte interface{
 		}
 		
 		var sum int64 = 0
+		var sum_amount float64 = 0.0
 		for date,value := range buytimes{
 			//fmt.Printf("date : %v start : %v end : %v sum : %v count : %v \n",date,start,end,sum,value.Count)
 			if date > start  && date < end {
 				sum = sum + value.Count
+				sum_amount = sum_amount + value.RealAmount
 			}
 		}
-		if sum > total {
-			fmt.Printf("Match .... %v \n", buytimes)
-			//fmt.Printf("Rules .... %v \n", rules)
+		if (sum > total_count && rule.Key == "buy_count") || (sum_amount > total_amount && rule.Key == "buy_amount"){
+			//fmt.Printf("Match .... %v \n", buytimes)
 			return true
 		}
 		//fmt.Printf("Not Match .... \n")

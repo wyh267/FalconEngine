@@ -489,33 +489,50 @@ func (this *Searcher) ParseSearchInfo(log_id string, params map[string]string, b
 
 				}
 
-				if vv.Key == "buys" {
+				if vv.Key == "buy_count" {
 					var FR indexer.FilterRule
 					FR.Field = "buy_times"
 					FR.IsForward = false
 					FR.Value = vv
-					//fmt.Printf("vv: %v\n",FR.Value)
 					SRs.FR = append(SRs.FR, FR)
 					continue
-
+				}
+				
+				if vv.Key == "buy_amount" {
+					var FR indexer.FilterRule
+					FR.Field = "buy_times"
+					FR.IsForward = false
+					FR.Value = vv
+					SRs.FR = append(SRs.FR, FR)
+					continue
 				}
 				
 				
-				if vv.Key == "buy_products" {
-					var FR indexer.FilterRule
-					FR.Field = "buy_products"
-					FR.IsForward = false
-					FR.Value = vv
+				if vv.Key == "has_buy" {
 					
-					//fmt.Printf("vv: %v\n",FR.Value)
-					SRs.FR = append(SRs.FR, FR)
-					
-					var SR indexer.SearchRule
-					SR.Field = "buy_products"
-					SR.Query = vv.Value
-					SRs.SR = append(SRs.SR, SR)
+					switch vv.Desc{
+						case "buy_products":
+							var FR indexer.FilterRule
+							FR.Field = "buy_products"
+							FR.IsForward = false
+							FR.Value = vv
+							SRs.FR = append(SRs.FR, FR)
+							var SR indexer.SearchRule
+							SR.Field = "buy_products"
+							SR.Query = vv.Value
+							SRs.SR = append(SRs.SR, SR)
+						case "buy_category":
+							var FR indexer.FilterRule
+							FR.Field = "buy_categorys"
+							FR.IsForward = false
+							FR.Value = vv
+							SRs.FR = append(SRs.FR, FR)
+							var SR indexer.SearchRule
+							SR.Field = "buy_categorys"
+							SR.Query = vv.Value
+							SRs.SR = append(SRs.SR, SR)
+					}
 					continue
-
 				}
 				
 				
