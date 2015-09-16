@@ -982,7 +982,7 @@ func (this *IndexSet) UpdateProfile(k, v string, doc_id int64) {
 		}
 
 		if field_info.FType == "I" {
-			this.Logger.Info("update text field : %v  value : %v  doc_id : %v ",k,v,doc_id)
+			//this.Logger.Info("update text field : %v  value : %v  doc_id : %v ",k,v,doc_id)
 			
 			err := this.PflIndex[k].Put(doc_id, []byte(v))
 			if err != nil {

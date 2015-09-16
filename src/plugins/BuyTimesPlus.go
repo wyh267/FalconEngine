@@ -148,7 +148,7 @@ func (this *ButTimesPlus) SegmentFunc(value interface{},isSearch bool) []string{
 	}
 	
 	for date,value := range buytimes{
-		fmt.Printf("date : %v  value  : %v \n",date,value)
+		//fmt.Printf("date : %v  value  : %v \n",date,value)
 		res=append(res,date)
 		
 	} 
