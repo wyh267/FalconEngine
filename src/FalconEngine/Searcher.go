@@ -499,6 +499,26 @@ func (this *Searcher) ParseSearchInfo(log_id string, params map[string]string, b
 					continue
 
 				}
+				
+				
+				if vv.Key == "buy_products" {
+					var FR indexer.FilterRule
+					FR.Field = "buy_products"
+					FR.IsForward = false
+					FR.Value = vv
+					
+					//fmt.Printf("vv: %v\n",FR.Value)
+					SRs.FR = append(SRs.FR, FR)
+					
+					var SR indexer.SearchRule
+					SR.Field = "buy_products"
+					SR.Query = vv.Value
+					SRs.SR = append(SRs.SR, SR)
+					continue
+
+				}
+				
+				
 
 				if vv.Op == "include" { //其他检索，倒排索引
 

@@ -48,7 +48,7 @@ func (this *TextProfile) Display() {
 
 func (this *TextProfile) PutProfile(doc_id int64, value string) error {
 	if doc_id > this.Len || doc_id < 1 {
-		fmt.Printf(" ========== [ NAME : %v ] [ LEN : %v ] [ DOC_ID : %v ]============\n", this.Name, this.Len, doc_id)
+		//fmt.Printf(" ========== [ NAME : %v ] [ LEN : %v ] [ DOC_ID : %v ]============\n", this.Name, this.Len, doc_id)
 		return errors.New("docid is wrong")
 	}
 	str_bytes := make([]byte, this.fieldLen)
@@ -74,7 +74,7 @@ func (this *TextProfile) PutProfile(doc_id int64, value string) error {
 		
 		pos := 16 + doc_id*(this.fieldLen+8)
 		this.textMmap.WriteInt64(pos, lens)
-		fmt.Printf("pos: %v doc_id : %v , lens : %v ,str_byte %v , field_len : %v\n",pos,doc_id,lens,string(str_bytes),this.fieldLen)
+		//fmt.Printf("pos: %v doc_id : %v , lens : %v ,str_byte %v , field_len : %v\n",pos,doc_id,lens,string(str_bytes),this.fieldLen)
 		this.textMmap.WriteBytes(pos+8, str_bytes)
 	}
 

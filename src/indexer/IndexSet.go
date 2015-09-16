@@ -41,6 +41,7 @@ type IndexFieldInfo struct {
 	FType string `json:"field_type"`
 	Name  string `json:"name"`
 	SType int64  `json:"split"`
+	Default string `json:"default"`
 }
 
 const (
@@ -696,7 +697,16 @@ func (this *IndexSet) FindPromaryKey(promary_id int64) (int64,bool){
 	
 }
 
-
+func (this *IndexSet) GetDefaultValue(info map[string]string) error {
+	
+	for k,v := range this.FieldInfo{
+		if _,ok:=info[k];!ok{
+			info[k]=v.Default
+		}
+	}
+	
+	return nil
+}
 
 func (this *IndexSet) checkDetail(doc_id int64,info map[string]string) int {
 	res := NoChange
@@ -717,7 +727,7 @@ func (this *IndexSet) checkDetail(doc_id int64,info map[string]string) int {
 			if this.FieldInfo[k].IsIvt == true {
 				this.Logger.Info("checkDetail IsIvt: %v  old:%v new:%v ",k,info[k],v)
 				res = IvtUpdate
-				break
+				//break 这句有严重bug
 			}
 		}
 	}
@@ -775,6 +785,11 @@ func (this *IndexSet) UpdateRecord(info map[string]string, UpdateType int) error
 	}else{
 		this.Logger.Info("Insert record .... ")
 		doc_id = this.MaxDocId + 1
+		err := this.GetDefaultValue(info)
+		if err!=nil{
+			this.Logger.Info("No Update ....Default Value Error....%v ",err)
+			return nil 
+		}
 		for k, v := range info {
 			this.UpdateInvert(k, v, doc_id)
 			this.UpdateProfile(k, v, doc_id)
@@ -907,7 +922,7 @@ func (this *IndexSet) UpdateInvert(k, v string, doc_id int64) {
 
 	if field_info.IsIvt {
 
-		if field_info.FType == "T" {
+		if field_info.FType == "T" || field_info.FType == "I" {
 			err := this.IncBuilder.BuildTextIndex(doc_id, v, this.IvtIndex[k].GetIvtIndex(), this.IvtIndex[k].GetStrDic(), field_info.SType, true,this.IvtIndex[k].GetCustomInterface())
 			if err != nil {
 				this.Logger.Error("ERROR : %v", err)
@@ -967,7 +982,8 @@ func (this *IndexSet) UpdateProfile(k, v string, doc_id int64) {
 		}
 
 		if field_info.FType == "I" {
-			//this.Logger.Info("update text field : %v  value : %v  doc_id : %v ",k,v,doc_id)
+			this.Logger.Info("update text field : %v  value : %v  doc_id : %v ",k,v,doc_id)
+			
 			err := this.PflIndex[k].Put(doc_id, []byte(v))
 			if err != nil {
 				this.Logger.Error("ERROR : %v Key : %v ", err, k)

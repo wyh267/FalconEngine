@@ -141,7 +141,7 @@ func (this *DBBuilder) ScanInc(Data_chan chan UpdateInfo) error {
 
 	this.Logger.Info("Start Inc Updating Now ..... ")
 
-	curr_time := time.Now().Format("2006-01-02 15:04:05")
+	curr_time := time.Now().Add(-10*time.Minute).Format("2006-01-02 15:04:05")
 	var fields string
 	isIvert := make(map[string]bool)
 	for _, v := range this.Fields {

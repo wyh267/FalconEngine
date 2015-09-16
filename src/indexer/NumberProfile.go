@@ -43,7 +43,7 @@ func (this *NumberProfile) Display() {
 }
 
 func (this *NumberProfile) PutProfile(doc_id, value int64) error {
-
+	//fmt.Printf(" ========== [ NAME : %v ] [ LEN : %v ] [ DOC_ID : %v ] [value : %v]============\n", this.Name, this.Len, doc_id,value)
 	if doc_id > this.Len || doc_id < 1 {
 		//fmt.Printf(" ========== [ NAME : %v ] [ LEN : %v ] [ DOC_ID : %v ]============\n", this.Name, this.Len, doc_id)
 		return errors.New("docid is wrong")
@@ -56,6 +56,7 @@ func (this *NumberProfile) PutProfile(doc_id, value int64) error {
 			this.numMmap.WriteInt64(0, this.Len)
 			this.numMmap.AppendInt64(value)
 		}
+	
 		return nil
 	}
 
@@ -64,6 +65,7 @@ func (this *NumberProfile) PutProfile(doc_id, value int64) error {
 		pos := 16 + doc_id*8
 		this.numMmap.WriteInt64(pos, value)
 	}
+	
 	return nil
 
 }

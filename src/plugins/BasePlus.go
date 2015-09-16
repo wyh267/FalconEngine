@@ -16,6 +16,12 @@ func NewPlus(plus_name string) u.CustomInterface {
 	case "buy_times":
 		fmt.Printf("NewBuyTimes\n ")
 		return NewBuyTimes()
+	case "buy_products":
+		fmt.Printf("NewBuyProducts....\n")
+		return NewBuyProducts()
+	case "buy_category":
+		fmt.Printf("NewBuyCategory...\n")
+		return NewBuyCategory()
 	default:
 		return NewBase()
 	}
