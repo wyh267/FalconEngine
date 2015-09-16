@@ -14,6 +14,9 @@ import (
 	"fmt"
 	"os"
 	"syscall"
+	"reflect"
+	"unsafe"
+	"errors"
 )
 
 type Mmap struct {
@@ -137,6 +140,16 @@ func (this *Mmap) Read(start, end int64) []byte {
 	return this.MmapBytes[start:end]
 }
 
+
+
+
+
+
+
+
+
+
+
 func (this *Mmap) WriteInt64(start, value int64) error {
 	/*
 		if err:=this.checkFileCap(start,8);err!= nil {
@@ -149,7 +162,7 @@ func (this *Mmap) WriteInt64(start, value int64) error {
 	//	this.AppendInt64(value)
 	//}
 
-	return nil
+	return nil //this.Sync()
 }
 
 func (this *Mmap) AppendInt64(value int64) error {
@@ -160,13 +173,13 @@ func (this *Mmap) AppendInt64(value int64) error {
 
 	binary.LittleEndian.PutUint64(this.MmapBytes[this.FilePointer:this.FilePointer+8], uint64(value))
 	this.FilePointer += 8
-	return nil
+	return nil //this.Sync()
 }
 
 func (this *Mmap) AppendStringWithLen(value string) error {
 	this.AppendInt64(int64(len(value)))
 	this.AppendString(value)
-	return nil
+	return nil //this.Sync()
 
 }
 
@@ -180,7 +193,7 @@ func (this *Mmap) AppendString(value string) error {
 	dst := this.MmapBytes[this.FilePointer : this.FilePointer+lens]
 	copy(dst, []byte(value))
 	this.FilePointer += lens
-	return nil
+	return nil //this.Sync()
 
 }
 
@@ -192,7 +205,7 @@ func (this *Mmap) AppendBytes(value []byte) error {
 	dst := this.MmapBytes[this.FilePointer : this.FilePointer+lens]
 	copy(dst, value)
 	this.FilePointer += lens
-	return nil
+	return nil //this.Sync()
 
 }
 
@@ -200,7 +213,7 @@ func (this *Mmap) WriteBytes(start int64, value []byte) error {
 	lens := int64(len(value))
 	dst := this.MmapBytes[start : start+lens]
 	copy(dst, value)
-	return nil
+	return nil //this.Sync()
 }
 
 func (this *Mmap) Unmap() error {
@@ -212,4 +225,22 @@ func (this *Mmap) Unmap() error {
 
 func (this *Mmap) GetPointer() int64 {
 	return this.FilePointer
+}
+
+
+
+func (this *Mmap) header() *reflect.SliceHeader {
+	return (*reflect.SliceHeader)(unsafe.Pointer(&this.MmapBytes))
+}
+
+
+
+func (this *Mmap) Sync() error {
+	dh:= this.header()
+	_,_,err:= syscall.Syscall(syscall.SYS_MSYNC,dh.Data,uintptr(dh.Len),syscall.MS_SYNC)
+	if err != 0 {
+		fmt.Printf("Sync Error ")
+		return errors.New("Sync Error")
+	}
+	return nil	
 }

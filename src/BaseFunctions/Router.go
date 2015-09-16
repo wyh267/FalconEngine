@@ -43,6 +43,11 @@ func (this *Router) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	log_id1 := rand.Intn(100000)
 	log_id2 := rand.Intn(100000)
 	log_id := fmt.Sprintf("%d-%d", log_id1, log_id2)
+	
+	
+	request_url := r.RequestURI
+	this.Logger.Info("[LOG_ID:%v] [URL : %v] ", log_id,request_url)
+	this.Logger.Info("[LOG_ID:%v] BODY : %v", log_id, string(body))
 
 	stype, err := this.ParseURL(r.RequestURI)
 	if err != nil {
@@ -92,7 +97,6 @@ END:
 	result["cost"] = fmt.Sprintf("%v", endTime.Sub(startTime))
 	result["request_url"] = r.RequestURI
 	this.Logger.Info("[LOG_ID:%v] [COST:%v] [URL : %v] ", log_id, result["cost"], result["request_url"])
-	this.Logger.Info("[LOG_ID:%v] BODY : %v", log_id, string(body))
 	resStr, _ := this.createJSON(result)
 	io.WriteString(w, resStr)
 	return

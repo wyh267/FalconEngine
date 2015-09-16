@@ -135,6 +135,7 @@ type UpdateInfo struct {
 	Info       map[string]string
 	UpdateType int
 	ErrChan    chan error
+	LogId	   string
 }
 
 func (this *DBBuilder) ScanInc(Data_chan chan UpdateInfo) error {
@@ -185,7 +186,7 @@ func (this *DBBuilder) ScanInc(Data_chan chan UpdateInfo) error {
 			if new_values["is_delete"] == "1" {
 				updateType = indexer.Delete
 			}
-			upinfo := UpdateInfo{new_values, updateType, make(chan error)}
+			upinfo := UpdateInfo{new_values, updateType, make(chan error),"NO_LOG_ID"}
 			Data_chan <- upinfo
 			errinfo := <-upinfo.ErrChan
 			if errinfo != nil {
@@ -321,7 +322,7 @@ func (this *DBBuilder) Buiding() error {
 		}
 
 	}
-	fmt.Printf("%v\n", fields)
+	//fmt.Printf("%v\n", fields)
 
 	this.DetailIdx = indexer.NewDetail()
 
@@ -433,7 +434,7 @@ func (this *DBBuilder) Buiding() error {
 		//for k,v := range redis_map{
 		//	fmt.Printf("\"%v\":\"%v\",",k,v)
 		//}
-		fmt.Printf("\n")
+		//fmt.Printf("\n")
 		if this.DetailIdx.PutDocInfo(doc_id, redis_map) != nil {
 			this.Logger.Error("PutDocInfo doc_id Error :  %v \n", err)
 		}
@@ -500,7 +501,7 @@ func (this *DBBuilder) Buiding() error {
 
 	}
 
-	fmt.Printf("Waiting %v threads\n ", writeCount)
+	//fmt.Printf("Waiting %v threads\n ", writeCount)
 	if writeCount == 0 {
 		close(writeChan)
 		return nil

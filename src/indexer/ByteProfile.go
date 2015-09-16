@@ -187,7 +187,7 @@ func (this *ByteProfile) PutDocInfoByte(doc_id int64, info_byte []byte) error {
 }
 
 func (this *ByteProfile) SetNewValueByte(doc_id int64, binfo []byte) error {
-	fmt.Printf("doc_id : %v max_doc_id : %v field : %v \n",doc_id,this.MaxDocId,this.Name)
+	//fmt.Printf("doc_id : %v max_doc_id : %v field : %v \n",doc_id,this.MaxDocId,this.Name)
 	//只要是新增的，都需要写入up文件中
 	info_start := this.upMmap.GetPointer()
 	info_lens := int64(len(binfo))

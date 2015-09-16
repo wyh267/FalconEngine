@@ -266,8 +266,8 @@ type SearchRule struct {
 }
 
 func (this *IndexSet) SearchByRules(rules /*map[string]interface{}*/ []SearchRule) ([]utils.DocIdInfo, bool) {
-	functime := utils.InitTime()
-	fmt.Printf("SearchByRules: %v \n", functime("Start"))
+	//functime := utils.InitTime()
+	//fmt.Printf("SearchByRules: %v \n", functime("Start"))
 	var res []utils.DocIdInfo
 	for index, rule := range rules {
 		var sub_res []utils.DocIdInfo
@@ -522,7 +522,7 @@ func (this *IndexSet) SearchFieldByString(query string, field string) ([]utils.D
 	}
 
 	
-	fmt.Printf("terms : %v \n",terms)
+	//fmt.Printf("terms : %v \n",terms)
 	/*
 	var terms []string
 
@@ -581,8 +581,8 @@ func (this *IndexSet) SearchFieldByString(query string, field string) ([]utils.D
 *
 ******************************************************************************/
 func (this *IndexSet) SearchFieldByNumber(query int64, field string) ([]utils.DocIdInfo, bool) {
-	functime := utils.InitTime()
-	fmt.Printf("SearchFieldByNumber: %v \n", functime("Start"))
+	//functime := utils.InitTime()
+	//fmt.Printf("SearchFieldByNumber: %v \n", functime("Start"))
 	_, ok := this.IvtIndex[field]
 	if !ok {
 		return nil, false
@@ -593,7 +593,7 @@ func (this *IndexSet) SearchFieldByNumber(query int64, field string) ([]utils.Do
 		return nil, false
 	}
 	//this.Logger.Info("[Number : %v ] [Field: %v ] DocIDs : %v", query, field, l)
-	fmt.Printf("SearchFieldByNumber: %v \n", functime("Find"))
+	//fmt.Printf("SearchFieldByNumber: %v \n", functime("Find"))
 	return l, true
 }
 
@@ -719,34 +719,34 @@ func (this *IndexSet) checkDetail(doc_id int64,info map[string]string) int {
 	for k, v := range detail_map {
 		_, ok := info[k]
 		if !ok {
-			this.Logger.Info("miss field , use defualt ...")
+			//this.Logger.Info("miss field , use defualt ...")
 			info[k] = v
 		}
 		if (v != info[k]) && k != this.IncField {
 			res = PlfUpdate
 			if this.FieldInfo[k].IsIvt == true {
-				this.Logger.Info("checkDetail IsIvt: %v  old:%v new:%v ",k,info[k],v)
+				//this.Logger.Info("checkDetail IsIvt: %v  old:%v new:%v ",k,info[k],v)
 				res = IvtUpdate
 				//break 这句有严重bug
 			}
 		}
 	}
-	this.Logger.Info("checkDetail : %v  ",res)
+	//this.Logger.Info("checkDetail : %v  ",res)
 	return res
 }
 
 
-func (this *IndexSet) UpdateRecord(info map[string]string, UpdateType int) error {
+func (this *IndexSet) UpdateRecord(info map[string]string, UpdateType int,log_id string) error {
 
 	//检查是否有PrimaryKey字段，如果没有的话，不允许更新
 	_, hasPK := info[this.PrimaryKey]
 	if !hasPK {
-		this.Logger.Error("No Primary Key,Update is not allow ")
+		this.Logger.Error("[LOG_ID:%v] [Update] No Primary Key,Update is not allow ",log_id)
 		return errors.New("No Primary Key,Update is not allow")
 	}
 	pk, err := strconv.ParseInt(info[this.PrimaryKey], 0, 0)
 	if err != nil {
-		this.Logger.Error("No Primary Key,Update is not allow  %v", err)
+		this.Logger.Error("[LOG_ID:%v] [Update] No Primary Key,Update is not allow  %v",log_id, err)
 		return err
 	}
 	
@@ -757,20 +757,20 @@ func (this *IndexSet) UpdateRecord(info map[string]string, UpdateType int) error
 	
 	
 	doc_id,has_key := this.FindPromaryKey(pk)
-	this.Logger.Info("FindPromaryKey : %v doc_id : %v , has_key : %v  ",pk,doc_id,has_key)
+	//this.Logger.Info("FindPromaryKey : %v doc_id : %v , has_key : %v  ",pk,doc_id,has_key)
 	
 	if has_key {
 		switch this.checkDetail(doc_id,info) {
 			case NoChange:
-				this.Logger.Info("No Update ....")
+				this.Logger.Info("[LOG_ID:%v] [Update] No Update ....",log_id)
 				return nil
 			case PlfUpdate:
-				this.Logger.Info("PlfUpdate .... ")
+				this.Logger.Info("[LOG_ID:%v] [Update] PlfUpdate .... ",log_id)
 				for k, v := range info {
 					this.UpdateProfile(k, v, doc_id)
 				}
 			case IvtUpdate:
-				this.Logger.Info("IvtUpdate .... ")
+				this.Logger.Info("[LOG_ID:%v] [Update] IvtUpdate .... ",log_id)
 				this.DeleteRecord(pk)
 				doc_id = this.MaxDocId + 1
 				for k, v := range info {
@@ -779,15 +779,15 @@ func (this *IndexSet) UpdateRecord(info map[string]string, UpdateType int) error
 				}
 				this.MaxDocId++
 			default:
-				this.Logger.Info("No Update ....")
+				this.Logger.Info("[LOG_ID:%v] [Update] No Update ....",log_id)
 				return nil
 		}
 	}else{
-		this.Logger.Info("Insert record .... ")
+		this.Logger.Info("[LOG_ID:%v] [Update] Insert record .... ",log_id)
 		doc_id = this.MaxDocId + 1
 		err := this.GetDefaultValue(info)
 		if err!=nil{
-			this.Logger.Info("No Update ....Default Value Error....%v ",err)
+			this.Logger.Info("[LOG_ID:%v] [Update] No Update ....Default Value Error....%v ",log_id,err)
 			return nil 
 		}
 		for k, v := range info {
@@ -800,7 +800,7 @@ func (this *IndexSet) UpdateRecord(info map[string]string, UpdateType int) error
 	//更新detail
 	err = this.Detail.SetNewValue(doc_id, info)
 	if err != nil {
-		this.Logger.Error("Update Detail Error : %v ", err)
+		this.Logger.Error("[LOG_ID:%v] Update Detail Error : %v ",log_id, err)
 	}
 	return nil
 	

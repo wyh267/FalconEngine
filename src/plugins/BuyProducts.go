@@ -28,7 +28,7 @@ func (this *BuyProducts) Init() bool {
 
 func (this *BuyProducts) SetRules(rules interface{}) func(value_byte interface{}) bool {
 	
-	fmt.Printf("rules : %v \n",rules)
+	//fmt.Printf("rules : %v \n",rules)
 	rule,ok:=rules.(utils.Condition)
 	if !ok {
 		fmt.Printf("Error rules\n")
@@ -105,7 +105,7 @@ func (this *BuyProducts) SegmentFunc(value interface{},isSearch bool) []string{
 		res=append(res,value...)
 		
 	} 
-	fmt.Printf("BuyProducts SegmentFunc res : %v \n",res)
+	//fmt.Printf("BuyProducts SegmentFunc res : %v \n",res)
 	return res
 
 }
@@ -114,7 +114,7 @@ func (this *BuyProducts) SegmentFunc(value interface{},isSearch bool) []string{
 //插件正排处理函数，建立索引的时候调用，stype =9 调用 ,返回byte数组
 func (this *BuyProducts) BuildByteProfile(value []byte) []byte {
 	
-	fmt.Printf("BuyProducts BuildByteProfile \n",)
+	//fmt.Printf("BuyProducts BuildByteProfile \n",)
 	
 	return value
 }

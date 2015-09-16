@@ -69,7 +69,7 @@ func (this *IndexBuilder) BuildTextIndex(doc_id int64, content string, ivt_idx *
 	}else{
 		terms=this.Segmenter.SegmentByType(content,split_type,true)
 	}
-	fmt.Printf("Terms : %v \n",terms)
+	//fmt.Printf("Terms : %v \n",terms)
 	/*
 	var terms []string
 

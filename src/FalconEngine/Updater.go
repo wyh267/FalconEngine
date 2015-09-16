@@ -58,6 +58,7 @@ func (this *Updater) Process(log_id string, body []byte, params map[string]strin
 	updateInfo.Info=params
 	updateInfo.UpdateType = 0
 	updateInfo.ErrChan = make(chan error)
+	updateInfo.LogId = log_id
 	this.Data_chan <- updateInfo
 	errinfo := <-updateInfo.ErrChan
 	if errinfo != nil {
@@ -133,7 +134,7 @@ func (this *Updater) updatingThread() {
 		select {
 		case info := <-this.Data_chan:
 			//this.Logger.Info("Got data ... %v ",info)
-			info.ErrChan <- this.Indexer.UpdateRecord(info.Info, info.UpdateType)
+			info.ErrChan <- this.Indexer.UpdateRecord(info.Info, info.UpdateType,info.LogId)
 
 		}
 
