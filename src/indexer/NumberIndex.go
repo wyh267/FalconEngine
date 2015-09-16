@@ -20,7 +20,7 @@ type NumberIndex struct {
 }
 
 func NewNumberIndex(name string, ivt *u.InvertIdx, dic *u.NumberIdxDic) *NumberIndex {
-	index := &Index{name, 2, ivt}
+	index := &Index{Name:name, Type:2, ivtIndex:ivt}
 	this := &NumberIndex{index, dic}
 	return this
 
@@ -66,4 +66,14 @@ func (this *NumberIndex) GetNumDic() *u.NumberIdxDic {
 }
 func (this *NumberIndex) GetStrDic() *u.StringIdxDic {
 	return nil
+}
+
+
+func (this *NumberIndex) SetCustomInterface(inter u.CustomInterface) error {
+	this.customeInter=inter
+	return nil
+}
+
+func (this *NumberIndex) GetCustomInterface() u.CustomInterface {
+	return this.customeInter
 }

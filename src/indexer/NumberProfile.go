@@ -43,7 +43,7 @@ func (this *NumberProfile) Display() {
 }
 
 func (this *NumberProfile) PutProfile(doc_id, value int64) error {
-
+	//fmt.Printf(" ========== [ NAME : %v ] [ LEN : %v ] [ DOC_ID : %v ] [value : %v]============\n", this.Name, this.Len, doc_id,value)
 	if doc_id > this.Len || doc_id < 1 {
 		//fmt.Printf(" ========== [ NAME : %v ] [ LEN : %v ] [ DOC_ID : %v ]============\n", this.Name, this.Len, doc_id)
 		return errors.New("docid is wrong")
@@ -56,6 +56,7 @@ func (this *NumberProfile) PutProfile(doc_id, value int64) error {
 			this.numMmap.WriteInt64(0, this.Len)
 			this.numMmap.AppendInt64(value)
 		}
+	
 		return nil
 	}
 
@@ -64,6 +65,7 @@ func (this *NumberProfile) PutProfile(doc_id, value int64) error {
 		pos := 16 + doc_id*8
 		this.numMmap.WriteInt64(pos, value)
 	}
+	
 	return nil
 
 }
@@ -80,8 +82,9 @@ func (this *NumberProfile) FindValue(doc_id int64) (int64, error) {
 func (this *NumberProfile) FilterValue(doc_ids []u.DocIdInfo, value int64, is_forward bool, filt_type int64) ([]u.DocIdInfo, error) {
 
 	res := make([]u.DocIdInfo, 0, 1000)
-
+	
 	switch filt_type {
+		
 	case FILT_TYPE_LESS:
 
 		for i, _ := range doc_ids {
@@ -98,6 +101,7 @@ func (this *NumberProfile) FilterValue(doc_ids []u.DocIdInfo, value int64, is_fo
 		}
 	case FILT_TYPE_EQUAL:
 		for i, _ := range doc_ids {
+			//fmt.Printf("DOC_ID:%v\n",doc_ids[i].DocId)
 			if this.ProfileList[doc_ids[i].DocId] == value {
 				res = append(res, doc_ids[i])
 			}
@@ -273,5 +277,12 @@ func (this *NumberProfile) ReadFromFile() error {
 }
 
 func (this *NumberProfile) SetCustomInterface(inter u.CustomInterface) error {
+	this.customeInter=inter
 	return nil
+}
+
+
+
+func (this *NumberProfile) GetCustomInterface() u.CustomInterface {
+	return this.customeInter
 }

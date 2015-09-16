@@ -59,6 +59,8 @@ func (this *Segmenter) SegmentByType(content string, split_type int64,search_mod
 		terms = RemoveDuplicatesAndEmpty(strings.Split(content, ";"))
 	case 4: //按规定的分隔符进行切词
 		terms = RemoveDuplicatesAndEmpty(strings.Split(content, "@"))
+	//default:
+	//	terms = append(terms,content)
 	}
 
 	return terms

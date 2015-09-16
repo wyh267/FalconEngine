@@ -36,6 +36,7 @@ const GROUP_BY string = "group_by"
 const QUERY string = "query"
 
 
+
 func (this *Searcher) SimpleSearch(log_id string, body []byte, params map[string]string, result map[string]interface{}, ftime func(string) string) error {
 	srules, frules, _, _ := this.ParseParams(log_id, params)
 
@@ -45,7 +46,7 @@ func (this *Searcher) SimpleSearch(log_id string, body []byte, params map[string
 		return nil
 	}
 	total_doc_ids, _ = this.Indexer.FilterByRules(total_doc_ids, frules)
-	this.Logger.Info("[LOG_ID:%v]Running Searcher ....Time: %v ", log_id, ftime("search fields"))
+	//this.Logger.Info("[LOG_ID:%v]Running Searcher ....Time: %v ", log_id, ftime("search fields"))
 	result["COUNT"] = len(total_doc_ids)
 	var tmp_doc_ids []utils.DocIdInfo
 	if len(total_doc_ids) > 10 {
@@ -54,7 +55,7 @@ func (this *Searcher) SimpleSearch(log_id string, body []byte, params map[string
 		tmp_doc_ids = total_doc_ids
 	}
 
-	this.Logger.Info("[LOG_ID:%v]Running Simple Searcher ....Time: %v \n\n", log_id, ftime("Display Detail"))
+	//this.Logger.Info("[LOG_ID:%v]Running Simple Searcher ....Time: %v \n\n", log_id, ftime("Display Detail"))
 	result["DATA"] = this.Indexer.GetDetailsByDocId(tmp_doc_ids)
 	return nil
 
@@ -71,6 +72,7 @@ func (this *Searcher) Process(log_id string, body []byte, params map[string]stri
 	return this.SimpleSearch(log_id, body, params, result, ftime)
 
 }
+
 
 
 func (this *Searcher) ParseParams(log_id string, params map[string]string) ([]indexer.SearchRule, []indexer.FilterRule, int64, int64) {
@@ -109,7 +111,7 @@ func (this *Searcher) ParseParams(log_id string, params map[string]string) ([]in
 		}
 
 		if k[0] != '-' && k[0] != '_' {
-			this.Logger.Info(" string field K : %v ,V : %v", k, v)
+			//this.Logger.Info(" string field K : %v ,V : %v", k, v)
 			stype := this.Indexer.GetIdxType(k)
 			if stype == -1 {
 				continue
@@ -129,7 +131,7 @@ func (this *Searcher) ParseParams(log_id string, params map[string]string) ([]in
 		}
 
 		if k[0] == '-' {
-			this.Logger.Info(" filter1 field K : %v ,V : %v", k, v)
+			//this.Logger.Info(" filter1 field K : %v ,V : %v", k, v)
 			stype := this.Indexer.GetPflType(k[1:])
 			if stype == -1 {
 				this.Logger.Error("[LOG_ID:%v] %v %v", log_id, v, k[1:])

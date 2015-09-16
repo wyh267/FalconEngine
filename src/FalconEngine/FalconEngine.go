@@ -70,12 +70,13 @@ func main() {
 		processor := &BaseFunctions.BaseProcessor{configure, logger, dbAdaptor /*redisClient*/, nil, remoteRedisClient}
 		bitmap := utils.NewBitmap()
 		fields, err := configure.GetTableFields()
+		inc_field,_ :=configure.GetIncField()
 		if err != nil {
 			logger.Error("%v", err)
 			return
 		}
 		index_set := indexer.NewIndexSet(bitmap, logger)
-		index_set.InitIndexSet(fields)
+		index_set.InitIndexSet(fields,inc_field)
 
 		data_chan := make(chan builder.UpdateInfo, 1000)
 		searcher := NewSearcher(processor, index_set, data_chan) // &Searcher{processor}

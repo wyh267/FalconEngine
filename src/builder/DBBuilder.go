@@ -1,30 +1,35 @@
 package builder
 
 import (
-	"errors"
 	"fmt"
 	"indexer"
 	"strconv"
 	"strings"
 	"time"
 	"utils"
+	"encoding/json"
+	"plugins"
 
 	//"os"
 )
 
 type FieldInfo struct {
-	IsPK      bool
-	IsIvt     bool
-	IsPlf     bool
-	FType     string
-	Name      string
-	SType     int64
+	IsPK      bool	`json:"is_pk"`
+	IsIvt     bool	`json:"is_ivt"`
+	IsPlf     bool	`json:"is_pro"`
+	FType     string `json:"field_type"`
+	Name      string `json:"name"`
+	SType     int64  `json:"split"`
 	IvtIdx    *utils.InvertIdx
 	IvtStrDic *utils.StringIdxDic
 	IvtNumDic *utils.NumberIdxDic
 	PlfText   *indexer.TextProfile
 	PlfNumber *indexer.NumberProfile
 	PlfByte   *indexer.ByteProfile
+	
+	CustomeInter utils.CustomInterface
+	
+	
 }
 
 type DBBuilder struct {
@@ -61,9 +66,16 @@ func (this *DBBuilder) ParseConfigure() error {
 		this.Logger.Error("%v", err)
 		return err
 	}
-
+	//this.Logger.Info("All Fields : %v ",fields)
 	for k, v := range fields {
-
+		var fi FieldInfo
+		err = json.Unmarshal([]byte(v), &fi)
+		if err != nil {
+			fmt.Printf("Unmarshal Error ...\n")
+			return err
+		}
+		fi.Name=k
+/*
 		l := strings.Split(v, ",")
 		if len(l) != 5 {
 			this.Logger.Error("%v", errors.New("Wrong config file"))
@@ -96,6 +108,7 @@ func (this *DBBuilder) ParseConfigure() error {
 		}
 
 		fi.SType = stype
+*/
 
 		this.Fields = append(this.Fields, fi)
 	}
@@ -122,13 +135,14 @@ type UpdateInfo struct {
 	Info       map[string]string
 	UpdateType int
 	ErrChan    chan error
+	LogId	   string
 }
 
 func (this *DBBuilder) ScanInc(Data_chan chan UpdateInfo) error {
 
 	this.Logger.Info("Start Inc Updating Now ..... ")
 
-	curr_time := time.Now().Format("2006-01-02 15:04:05")
+	curr_time := time.Now().Add(-10*time.Minute).Format("2006-01-02 15:04:05")
 	var fields string
 	isIvert := make(map[string]bool)
 	for _, v := range this.Fields {
@@ -149,7 +163,7 @@ func (this *DBBuilder) ScanInc(Data_chan chan UpdateInfo) error {
 		}
 		defer rows.Close()
 		for rows.Next() {
-			isUpdate := false
+			//isUpdate := false
 			updateType := indexer.PlfUpdate
 			//values := make([]interface{},len(this.Fields))
 			values := make([]interface{}, len(this.Fields))
@@ -169,7 +183,20 @@ func (this *DBBuilder) ScanInc(Data_chan chan UpdateInfo) error {
 
 			}
 
-
+			if new_values["is_delete"] == "1" {
+				updateType = indexer.Delete
+			}
+			upinfo := UpdateInfo{new_values, updateType, make(chan error),"NO_LOG_ID"}
+			Data_chan <- upinfo
+			errinfo := <-upinfo.ErrChan
+			if errinfo != nil {
+				this.Logger.Info("Update Fail.... %v ", errinfo)
+			} else {
+				this.Logger.Info("Update Success.... ")
+			}
+			curr_time = new_values[incField]
+			
+			/*	
 			pk, err := strconv.ParseInt(new_values["id"], 0, 0)
 			if err != nil {
 				this.Logger.Error("parse error : %v", err)
@@ -222,6 +249,7 @@ func (this *DBBuilder) ScanInc(Data_chan chan UpdateInfo) error {
 					this.Logger.Info("Update Success.... ")
 				}
 			}
+			*/
 
 		}
 		time.Sleep(5000 * time.Millisecond)
@@ -244,40 +272,59 @@ func (this *DBBuilder) Buiding() error {
 	for index, v := range this.Fields {
 		//构造sql语句
 		fields = fields + "," + v.Name
+		
+		//新建插件
+		cumstom := plugins.NewPlus(v.Name)
+		cumstom.Init()
+
 		//构造索引数据指针
 		if v.IsIvt {
-
 			if v.FType == "T" {
 				this.Fields[index].IvtIdx = utils.NewInvertIdx(utils.TYPE_TEXT, v.Name)
 				this.Fields[index].IvtStrDic = utils.NewStringIdxDic(v.Name)
+				this.Fields[index].CustomeInter=cumstom
 
 
 			}
 
 			if v.FType == "N" {
+				
 				this.Fields[index].IvtIdx = utils.NewInvertIdx(utils.TYPE_NUM, v.Name)
 				this.Fields[index].IvtNumDic = utils.NewNumberIdxDic(v.Name)
+				this.Fields[index].CustomeInter=cumstom
+			}
+			
+			if v.FType == "I" {
+				
+				this.Fields[index].IvtIdx = utils.NewInvertIdx(utils.TYPE_TEXT, v.Name)
+				this.Fields[index].IvtStrDic = utils.NewStringIdxDic(v.Name)
+				this.Fields[index].CustomeInter=cumstom
 
 			}
+			
+			
 		}
 
 		if v.IsPlf {
 			if v.FType == "T" {
 				this.Fields[index].PlfText = indexer.NewTextProfile(v.Name)
+				this.Fields[index].PlfText.SetCustomInterface(cumstom)
 			}
 
 			if v.FType == "N" {
 				this.Fields[index].PlfNumber = indexer.NewNumberProfile(v.Name)
+				this.Fields[index].PlfNumber.SetCustomInterface(cumstom)
 			}
 
 			if v.FType == "I" {
 				this.Fields[index].PlfByte = indexer.NewByteProfile(v.Name)
+				this.Fields[index].PlfByte.SetCustomInterface(cumstom)
 			}
 
 		}
 
 	}
-	fmt.Printf("%v\n", fields)
+	//fmt.Printf("%v\n", fields)
 
 	this.DetailIdx = indexer.NewDetail()
 
@@ -314,8 +361,8 @@ func (this *DBBuilder) Buiding() error {
 			//v,_ := value.(string)
 			if this.Fields[index].IsIvt {
 
-				if this.Fields[index].FType == "T" {
-					err := builder.BuildTextIndex(doc_id, v, this.Fields[index].IvtIdx, this.Fields[index].IvtStrDic, this.Fields[index].SType, false)
+				if this.Fields[index].FType == "T" || this.Fields[index].FType == "I"{
+					err := builder.BuildTextIndex(doc_id, v, this.Fields[index].IvtIdx, this.Fields[index].IvtStrDic, this.Fields[index].SType, false,this.Fields[index].CustomeInter)
 					//err := builder.BuildTextIndexTemp(doc_id, v, this.Fields[index].IvtIdx, this.Fields[index].IvtStrDic,this.Fields[index].SType,this.Fields[index].Name)
 					if err != nil {
 						this.Logger.Error("ERROR : %v", err)
@@ -329,7 +376,7 @@ func (this *DBBuilder) Buiding() error {
 						this.Logger.Warn("Warning : name : [%v] , value: [%v] , error : [%v]", this.Fields[index].Name, v, err)
 					}
 
-					err = builder.BuildNumberIndex(doc_id, v_num, this.Fields[index].IvtIdx, this.Fields[index].IvtNumDic, false)
+					err = builder.BuildNumberIndex(doc_id, v_num, this.Fields[index].IvtIdx, this.Fields[index].IvtNumDic, this.Fields[index].SType,false,this.Fields[index].CustomeInter)
 					//err = builder.BuildNumberIndexTemp(doc_id, v_num, this.Fields[index].IvtIdx, this.Fields[index].IvtNumDic,this.Fields[index].Name)
 					if err != nil {
 						this.Logger.Error("ERROR : %v", err)
@@ -345,6 +392,8 @@ func (this *DBBuilder) Buiding() error {
 					if this.Fields[index].SType == 5 {
 						vl := strings.Split(v, " ")
 						v = vl[0]
+					}else if this.Fields[index].SType == 9{
+						v=this.Fields[index].PlfText.GetCustomInterface().BuildStringProfile(v)
 					}
 					err := this.Fields[index].PlfText.PutProfile(doc_id, v)
 					if err != nil {
@@ -358,6 +407,9 @@ func (this *DBBuilder) Buiding() error {
 						v_num = 0
 						this.Logger.Warn("Warning : name : %v , value: %v , error : %v", this.Fields[index].Name, v, err)
 					}
+					if this.Fields[index].SType == 9{
+						v_num=this.Fields[index].PlfNumber.GetCustomInterface().BuildIntProfile(v)
+					}
 					err = this.Fields[index].PlfNumber.PutProfile(doc_id, v_num)
 					if err != nil {
 						this.Logger.Error("ERROR : %v", err)
@@ -366,6 +418,9 @@ func (this *DBBuilder) Buiding() error {
 
 				if this.Fields[index].FType == "I" {
 					v_byte := []byte(v)
+					if this.Fields[index].SType == 9{
+						v_byte=this.Fields[index].PlfByte.GetCustomInterface().BuildByteProfile(v_byte)
+					}
 					err = this.Fields[index].PlfByte.PutProfile(doc_id, v_byte)
 					if err != nil {
 						this.Logger.Error("ERROR : %v", err)
@@ -378,6 +433,10 @@ func (this *DBBuilder) Buiding() error {
 		/////
 		//this.RedisCli.SetFields(doc_id, redis_map)
 		////
+		//for k,v := range redis_map{
+		//	fmt.Printf("\"%v\":\"%v\",",k,v)
+		//}
+		//fmt.Printf("\n")
 		if this.DetailIdx.PutDocInfo(doc_id, redis_map) != nil {
 			this.Logger.Error("PutDocInfo doc_id Error :  %v \n", err)
 		}
@@ -403,11 +462,10 @@ func (this *DBBuilder) Buiding() error {
 	utils.MakeBitmapFile()
 
 	for index, _ := range this.Fields {
-
 		if this.Fields[index].IsIvt {
 			//utils.WriteToIndexFile(this.Fields[index].IvtIdx, fmt.Sprintf("./index/%v_idx.idx", this.Fields[index].Name))
 			this.Fields[index].IvtIdx.WriteToFile()
-			if this.Fields[index].FType == "T" {
+			if this.Fields[index].FType == "T" || this.Fields[index].FType == "I"{
 
 				this.Fields[index].IvtStrDic.WriteToFile()
 
@@ -448,7 +506,7 @@ func (this *DBBuilder) Buiding() error {
 
 	}
 
-	fmt.Printf("Waiting %v threads\n ", writeCount)
+	//fmt.Printf("Waiting %v threads\n ", writeCount)
 	if writeCount == 0 {
 		close(writeChan)
 		return nil
