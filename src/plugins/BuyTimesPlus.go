@@ -135,7 +135,7 @@ func (this *ButTimesPlus) SegmentFunc(value interface{},isSearch bool) []string{
 	}
 	
 	
-	fmt.Printf("SegmentFunc...\n")
+	//fmt.Printf("SegmentFunc...\n")
 	buytimes := make(map[string]Order)
 	body, ok := value.(string)
 	if !ok {
@@ -147,12 +147,12 @@ func (this *ButTimesPlus) SegmentFunc(value interface{},isSearch bool) []string{
 		return nil
 	}
 	
-	for date,value := range buytimes{
+	for date,_ := range buytimes{
 		//fmt.Printf("date : %v  value  : %v \n",date,value)
 		res=append(res,date)
 		
 	} 
-	fmt.Printf("res : %v \n",res)
+	//fmt.Printf("res : %v \n",res)
 	return res
 }
 
