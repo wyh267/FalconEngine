@@ -388,14 +388,15 @@ func checkBuyTimes(rule Condition, contact_info map[string]string, field string)
 	var sum int64 = 0
 	var sum_amount float64 = 0.0
 	for date,value := range buytimes{
-		//fmt.Printf("date : %v start : %v end : %v sum : %v count : %v \n",date,start,end,sum,value.Count)
 		if date > start  && date < end {
 			sum = sum + value.Count
 			sum_amount = sum_amount + value.RealAmount
 		}
 	}
+	//fmt.Printf("start : %v end : %v sum : %v  \n",start,end,sum)
 	switch rule.Op{
 		case "more":
+	//		fmt.Printf("more, %v \n",((sum > total_count && rule.Key == "buy_count") || (sum_amount > total_amount && rule.Key == "buy_amount")))
 			return ((sum > total_count && rule.Key == "buy_count") || (sum_amount > total_amount && rule.Key == "buy_amount"))
 		case "less":
 			return ((sum < total_count && rule.Key == "buy_count") || (sum_amount < total_amount && rule.Key == "buy_amount"))
@@ -477,6 +478,7 @@ func ComputScore(body []byte, ContactInfo map[string]string) (int64, error) {
 		}
 
 		if sub_flag == true {
+			//fmt.Printf("HAHAHAHAHAHA: %v \n",data.Score)
 			return data.Score, nil
 		}
 	}

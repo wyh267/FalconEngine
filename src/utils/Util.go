@@ -158,5 +158,5 @@ type Condition struct {
 	Op    string `json:"operate"`
 	Value string `json:"value"`
 	Desc  string `json:"desc"`
-	Range string `json:"range"`
+	Range string `json:"daterange"`
 }
