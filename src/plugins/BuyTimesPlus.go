@@ -85,10 +85,18 @@ func (this *ButTimesPlus) SetRules(rules interface{}) func(value_byte interface{
 				sum_amount = sum_amount + value.RealAmount
 			}
 		}
-		if (sum > total_count && rule.Key == "buy_count") || (sum_amount > total_amount && rule.Key == "buy_amount"){
-			//fmt.Printf("Match .... %v \n", buytimes)
-			return true
+		switch rule.Op{
+			case "more":
+				return ((sum > total_count && rule.Key == "buy_count") || (sum_amount > total_amount && rule.Key == "buy_amount"))
+			case "less":
+				return ((sum < total_count && rule.Key == "buy_count") || (sum_amount < total_amount && rule.Key == "buy_amount"))
+			case "equal":
+				return ((sum == total_count && rule.Key == "buy_count") || (sum_amount == total_amount && rule.Key == "buy_amount"))
 		}
+		//if (sum > total_count && rule.Key == "buy_count") || (sum_amount > total_amount && rule.Key == "buy_amount"){
+			//fmt.Printf("Match .... %v \n", buytimes)
+		//	return true
+		//}
 		//fmt.Printf("Not Match .... \n")
 		return false
 	}
