@@ -272,12 +272,144 @@ func checkAllConditions(vv Condition, ContactInfo map[string]string) bool {
 		result = checkDateTime(vv.Op, vv.Value, ContactInfo, "update_time")
 	case "score":
 		result = checkNumber(vv.Op, vv.Value, ContactInfo, "score")
+	case "buy_count":
+		result = checkBuyTimes(vv, ContactInfo, "buy_times")
+	case "buy_amount":
+		result = checkBuyTimes(vv, ContactInfo, "buy_times")
+	case "has_buy":
+		switch vv.Desc {
+			case "buy_products":
+				result = checkBuyProductsOrCategorys(vv, ContactInfo, "buy_products")
+			case "buy_category":	
+				result = checkBuyProductsOrCategorys(vv, ContactInfo, "buy_categorys")
+		}
+	case "last_buy_date":
+		result = checkDateTime(vv.Op, vv.Value, ContactInfo, "last_buy_date")
 
 	}
 
 	return result
 
 }
+
+
+func stringInList(target string,sources []string) bool {
+	
+	for _,source := range sources{
+		if target == source {
+			return true
+		}
+	}
+	return false
+}
+
+
+func checkBuyProductsOrCategorys(rule Condition, contact_info map[string]string, field string) bool {
+	
+	var start,end string
+	date_range := strings.Split(rule.Range,",")
+	if len(date_range) != 2{
+		start= "2015-01-01"
+		end = "2015-12-31"
+	}
+	start = date_range[0]
+	end = date_range[1]
+	products := RemoveDuplicatesAndEmpty(strings.Split(rule.Value, ";"))
+	//fmt.Printf("total : %v start : %v end : %v \n",total,start,end)
+
+	productsInfo := make(map[string][]string)
+	
+	err := json.Unmarshal([]byte(contact_info[field]), &productsInfo)
+	if err != nil {
+		fmt.Printf("Unmarshal Error ...\n")
+		return false
+	}
+	list :=make([]string,0)
+	for k,v := range productsInfo{
+		
+		if k>end || k < start {
+			continue
+		}
+		list = append(list,v...)
+	}
+	
+	for _,p := range products{
+		if stringInList(p,list) == false{
+			return false 
+		}
+	}
+	
+	return true
+	
+	
+}
+
+
+type utilOrder struct {
+
+	Count    int64  `json:"count"`
+	TotalAmount   float64  `json:"total_amount"`
+	RealAmount	  float64  `json:"real_amount"`	
+}
+
+func checkBuyTimes(rule Condition, contact_info map[string]string, field string) bool {
+	var start,end string
+	date_range := strings.Split(rule.Range,",")
+	if len(date_range) != 2{
+		start= "2015-01-01"
+		end = "2015-12-31"
+	}
+	start = date_range[0]
+	end = date_range[1]
+	var total_count int64
+	var total_amount float64
+	var err error
+	if rule.Key == "buy_count"{
+		total_count, err = strconv.ParseInt(rule.Value, 0, 0)
+		if err != nil {
+			fmt.Printf("Error %v \n", rule.Value)
+			return false
+		}
+	}else{
+		total_amount, err = strconv.ParseFloat(rule.Value,0)
+		if err != nil {
+			fmt.Printf("Error %v \n", rule.Value)
+			return false
+		}		
+	}
+	
+	buytimes := make(map[string]utilOrder)
+	err = json.Unmarshal([]byte(contact_info[field]), &buytimes)
+	if err != nil {
+		fmt.Printf("Unmarshal Error ...\n")
+		return false
+	}
+	
+	var sum int64 = 0
+	var sum_amount float64 = 0.0
+	for date,value := range buytimes{
+		//fmt.Printf("date : %v start : %v end : %v sum : %v count : %v \n",date,start,end,sum,value.Count)
+		if date > start  && date < end {
+			sum = sum + value.Count
+			sum_amount = sum_amount + value.RealAmount
+		}
+	}
+	switch rule.Op{
+		case "more":
+			return ((sum > total_count && rule.Key == "buy_count") || (sum_amount > total_amount && rule.Key == "buy_amount"))
+		case "less":
+			return ((sum < total_count && rule.Key == "buy_count") || (sum_amount < total_amount && rule.Key == "buy_amount"))
+		case "equal":
+			return ((sum == total_count && rule.Key == "buy_count") || (sum_amount == total_amount && rule.Key == "buy_amount"))
+	}
+
+	return false
+	
+	
+	
+	
+}
+
 
 func searchSubstringInField(query, fieldstr string) bool {
 	return strings.Contains(fieldstr, query)

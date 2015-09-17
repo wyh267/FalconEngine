@@ -45,8 +45,14 @@ func (this *ButTimesPlus) SetRules(rules interface{}) func(value_byte interface{
 	if !ok {
 		fmt.Printf("Error rules\n")
 	}
-	start := strings.Split(rule.Range,",")[0]
-	end := strings.Split(rule.Range,",")[1]
+	var start,end string
+	date_range := strings.Split(rule.Range,",")
+	if len(date_range) != 2{
+		start= "2015-01-01"
+		end = "2015-12-31"
+	}
+	start = date_range[0]
+	end = date_range[1]
 	var total_count int64
 	var total_amount float64
 	var err error
