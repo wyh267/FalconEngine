@@ -64,7 +64,7 @@ func (this *ButTimesPlus) SetRules(rules interface{}) func(value_byte interface{
 	}else{
 		total_amount, err = strconv.ParseFloat(rule.Value,0)
 		if err != nil {
-			fmt.Printf("Error %v \n", rule.Value)
+			fmt.Printf("yyyyyyError %v \n", rule.Value)
 		}		
 	}
 	
@@ -86,18 +86,21 @@ func (this *ButTimesPlus) SetRules(rules interface{}) func(value_byte interface{
 		var sum_amount float64 = 0.0
 		for date,value := range buytimes{
 			//fmt.Printf("date : %v start : %v end : %v sum : %v count : %v \n",date,start,end,sum,value.Count)
-			if date > start  && date < end {
+			if date >= start  && date <= end {
 				sum = sum + value.Count
 				sum_amount = sum_amount + value.RealAmount
 			}
 		}
+//		fmt.Printf(" start : %v end : %v sum : %v sum_amount : %v total_count: %v total_amount:%v \n",start,end,sum,sum_amount,total_count,total_amount)
 		switch rule.Op{
 			case "more":
 				return ((sum > total_count && rule.Key == "buy_count") || (sum_amount > total_amount && rule.Key == "buy_amount"))
 			case "less":
-				return ((sum < total_count && rule.Key == "buy_count") || (sum_amount < total_amount && rule.Key == "buy_amount"))
+				return ((sum > 0 && sum < total_count && rule.Key == "buy_count") || (sum_amount >0 && sum_amount < total_amount && rule.Key == "buy_amount"))
 			case "equal":
 				return ((sum == total_count && rule.Key == "buy_count") || (sum_amount == total_amount && rule.Key == "buy_amount"))
+			case "unequal":
+				return ((sum != total_count && rule.Key == "buy_count") || (sum_amount != total_amount && rule.Key == "buy_amount"))
 		}
 		//if (sum > total_count && rule.Key == "buy_count") || (sum_amount > total_amount && rule.Key == "buy_amount"){
 			//fmt.Printf("Match .... %v \n", buytimes)

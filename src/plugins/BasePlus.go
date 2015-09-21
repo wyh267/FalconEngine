@@ -19,7 +19,7 @@ func NewPlus(plus_name string) u.CustomInterface {
 	case "buy_products":
 		fmt.Printf("NewBuyProducts....\n")
 		return NewBuyProducts()
-	case "buy_category":
+	case "buy_categorys":
 		fmt.Printf("NewBuyCategory...\n")
 		return NewBuyCategory()
 	default:
