@@ -96,7 +96,7 @@ func (this *TextProfile) FilterValue(doc_ids []u.DocIdInfo, value string, is_for
 	switch filt_type {
 	case FILT_TYPE_LESS:
 		for i, _ := range doc_ids {
-			if this.ProfileList[doc_ids[i].DocId] < value {
+			if this.ProfileList[doc_ids[i].DocId] < value &&  this.ProfileList[doc_ids[i].DocId] > "1900-01-01"{
 				res = append(res, doc_ids[i])
 			}
 		}

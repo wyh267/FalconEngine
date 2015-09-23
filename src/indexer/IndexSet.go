@@ -709,7 +709,7 @@ func (this *IndexSet) checkDetail(doc_id int64,info map[string]string) int {
 		this.Logger.Error("Read Detail error...%v", err)
 		return res
 	}
-	
+	ivt := NoChange
 	for k, v := range detail_map {
 		_, ok := info[k]
 		if !ok {
@@ -720,10 +720,15 @@ func (this *IndexSet) checkDetail(doc_id int64,info map[string]string) int {
 			res = PlfUpdate
 			if this.FieldInfo[k].IsIvt == true {
 				//this.Logger.Info("checkDetail IsIvt: %v  old:%v new:%v ",k,info[k],v)
-				res = IvtUpdate
+				ivt = IvtUpdate
+				
 				//break 这句有严重bug
 			}
 		}
+	}
+	
+	if ivt == IvtUpdate{
+		res = IvtUpdate
 	}
 	//this.Logger.Info("checkDetail : %v  ",res)
 	return res
