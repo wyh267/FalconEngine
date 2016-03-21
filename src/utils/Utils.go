@@ -43,22 +43,6 @@ const (
 	IDX_ONLYSTORE = 30 //只保存详情，不参与检索
 )
 
-const (
-	PARENT_INDEX uint8 = 1
-	CHILD_INDEX  uint8 = 2
-)
-
-const (
-	URL_PARM_DB        string = "db"
-	URL_PARM_TABLE     string = "table"
-	URL_PARM_INDEX     string = "index"
-	URL_PARM_CONTACTID string = "contactid"
-	URL_PARM_DELETE_ID string = "contact_id"
-	URL_PARM_FIELD     string = "field"
-	URL_PARM_PAGE_SIZE string = "ps"
-	URL_PARM_PAGE_NUM  string = "pg"
-)
-
 // 过滤类型，对应filtertype
 const (
 	FILT_EQ    uint64 = 1 //等于
@@ -66,18 +50,6 @@ const (
 	FILT_LESS  uint64 = 3 //小于
 	FILT_RANGE uint64 = 4 //范围内
 )
-
-// FieldDic
-type FieldDic struct {
-	Offset uint32
-	KeyId  uint32
-	DF     uint32
-}
-
-type DetailInfo struct {
-	Offset int64
-	Len    int
-}
 
 // SimpleFieldInfo description: 字段的描述信息
 type SimpleFieldInfo struct {
@@ -87,54 +59,7 @@ type SimpleFieldInfo struct {
 	PflLen    int            `json:"pfllen"`    //正排索引长度
 }
 
-/*************************************************************************
-索引类的接口
-************************************************************************/
 
-// InvertInterface interface description : 倒排索引的接口
-type InvertInterface interface {
-	AddDocument(docid uint32, content interface{}) error //添加文档
-	Query(key interface{}) ([]DocIdNode, bool)           //关键词查询[倒排]
-	Serialization(filename string) (int64, int, error)   //序列化数据
-	Destroy() error
-	SetMmap(mmap *Mmap)
-}
-
-// ProfileInterface interface description : 正排索引的接口
-type ProfileInterface interface {
-	AddDocument(docid uint32, content interface{}) error //添加文档
-	Serialization(filename string) (int64, int, error)   //序列化数据
-	GetValue(pos uint32) (string, bool)                  //获取值，转成字符串返回
-	Filter(pos uint32, filtertype uint64, start, end int64) bool
-	Destroy() error
-	SetMmap(mmap *Mmap)
-	SetDtlMmap(mmap *Mmap)
-	UpdateDocument(docid uint32, content interface{}) error //更新文档
-}
-
-// IndexInterface interface description : 索引的接口描述，所有索引（正排，倒排）都需要实现此接口
-type IndexInterface interface {
-	AddDocument(docid uint32, contentstr string) error    //添加文档
-	UpdateDocument(docid uint32, contentstr string) error //更新文档
-	Query(key interface{}) ([]DocIdNode, bool)            //关键词查询[倒排]
-	Serialization(filename string) error                  //序列化数据
-	GetValue(docid uint32) (string, bool)                 //获取值，转成字符串返回
-	Filter(docid uint32, filtertype uint64, start, end int64) bool
-	Destroy() error
-	SetIvtOffset(val int64)
-	GetIvtOffset() int64
-	SetPflOffset(val int64)
-	GetPflOffset() int64
-	SetIvtLen(val int)
-	GetIvtLen() int
-	SetPflLen(val int)
-	GetPflLen() int
-	SetMmap(idxmmap, pflmmap, dtlmmap *Mmap)
-	//Filter(docid uint32, filtertype uint64, start, end int64) bool //过滤操作[正排]【>,<,==,!=,<>》】
-	//GetStringValue(docid uint32) (string, bool)                    //对于字符型正排，获取值
-	//GetNumberValue(docid uint32) (int64, bool)                     //对于数字型正排，获取值
-	//Destroy() error                                                //销毁这个字段的内容
-}
 
 /*************************************************************************
 索引查询接口
@@ -159,6 +84,12 @@ type FSSearchFilted struct {
 	Type      uint64 `json:"_type"`
 }
 
+type FSSearchUnit struct {
+    IndexName  string           `json:"indexname"`
+	Querys     []FSSearchQuery  `json:"_querys"`
+	Filters    []FSSearchFilted `json:"_filters"`
+}
+
 //统计类型
 const (
 	OP_COUNT uint64 = 1
@@ -178,92 +109,7 @@ type FSStatistics struct {
 	End      int64  `json:"_end"`       //统计后操作的结束范围
 	StartStr string `json:"_start_str"` //统计后操作的起始范围
 	EndStr   string `json:"_end_str"`   //统计后操作的结束范围
-
 }
-
-type FSDimSearch struct {
-	DimensionName string         `json:"dimensionname"`
-	SearchUnits   []FSSearchUnit `json:"searchunits"`
-}
-
-// FSSearchUnit function description : 查询接口总体数据结构基本单位，内部都是求交集
-type FSSearchUnit struct {
-	IndexName  string           `json:"indexname"`
-	Querys     []FSSearchQuery  `json:"_querys"`
-	Filters    []FSSearchFilted `json:"_filters"`
-	Statistics []FSStatistics   `json:"_statistics"`
-	SubSearch  []FSSearchUnit   `json:"_subquerys"`
-}
-
-//FSDimSearchUnit description:维度搜索的基本单元，各个索引必须一致，索引之间求交集
-type FSDimSearchUnit struct {
-	DimensionName string         `json:"dimensionname"`
-	IndexName     string         `json:"indexname"`
-	Score         string         `json:"score"`
-	SearchUnits   []FSSearchUnit `json:"searchunits"`
-}
-
-//FSDimSearchUnit description:维度搜索的基本单元，各个索引必须一致，索引之间求并集
-type FSDimSearchDoubleArray struct {
-	DimensionName  string            `json:"dimensionname"`
-	IndexName      string            `json:"indexname"`
-	DimSearchUnits []FSDimSearchUnit `json:"dimsearchunits"`
-}
-
-type FSDatabaseSearchUnit struct {
-	DabaseName           string                 `json:"dbname"`
-	DimensionName        string                 `json:"dimensionname"`
-	IndexName            string                 `json:"indexname"`
-	DimSearchDoubleArray FSDimSearchDoubleArray `json:"doublesearch"`
-}
-
-// FEArrayQueryInterface function description : 复杂查询接口数据结构[数组型]求交集
-type FEArrayQueryInterface struct {
-	DBName    string         `json:"dbname"`
-	TableName string         `json:"tablename"`
-	IndexName string         `json:"indexname"`
-	ArryQuery []FSSearchUnit `json:"_arrquerys"`
-}
-
-// FEArrayQueryInterface function description : 复杂查询接口数据结构[二维数组型]求并集
-type FEDoubleDimArrayQueryInterface struct {
-	DBName    string                  `json:"dbname"`
-	TableName string                  `json:"tablename"`
-	IndexName string                  `json:"indexname"`
-	ArryQuery []FEArrayQueryInterface `json:"_arrquerys"`
-}
-
-// ConditionChild 具体查询
-type ConditionChild struct {
-	Operate FSSearchUnit `json:"operate"`
-}
-
-// 查询子节点
-type Condition struct {
-	Score  string           `json:"score"`
-	Childs []ConditionChild `json:"childs"`
-}
-
-// 前端整体结构
-type FrontEndQuery struct {
-	Group      string      `json:"group"`
-	Conditions []Condition `json:"condition"`
-}
-
-/*
-type FSBoolSearchUnit struct{
-    BoolType    string `json:"_bool"`
-    Querys     []FSSearchQuery      `json:"_querys"`
-	Filters    []FSSearchFilted     `json:"_filters"`
-}
-
-
-type FSBoolSearch struct{
-    BoolType    string `json:"_bool"`
-    BoolUnit    []FSBoolSearchUnit `json:"_boolunit"`
-    SubBoolSearch []FSBoolSearch  `json:"_subbool"`
-}
-*/
 
 /*************************************************************************
 查询返回的数据结构项
@@ -304,34 +150,6 @@ type FEResultAutomaticSingle struct {
 	Condition  int    `json:"_condition"`
 }
 
-/*************************************************************************
-新建数据库，表，索引
-************************************************************************/
-// Indexcreate 索引构造结构，包含字段信息
-type Indexcreate struct {
-	IndexName    string            `json:"indexname"`
-	IndexMapping []SimpleFieldInfo `json:"indexmapping"`
-}
-
-// Tablecreate 表构造结构，包含索引信息
-type Tablecreate struct {
-	TableName  string        `json:"tablename"`
-	IndexNames []Indexcreate `json:"indexnames"`
-}
-
-// DBcreate 库构造结构，包含表信息
-type DBcreate struct {
-	DBName     string        `json:"dbname"`
-	TableNames []Tablecreate `json:"tablenames"`
-}
-
-// IndexUpdateStruct 索引更新数据结构
-type IndexUpdateStruct struct {
-	DBName    string            `json:"dbname"`
-	TableName string            `json:"tablename"`
-	IndexName string            `json:"indexname"`
-	Data      map[string]string `json:"data"`
-}
 
 /*****************************************************************************
 *  function name : Merge

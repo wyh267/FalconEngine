@@ -512,28 +512,27 @@ func (this *Segment) GetValueWithFields(docid uint32, fields []string) (map[stri
 
 
 
-// searchUnitDocIds function description : 搜索的基本单元
+// SearchUnitDocIds function description : 搜索的基本单元
 // params :
 // return :
-/*
-func (this *Segment) searchUnitDocIds(searchunit utils.FSSearchUnit, bitmap *utils.Bitmap, indocids []utils.DocIdNode) ([]utils.DocIdNode, bool) {
+func (this *Segment) SearchUnitDocIds(querys []utils.FSSearchQuery,filteds []utils.FSSearchFilted,bitmap *utils.Bitmap, indocids []utils.DocIdNode) ([]utils.DocIdNode, bool) {
 
 	start := len(indocids)
 	flag := false
 
-	if len(searchunit.Querys) == 0 || searchunit.Querys == nil {
+	if len(querys) == 0 || querys == nil {
 		docids := make([]utils.DocIdNode, 0)
 		for i := this.StartDocId; i < this.MaxDocId; i++ {
 			docids = append(docids, utils.DocIdNode(i))
 		}
 		indocids = append(indocids, docids...)
 	} else {
-		for _, query := range searchunit.Querys {
-			if _, hasField := this.Fields[query.FieldName]; !hasField {
+		for _, query := range querys {
+			if _, hasField := this.fields[query.FieldName]; !hasField {
 				this.Logger.Info("[INFO] Field %v not found", query.FieldName)
 				return indocids[:start], false
 			}
-			docids, match := this.Fields[query.FieldName].Indexer.Query(query.Value)
+			docids, match := this.fields[query.FieldName].query(query.Value)
 			if !match {
 				return indocids[:start], false
 			}
@@ -554,7 +553,7 @@ func (this *Segment) searchUnitDocIds(searchunit utils.FSSearchUnit, bitmap *uti
 	//bitmap去掉数据
 	index := start
 
-	if searchunit.Filters == nil {
+	if filteds == nil && bitmap != nil{
 		for _, docid := range indocids[start:] {
 			//去掉bitmap删除的
 			if bitmap.GetBit(uint64(docid)) == 0 {
@@ -572,9 +571,9 @@ func (this *Segment) searchUnitDocIds(searchunit utils.FSSearchUnit, bitmap *uti
 	index = start
 	for _, docidinfo := range indocids[start:] {
 		match := true
-		for _, filter := range searchunit.Filters {
-			if _, hasField := this.Fields[filter.FieldName]; hasField {
-				if (bitmap.GetBit(uint64(docidinfo)) == 1) || (!this.Fields[filter.FieldName].Indexer.Filter(uint32(docidinfo), filter.Type, filter.Start, filter.End)) {
+		for _, filter := range filteds {
+			if _, hasField := this.fields[filter.FieldName]; hasField  {
+				if (bitmap != nil  && bitmap.GetBit(uint64(docidinfo)) == 1) || (!this.fields[filter.FieldName].filter(uint32(docidinfo), filter.Type, filter.Start, filter.End)) {
 					match = false
 					break
 				}
@@ -599,8 +598,3 @@ func (this *Segment) searchUnitDocIds(searchunit utils.FSSearchUnit, bitmap *uti
 }
 
 
-
-
-
-
-*/
