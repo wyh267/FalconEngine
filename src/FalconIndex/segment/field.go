@@ -7,7 +7,7 @@
  *
 ******************************************************************************/
 
-package FalconIndex
+package segment
 
 import (
 	"errors"

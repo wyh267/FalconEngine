@@ -1,4 +1,4 @@
-package FalconIndex
+package segment
 
 import (
 	"fmt"
