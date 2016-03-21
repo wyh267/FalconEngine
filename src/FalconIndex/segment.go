@@ -10,7 +10,6 @@
 package FalconIndex
 
 import (
-
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -21,46 +20,45 @@ import (
 
 // FieldInfo description: 字段的描述信息
 type FieldInfo struct {
-	FieldName string         `json:"fieldname"`
-	FieldType uint64         `json:"fieldtype"`
-	PflOffset int64          `json:"pfloffset"` //正排索引的偏移量
-	PflLen    int            `json:"pfllen"`    //正排索引长度
-	
+	FieldName string `json:"fieldname"`
+	FieldType uint64 `json:"fieldtype"`
+	PflOffset int64  `json:"pfloffset"` //正排索引的偏移量
+	PflLen    int    `json:"pfllen"`    //正排索引长度
+
 }
 
 // Segment description:段结构
 type Segment struct {
-	StartDocId  uint32                     `json:"startdocid"`
-	MaxDocId    uint32                           `json:"maxdocid"`
-    //SegmentNumber uint32                         `json:"segmentnumber"`
+	StartDocId uint32 `json:"startdocid"`
+	MaxDocId   uint32 `json:"maxdocid"`
+	//SegmentNumber uint32                         `json:"segmentnumber"`
 	SegmentName string                           `json:"segmentname"`
 	FieldInfos  map[string]utils.SimpleFieldInfo `json:"fields"`
-    fields      map[string]*FSField
+	fields      map[string]*FSField
 	isMemory    bool
 	idxMmap     *utils.Mmap
 	pflMmap     *utils.Mmap
 	dtlMmap     *utils.Mmap
 	btdb        *tree.BTreedb
-    Logger      *utils.Log4FE               `json:"-"`
+	Logger      *utils.Log4FE `json:"-"`
 }
-
 
 // NewEmptySegmentWithFieldsInfo function description : 新建一个空的段，可以进行数据添加，包含字段信息
 // params :
 // return :
 func NewEmptySegmentWithFieldsInfo(segmentname string, start uint32, fields []utils.SimpleFieldInfo, logger *utils.Log4FE) *Segment {
 
-	this := &Segment{btdb: nil, StartDocId: start, 
-            MaxDocId: start, SegmentName: segmentname, 
-            idxMmap: nil, dtlMmap: nil, pflMmap: nil, fields:make(map[string]*FSField),
-            Logger: logger, isMemory: true,FieldInfos:make(map[string]utils.SimpleFieldInfo)}
-            
+	this := &Segment{btdb: nil, StartDocId: start,
+		MaxDocId: start, SegmentName: segmentname,
+		idxMmap: nil, dtlMmap: nil, pflMmap: nil, fields: make(map[string]*FSField),
+		Logger: logger, isMemory: true, FieldInfos: make(map[string]utils.SimpleFieldInfo)}
+
 	for _, sfield := range fields {
 		field := utils.SimpleFieldInfo{FieldName: sfield.FieldName, FieldType: sfield.FieldType}
-        this.FieldInfos[field.FieldName] = field
-		indexer := newEmptyField(sfield.FieldName,start,sfield.FieldType,logger)
+		this.FieldInfos[field.FieldName] = field
+		indexer := newEmptyField(sfield.FieldName, start, sfield.FieldType, logger)
 		this.fields[field.FieldName] = indexer
-        
+
 	}
 
 	this.Logger.Info("[INFO] Segment --> NewEmptySegmentWithFieldsInfo :: [%v] Success ", segmentname)
@@ -73,29 +71,26 @@ func NewEmptySegmentWithFieldsInfo(segmentname string, start uint32, fields []ut
 // return :
 func NewSegmentWithLocalFile(segmentname string, logger *utils.Log4FE) *Segment {
 
-	this := &Segment{btdb: nil, StartDocId: 0, MaxDocId: 0, SegmentName: segmentname, 
-        idxMmap: nil, dtlMmap: nil, pflMmap: nil, Logger: logger, fields:make(map[string]*FSField),
-        FieldInfos: make(map[string]utils.SimpleFieldInfo), isMemory: true}
+	this := &Segment{btdb: nil, StartDocId: 0, MaxDocId: 0, SegmentName: segmentname,
+		idxMmap: nil, dtlMmap: nil, pflMmap: nil, Logger: logger, fields: make(map[string]*FSField),
+		FieldInfos: make(map[string]utils.SimpleFieldInfo), isMemory: true}
 
-	
 	metaFileName := fmt.Sprintf("%v.meta", segmentname)
 	buffer, err := utils.ReadFromJson(metaFileName)
 	if err != nil {
 		return this
 	}
-    
 
 	err = json.Unmarshal(buffer, &this)
 	if err != nil {
 		return this
 	}
-    
-    btdbname := fmt.Sprintf("%v.bt", segmentname)
+
+	btdbname := fmt.Sprintf("%v.bt", segmentname)
 	if utils.Exist(btdbname) {
-        this.Logger.Info("[INFO] Load B+Tree File : %v",btdbname)
+		this.Logger.Info("[INFO] Load B+Tree File : %v", btdbname)
 		this.btdb = tree.NewBTDB(btdbname)
 	}
-
 
 	this.idxMmap, err = utils.NewMmap(fmt.Sprintf("%v.idx", segmentname), utils.MODE_APPEND)
 	if err != nil {
@@ -117,23 +112,21 @@ func NewSegmentWithLocalFile(segmentname string, logger *utils.Log4FE) *Segment 
 	}
 	this.dtlMmap.SetFileEnd(0)
 	this.Logger.Info("[INFO] Load Detail File : %v.dtl", segmentname)
-       
-    for _, field := range this.FieldInfos {
-        if field.PflLen == 0 {
-            indexer := newEmptyField(field.FieldName,this.StartDocId,field.FieldType,logger)
-		    this.fields[field.FieldName] = indexer
-            continue
-        }
-        indexer := newFieldWithLocalFile(field.FieldName, segmentname, this.StartDocId, 
-                        this.MaxDocId, field.FieldType,field.PflOffset,field.PflLen, 
-                        this.idxMmap, this.pflMmap, this.dtlMmap,false,this.btdb,logger)
-        this.fields[field.FieldName] = indexer
-        this.Logger.Info("[TRACE] %v", this.FieldInfos[field.FieldName])
-    }
 
-    return this
+	for _, field := range this.FieldInfos {
+		if field.PflLen == 0 {
+			indexer := newEmptyField(field.FieldName, this.StartDocId, field.FieldType, logger)
+			this.fields[field.FieldName] = indexer
+			continue
+		}
+		indexer := newFieldWithLocalFile(field.FieldName, segmentname, this.StartDocId,
+			this.MaxDocId, field.FieldType, field.PflOffset, field.PflLen,
+			this.idxMmap, this.pflMmap, this.dtlMmap, false, this.btdb, logger)
+		this.fields[field.FieldName] = indexer
+		this.Logger.Info("[TRACE] %v", this.FieldInfos[field.FieldName])
+	}
 
-
+	return this
 
 }
 
@@ -146,18 +139,18 @@ func (this *Segment) AddField(sfield utils.SimpleFieldInfo) error {
 		this.Logger.Warn("[WARN] Segment --> AddField Already has field [%v]", sfield.FieldName)
 		return errors.New("Already has field..")
 	}
-    
-    if this.isMemory {
-        this.Logger.Warn("[WARN] Segment --> AddField field [%v] fail..", sfield.FieldName)
-		return errors.New("memory segment can not add field..")
-    }
 
-	indexer :=  newEmptyField(sfield.FieldName,this.MaxDocId,sfield.FieldType,this.Logger)
-    this.FieldInfos[sfield.FieldName] = sfield
-    this.fields[sfield.FieldName] = indexer
-    if err:=this.storeStruct();err!=nil{
-        return err
-    }
+	if this.isMemory {
+		this.Logger.Warn("[WARN] Segment --> AddField field [%v] fail..", sfield.FieldName)
+		return errors.New("memory segment can not add field..")
+	}
+
+	indexer := newEmptyField(sfield.FieldName, this.MaxDocId, sfield.FieldType, this.Logger)
+	this.FieldInfos[sfield.FieldName] = sfield
+	this.fields[sfield.FieldName] = indexer
+	if err := this.storeStruct(); err != nil {
+		return err
+	}
 	this.Logger.Info("[INFO] Segment --> AddField :: Success ")
 	return nil
 }
@@ -171,19 +164,19 @@ func (this *Segment) DeleteField(fieldname string) error {
 		this.Logger.Warn("[WARN] Segment --> DeleteField not found field [%v]", fieldname)
 		return errors.New("not found field")
 	}
-    
-    if this.isMemory {
-        this.Logger.Warn("[WARN] Segment --> deleteField field [%v] fail..", fieldname)
+
+	if this.isMemory {
+		this.Logger.Warn("[WARN] Segment --> deleteField field [%v] fail..", fieldname)
 		return errors.New("memory segment can not delete field..")
-    }
-    
-    this.fields[fieldname].destroy()
+	}
+
+	this.fields[fieldname].destroy()
 	delete(this.FieldInfos, fieldname)
-    delete(this.fields, fieldname)
-    if err:=this.storeStruct();err!=nil{
-        return err
-    }
-	this.Logger.Info("[INFO] Segment --> DeleteField[%v] :: Success ",fieldname)
+	delete(this.fields, fieldname)
+	if err := this.storeStruct(); err != nil {
+		return err
+	}
+	this.Logger.Info("[INFO] Segment --> DeleteField[%v] :: Success ", fieldname)
 	// this.Fields[field.FieldName].Indexer=idf
 	return nil
 }
@@ -245,27 +238,26 @@ func (this *Segment) AddDocument(docid uint32, content map[string]string) error 
 // params :
 // return :
 func (this *Segment) Serialization() error {
-    
-    btdbname := fmt.Sprintf("%v.bt", this.SegmentName)
-	if this.btdb == nil {
-        this.btdb=tree.NewBTDB(btdbname)
-    }
 
+	btdbname := fmt.Sprintf("%v.bt", this.SegmentName)
+	if this.btdb == nil {
+		this.btdb = tree.NewBTDB(btdbname)
+	}
 
 	for name, field := range this.FieldInfos {
-		if err := this.fields[name].serialization(this.SegmentName,this.btdb); err != nil {
+		if err := this.fields[name].serialization(this.SegmentName, this.btdb); err != nil {
 			this.Logger.Error("[ERROR] Segment --> Serialization %v", err)
 			return err
 		}
 		field.PflOffset = this.fields[name].pflOffset
-		field.PflLen =  this.fields[name].pflLen
+		field.PflLen = this.fields[name].pflLen
 		this.FieldInfos[field.FieldName] = field
 		this.Logger.Trace("[TRACE] %v %v %v", name, field.PflOffset, field.PflLen)
 	}
 
-	if err:=this.storeStruct();err!=nil{
-        return err
-    }
+	if err := this.storeStruct(); err != nil {
+		return err
+	}
 
 	this.isMemory = false
 
@@ -298,27 +290,24 @@ func (this *Segment) Serialization() error {
 
 }
 
-
-
 func (this *Segment) storeStruct() error {
-    metaFileName := fmt.Sprintf("%v.meta", this.SegmentName)
+	metaFileName := fmt.Sprintf("%v.meta", this.SegmentName)
 	if err := utils.WriteToJson(this, metaFileName); err != nil {
 		return err
 	}
-    return nil
+	return nil
 }
-
 
 // Close function description : 销毁段
 // params :
 // return :
 func (this *Segment) Close() error {
-    
-    for _, field := range this.fields {
+
+	for _, field := range this.fields {
 		field.destroy()
 	}
-    
-    if this.idxMmap != nil {
+
+	if this.idxMmap != nil {
 		this.idxMmap.Unmap()
 	}
 
@@ -333,11 +322,10 @@ func (this *Segment) Close() error {
 	if this.btdb != nil {
 		this.btdb.Close()
 	}
-    
-    return nil
-    
-}
 
+	return nil
+
+}
 
 // Destroy function description : 销毁段
 // params :
@@ -393,8 +381,6 @@ func (this *Segment) findField(key, field string, bitmap *utils.Bitmap) ([]utils
 
 }
 
-
-
 // Query function description : 查询接口
 // params :
 // return :
@@ -409,7 +395,6 @@ func (this *Segment) Query(fieldname string, key interface{}) ([]utils.DocIdNode
 
 }
 
-
 // Filter function description : 过滤
 // params :
 // return :
@@ -419,22 +404,22 @@ func (this *Segment) Filter(fieldname string, filtertype uint64, start, end int6
 		this.Logger.Warn("[WARN] Field[%v] not found", fieldname)
 		return nil
 	}
-    
-    if docids==nil || len(docids)==0 {
-        return nil
-    }
-    
-    if  !(uint32(docids[0]) <  this.MaxDocId && 
-    uint32(docids[0]) >=  this.StartDocId &&
-    uint32(docids[len(docids)-1]) <  this.MaxDocId && 
-    uint32(docids[len(docids)-1]) >=  this.StartDocId) {
-         return nil
-    }
-    
-    var res []utils.DocIdNode
+
+	if docids == nil || len(docids) == 0 {
+		return nil
+	}
+
+	if !(uint32(docids[0]) < this.MaxDocId &&
+		uint32(docids[0]) >= this.StartDocId &&
+		uint32(docids[len(docids)-1]) < this.MaxDocId &&
+		uint32(docids[len(docids)-1]) >= this.StartDocId) {
+		return nil
+	}
+
+	var res []utils.DocIdNode
 
 	for _, docid := range docids {
-		
+
 		if this.fields[fieldname].filter(uint32(docid), filtertype, start, end) {
 			res = append(res, docid)
 		}
@@ -443,8 +428,6 @@ func (this *Segment) Filter(fieldname string, filtertype uint64, start, end int6
 	return res
 
 }
-
-
 
 // getFieldValue function description : 获取详情，单个字段
 // params :
@@ -498,7 +481,7 @@ func (this *Segment) GetValueWithFields(docid uint32, fields []string) (map[stri
 	res := make(map[string]string)
 	for _, field := range fields {
 		if _, ok := this.fields[field]; ok {
-			res[field], _ = this.GetFieldValue(docid,field)
+			res[field], _ = this.GetFieldValue(docid, field)
 			flag = true
 		} else {
 			res[field] = ""
@@ -510,12 +493,10 @@ func (this *Segment) GetValueWithFields(docid uint32, fields []string) (map[stri
 
 }
 
-
-
 // SearchUnitDocIds function description : 搜索的基本单元
 // params :
 // return :
-func (this *Segment) SearchUnitDocIds(querys []utils.FSSearchQuery,filteds []utils.FSSearchFilted,bitmap *utils.Bitmap, indocids []utils.DocIdNode) ([]utils.DocIdNode, bool) {
+func (this *Segment) SearchUnitDocIds(querys []utils.FSSearchQuery, filteds []utils.FSSearchFilted, bitmap *utils.Bitmap, indocids []utils.DocIdNode) ([]utils.DocIdNode, bool) {
 
 	start := len(indocids)
 	flag := false
@@ -553,7 +534,7 @@ func (this *Segment) SearchUnitDocIds(querys []utils.FSSearchQuery,filteds []uti
 	//bitmap去掉数据
 	index := start
 
-	if filteds == nil && bitmap != nil{
+	if filteds == nil && bitmap != nil {
 		for _, docid := range indocids[start:] {
 			//去掉bitmap删除的
 			if bitmap.GetBit(uint64(docid)) == 0 {
@@ -572,8 +553,8 @@ func (this *Segment) SearchUnitDocIds(querys []utils.FSSearchQuery,filteds []uti
 	for _, docidinfo := range indocids[start:] {
 		match := true
 		for _, filter := range filteds {
-			if _, hasField := this.fields[filter.FieldName]; hasField  {
-				if (bitmap != nil  && bitmap.GetBit(uint64(docidinfo)) == 1) || (!this.fields[filter.FieldName].filter(uint32(docidinfo), filter.Type, filter.Start, filter.End)) {
+			if _, hasField := this.fields[filter.FieldName]; hasField {
+				if (bitmap != nil && bitmap.GetBit(uint64(docidinfo)) == 1) || (!this.fields[filter.FieldName].filter(uint32(docidinfo), filter.Type, filter.Start, filter.End)) {
 					match = false
 					break
 				}
@@ -596,5 +577,3 @@ func (this *Segment) SearchUnitDocIds(querys []utils.FSSearchQuery,filteds []uti
 	return indocids[:index], true
 
 }
-
-

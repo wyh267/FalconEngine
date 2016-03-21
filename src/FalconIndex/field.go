@@ -11,70 +11,68 @@ package FalconIndex
 
 import (
 	"errors"
+	"tree"
 	"utils"
-    "tree"
 )
 
 // FSField struct description : 字段的基本单元，这是对外的最基本单元
 type FSField struct {
-	fieldName   string
+	fieldName  string
 	startDocId uint32
 	maxDocId   uint32
 	fieldType  uint64
 	isMomery   bool
-	Logger     *utils.Log4FE          `json:"-"` //logger
-	ivt        *invert                 //一个倒排接口
-    pfl        *profile
-	pflOffset  int64                  //正排索引的偏移量
-	pflLen     int                    //正排索引长度
-    btree      *tree.BTreedb
+	Logger     *utils.Log4FE `json:"-"` //logger
+	ivt        *invert       //一个倒排接口
+	pfl        *profile
+	pflOffset  int64 //正排索引的偏移量
+	pflLen     int   //正排索引长度
+	btree      *tree.BTreedb
 }
-
 
 // newEmptyField function description : 新建空字段
 // params :
 // return :
-func newEmptyField(fieldname string, start uint32, fieldtype uint64,logger *utils.Log4FE) *FSField {
+func newEmptyField(fieldname string, start uint32, fieldtype uint64, logger *utils.Log4FE) *FSField {
 
-	this := &FSField{fieldName: fieldname, startDocId: start, maxDocId: start, 
-                     fieldType: fieldtype, Logger: logger, 
-                     isMomery:true,ivt:nil,pfl:nil,pflOffset:-1,pflLen:-1,btree:nil}
+	this := &FSField{fieldName: fieldname, startDocId: start, maxDocId: start,
+		fieldType: fieldtype, Logger: logger,
+		isMomery: true, ivt: nil, pfl: nil, pflOffset: -1, pflLen: -1, btree: nil}
 
-    if fieldtype == utils.IDX_TYPE_STRING ||
-       fieldtype == utils.IDX_TYPE_STRING_SEG ||
-       fieldtype == utils.IDX_TYPE_STRING_LIST ||
-       fieldtype == utils.GATHER_TYPE {
-          this.ivt = newEmptyInvert(fieldtype, start, fieldname, logger) 
-    }
-    this.pfl = newEmptyProfile(fieldtype, 0, fieldname,start, logger)
+	if fieldtype == utils.IDX_TYPE_STRING ||
+		fieldtype == utils.IDX_TYPE_STRING_SEG ||
+		fieldtype == utils.IDX_TYPE_STRING_LIST ||
+		fieldtype == utils.GATHER_TYPE {
+		this.ivt = newEmptyInvert(fieldtype, start, fieldname, logger)
+	}
+	this.pfl = newEmptyProfile(fieldtype, 0, fieldname, start, logger)
 	return this
 }
 
 // newFieldWithLocalFile function description : 从文件重建字段索引
 // params :
 // return :
-func newFieldWithLocalFile(fieldname, segmentname string, start, max uint32, 
-                          fieldtype uint64, pfloffset int64, pfllen int, 
-                          idxMmap *utils.Mmap, pflMmap,dtlMmap *utils.Mmap,isMomery bool,btree *tree.BTreedb,
-                          logger *utils.Log4FE) *FSField {
-                              
-	this := &FSField{fieldName: fieldname, startDocId: start, maxDocId: max, 
-             fieldType: fieldtype, Logger: logger,
-		      isMomery: isMomery,  pflLen: pfllen, pflOffset: pfloffset, 
-              ivt: nil, pfl: nil,btree:btree}
-                 
-              
-    if fieldtype == utils.IDX_TYPE_STRING ||
-       fieldtype == utils.IDX_TYPE_STRING_SEG ||
-       fieldtype == utils.IDX_TYPE_STRING_LIST ||
-       fieldtype == utils.GATHER_TYPE {
-          this.ivt = newInvertWithLocalFile(btree,fieldtype,fieldname,segmentname,
-                     idxMmap, logger) 
-    }
-    
-    this.pfl = newProfileWithLocalFile(fieldtype,0,segmentname,pflMmap,dtlMmap,
-                                pfloffset,uint64(pfllen),false,logger)
-    
+func newFieldWithLocalFile(fieldname, segmentname string, start, max uint32,
+	fieldtype uint64, pfloffset int64, pfllen int,
+	idxMmap *utils.Mmap, pflMmap, dtlMmap *utils.Mmap, isMomery bool, btree *tree.BTreedb,
+	logger *utils.Log4FE) *FSField {
+
+	this := &FSField{fieldName: fieldname, startDocId: start, maxDocId: max,
+		fieldType: fieldtype, Logger: logger,
+		isMomery: isMomery, pflLen: pfllen, pflOffset: pfloffset,
+		ivt: nil, pfl: nil, btree: btree}
+
+	if fieldtype == utils.IDX_TYPE_STRING ||
+		fieldtype == utils.IDX_TYPE_STRING_SEG ||
+		fieldtype == utils.IDX_TYPE_STRING_LIST ||
+		fieldtype == utils.GATHER_TYPE {
+		this.ivt = newInvertWithLocalFile(btree, fieldtype, fieldname, segmentname,
+			idxMmap, logger)
+	}
+
+	this.pfl = newProfileWithLocalFile(fieldtype, 0, segmentname, pflMmap, dtlMmap,
+		pfloffset, uint64(pfllen), false, logger)
+
 	return this
 }
 
@@ -85,7 +83,7 @@ func newFieldWithLocalFile(fieldname, segmentname string, start, max uint32,
 func (this *FSField) addDocument(docid uint32, contentstr string) error {
 
 	if docid != this.maxDocId || this.isMomery == false || this.pfl == nil {
-		this.Logger.Error("[ERROR] FSField --> AddDocument :: Wrong docid %v this.maxDocId %v this.profile %v", docid,this.maxDocId,this.pfl)
+		this.Logger.Error("[ERROR] FSField --> AddDocument :: Wrong docid %v this.maxDocId %v this.profile %v", docid, this.maxDocId, this.pfl)
 		return errors.New("[ERROR] Wrong docid")
 	}
 
@@ -94,9 +92,9 @@ func (this *FSField) addDocument(docid uint32, contentstr string) error {
 		return err
 	}
 
-	if this.fieldType != utils.IDX_TYPE_NUMBER && 
-        this.fieldType != utils.IDX_TYPE_DATE && 
-        this.ivt != nil {
+	if this.fieldType != utils.IDX_TYPE_NUMBER &&
+		this.fieldType != utils.IDX_TYPE_DATE &&
+		this.ivt != nil {
 		if err := this.ivt.addDocument(docid, contentstr); err != nil {
 			this.Logger.Error("[ERROR] FSField --> AddDocument :: Add Invert Document Error %v", err)
 			// return err
@@ -107,30 +105,26 @@ func (this *FSField) addDocument(docid uint32, contentstr string) error {
 	return nil
 }
 
-
-func (this *FSField)updateDocument(docid uint32, contentstr string) error{
-    if docid < this.startDocId || docid>= this.maxDocId || this.pfl == nil {
+func (this *FSField) updateDocument(docid uint32, contentstr string) error {
+	if docid < this.startDocId || docid >= this.maxDocId || this.pfl == nil {
 		this.Logger.Error("[ERROR] FSField --> UpdateDocument :: Wrong docid %v", docid)
 		return errors.New("[ERROR] Wrong docid")
 	}
-    if this.fieldType == utils.IDX_TYPE_NUMBER{
-        if err := this.pfl.updateDocument(docid, contentstr); err != nil {
-		this.Logger.Error("[ERROR] FSField --> UpdateDocument :: Add Document Error %v", err)
-		return err
-	   }
-    }
-    
-    
-    return nil
-    
+	if this.fieldType == utils.IDX_TYPE_NUMBER {
+		if err := this.pfl.updateDocument(docid, contentstr); err != nil {
+			this.Logger.Error("[ERROR] FSField --> UpdateDocument :: Add Document Error %v", err)
+			return err
+		}
+	}
+
+	return nil
+
 }
-
-
 
 // Serialization function description : 序列化倒排索引（标准操作）
 // params :
 // return : error 正确返回Nil，否则返回错误类型
-func (this *FSField) serialization(segmentname string,btree *tree.BTreedb) error {
+func (this *FSField) serialization(segmentname string, btree *tree.BTreedb) error {
 
 	var err error
 	if this.pfl != nil {
@@ -142,12 +136,12 @@ func (this *FSField) serialization(segmentname string,btree *tree.BTreedb) error
 	}
 
 	if this.ivt != nil {
-        this.btree=btree
-        if err:=this.btree.AddBTree(this.fieldName);err!=nil{
-            this.Logger.Error("[ERROR] invert --> Create BTree Error %v",err)
-            return err
-        }
-		err = this.ivt.serialization(segmentname,this.btree)
+		this.btree = btree
+		if err := this.btree.AddBTree(this.fieldName); err != nil {
+			this.Logger.Error("[ERROR] invert --> Create BTree Error %v", err)
+			return err
+		}
+		err = this.ivt.serialization(segmentname, this.btree)
 		if err != nil {
 			this.Logger.Error("[ERROR] FSField --> Serialization :: Serialization Error %v", err)
 			return err
@@ -214,14 +208,12 @@ func (this *FSField) destroy() error {
 	return nil
 }
 
-
-
 func (this *FSField) setPflMmap(mmap *utils.Mmap) {
-    
-    if this.pfl != nil {
+
+	if this.pfl != nil {
 		this.pfl.setPflMmap(mmap)
 	}
-    
+
 }
 
 func (this *FSField) setDtlMmap(mmap *utils.Mmap) {
@@ -230,13 +222,11 @@ func (this *FSField) setDtlMmap(mmap *utils.Mmap) {
 	}
 }
 
-
 func (this *FSField) setIdxMmap(mmap *utils.Mmap) {
 	if this.ivt != nil {
 		this.ivt.setIdxMmap(mmap)
 	}
 }
-
 
 func (this *FSField) setBtree(btdb *tree.BTreedb) {
 	if this.ivt != nil {
@@ -244,15 +234,10 @@ func (this *FSField) setBtree(btdb *tree.BTreedb) {
 	}
 }
 
+func (this *FSField) setMmap(pfl, dtl, idx *utils.Mmap) {
 
+	this.setPflMmap(pfl)
+	this.setDtlMmap(dtl)
+	this.setIdxMmap(idx)
 
-func (this *FSField) setMmap(pfl,dtl,idx *utils.Mmap) {
-    
-    this.setPflMmap(pfl)
-    this.setDtlMmap(dtl)
-    this.setIdxMmap(idx)
-    
-    
 }
-
-

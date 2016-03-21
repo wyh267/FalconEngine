@@ -33,7 +33,7 @@ import (
 type invert struct {
 	curDocId      uint32
 	isMomery      bool
-	fieldType       uint64
+	fieldType     uint64
 	fieldName     string
 	idxMmap       *utils.Mmap
 	tempHashTable map[string][]utils.DocIdNode
@@ -52,10 +52,10 @@ func newEmptyInvert(fieldType uint64, startDocId uint32, fieldname string, logge
 // newInvertWithLocalFile function description : 通过段的名称建立字符型倒排索引
 // params :
 // return :
-func newInvertWithLocalFile(btdb *tree.BTreedb, fieldType uint64, fieldname,fullsegmentname string, 
-                            idxMmap *utils.Mmap, logger *utils.Log4FE) *invert {
+func newInvertWithLocalFile(btdb *tree.BTreedb, fieldType uint64, fieldname, fullsegmentname string,
+	idxMmap *utils.Mmap, logger *utils.Log4FE) *invert {
 
-	this := &invert{btree: btdb, fieldType: fieldType,fieldName:fieldname, Logger: logger, isMomery: false, idxMmap: idxMmap}
+	this := &invert{btree: btdb, fieldType: fieldType, fieldName: fieldname, Logger: logger, isMomery: false, idxMmap: idxMmap}
 	return this
 
 }
@@ -100,7 +100,7 @@ func (this *invert) addDocument(docid uint32, content interface{}) error {
 // serialization function description : 序列化倒排索引（标准操作）
 // params :
 // return : error 正确返回Nil，否则返回错误类型
-func (this *invert) serialization(fullsegmentname string, btdb *tree.BTreedb)  error {
+func (this *invert) serialization(fullsegmentname string, btdb *tree.BTreedb) error {
 
 	//打开倒排文件
 	idxFileName := fmt.Sprintf("%v.idx", fullsegmentname)
@@ -112,16 +112,14 @@ func (this *invert) serialization(fullsegmentname string, btdb *tree.BTreedb)  e
 	fi, _ := idxFd.Stat()
 	totalOffset := int(fi.Size())
 
-
 	this.btree = btdb
-    
-    
+
 	for key, value := range this.tempHashTable {
 		lens := len(value)
 		//offset := /*len(value)*DOCNODE_SIZE + */ totalOffset
 		lenBufer := make([]byte, 8)
-        binary.LittleEndian.PutUint64(lenBufer, uint64(lens))
-		
+		binary.LittleEndian.PutUint64(lenBufer, uint64(lens))
+
 		idxFd.Write(lenBufer)
 		buffer := new(bytes.Buffer)
 		err = binary.Write(buffer, binary.LittleEndian, value)
@@ -130,12 +128,12 @@ func (this *invert) serialization(fullsegmentname string, btdb *tree.BTreedb)  e
 			return err
 		}
 		idxFd.Write(buffer.Bytes())
-        //this.Logger.Info("[INFO] key :%v totalOffset: %v len:%v value:%v",key,totalOffset,lens,value)
+		//this.Logger.Info("[INFO] key :%v totalOffset: %v len:%v value:%v",key,totalOffset,lens,value)
 		this.btree.Set(this.fieldName, key, uint64(totalOffset))
-        totalOffset = totalOffset + 8 + lens * utils.DOCNODE_SIZE
+		totalOffset = totalOffset + 8 + lens*utils.DOCNODE_SIZE
 
 	}
-    this.tempHashTable = nil
+	this.tempHashTable = nil
 	this.isMomery = false
 	this.Logger.Trace("[TRACE] invert --> Serialization :: Writing to File : [%v.bt] ", fullsegmentname)
 	this.Logger.Trace("[TRACE] invert --> Serialization :: Writing to File : [%v.idx] ", fullsegmentname)
@@ -153,18 +151,18 @@ func (this *invert) queryTerm(keystr string) ([]utils.DocIdNode, bool) {
 		if ok {
 			return docids, true
 		}
-	} else if this.idxMmap != nil{
-		
-        ok,offset:=this.btree.Search(this.fieldName,keystr)
-        //this.Logger.Info("[INFO] found  %v this.FullName %v offset %v",keystr,this.fieldName,offset)
-        if !ok{
-            return nil,false
-        }
-        lens:=this.idxMmap.ReadInt64(int64(offset))
-        //this.Logger.Info("[INFO] found  %v offset %v lens %v",keystr,offset,int(lens))
-        res := this.idxMmap.ReadUInt32Arry(uint64(offset+8),uint64(lens))
-        return res,true
-        
+	} else if this.idxMmap != nil {
+
+		ok, offset := this.btree.Search(this.fieldName, keystr)
+		//this.Logger.Info("[INFO] found  %v this.FullName %v offset %v",keystr,this.fieldName,offset)
+		if !ok {
+			return nil, false
+		}
+		lens := this.idxMmap.ReadInt64(int64(offset))
+		//this.Logger.Info("[INFO] found  %v offset %v lens %v",keystr,offset,int(lens))
+		res := this.idxMmap.ReadUInt32Arry(uint64(offset+8), uint64(lens))
+		return res, true
+
 	}
 
 	return nil, false
@@ -232,8 +230,6 @@ func (this *invert) setIdxMmap(mmap *utils.Mmap) {
 	this.idxMmap = mmap
 }
 
-
 func (this *invert) setBtree(btdb *tree.BTreedb) {
 	this.btree = btdb
 }
-

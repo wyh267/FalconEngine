@@ -281,7 +281,7 @@ func (p *page) search(key string, stack *[]pagestack, bt *btree) (bool, uint64, 
 		idx := sort.Search(int(p.count), c)
 		if idx < int(p.count) {
 			if elements[idx].key() == key {
-                //fmt.Printf("found : %v %v\n",key,elements[idx].value)
+				//fmt.Printf("found : %v %v\n",key,elements[idx].value)
 				*stack = append(*stack, pagestack{pageid: p.curid, index: idx})
 				return true, elements[idx].value, idx, nil
 			}
@@ -361,10 +361,10 @@ func (bt *btree) Set(key string, value uint64) error {
 	bt.root = bt.db.getpage(bt.rootpgid)
 	res := bt.root.set(key, value, bt)
 	if res {
-        //bt.db.Sync()
+		//bt.db.Sync()
 		return nil
 	}
-    
+
 	return errors.New("update fail")
 }
 
@@ -388,7 +388,7 @@ func (bt *btree) getpage(pgid uint32) *page {
 	return bt.db.getpage(pgid)
 }
 
-func (bt *btree) Search(key string) (bool,  uint64) {
+func (bt *btree) Search(key string) (bool, uint64) {
 	bt.root = bt.db.getpage(bt.rootpgid)
 	stack := make([]pagestack, 0)
 	ok, value, _, _ := bt.root.search(key, &stack, bt)
@@ -626,7 +626,7 @@ func (db *BTreedb) AddBTree(name string) error {
 	}
 	db.btmap[name] = bt
 	db.meta.addbt(name, bt.root.curid)
-    db.Sync()
+	db.Sync()
 	return nil
 }
 
@@ -644,14 +644,14 @@ func (db *BTreedb) Sync() error {
 	return nil
 }
 
-func (db *BTreedb) Set(btname, key string, value  uint64) error {
+func (db *BTreedb) Set(btname, key string, value uint64) error {
 
 	if _, ok := db.btmap[btname]; !ok {
 		return errors.New("has one")
 	}
 
 	return db.btmap[btname].Set(key, value)
-    
+
 }
 
 func (db *BTreedb) Search(btname, key string) (bool, uint64) {
