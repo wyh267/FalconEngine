@@ -1,0 +1,239 @@
+/*****************************************************************************
+ *  file name : StringIvtert.go
+ *  author : Wu Yinghao
+ *  email  : wyh817@gmail.com
+ *
+ *  file description : 文本类倒排索引类
+ *
+******************************************************************************/
+
+package FalconIndex
+
+import (
+	"bytes"
+	"encoding/binary"
+	"errors"
+	"fmt"
+	"os"
+	"strings"
+	"tree"
+	"utils"
+)
+
+/************************************************************************
+
+字符型倒排索引，操作文件
+
+[fullname].dic 该字段的字典文件，格式 | termlen | term | termId(uint32) | DF(uint32) |  ......
+[segmentname].pos 该段的位置信息
+[segmentname].idx 该段的倒排文件
+
+************************************************************************/
+//invert 字符串倒排索引
+type invert struct {
+	curDocId      uint32
+	isMomery      bool
+	fieldType       uint64
+	fieldName     string
+	idxMmap       *utils.Mmap
+	tempHashTable map[string][]utils.DocIdNode
+	Logger        *utils.Log4FE
+	btree         *tree.BTreedb
+}
+
+// newEmptyInvert function description : 新建空的字符型倒排索引
+// params :
+// return :
+func newEmptyInvert(fieldType uint64, startDocId uint32, fieldname string, logger *utils.Log4FE) *invert {
+	this := &invert{btree: nil, curDocId: startDocId, fieldName: fieldname, fieldType: fieldType, tempHashTable: make(map[string][]utils.DocIdNode), Logger: logger, isMomery: true}
+	return this
+}
+
+// newInvertWithLocalFile function description : 通过段的名称建立字符型倒排索引
+// params :
+// return :
+func newInvertWithLocalFile(btdb *tree.BTreedb, fieldType uint64, fieldname,fullsegmentname string, 
+                            idxMmap *utils.Mmap, logger *utils.Log4FE) *invert {
+
+	this := &invert{btree: btdb, fieldType: fieldType,fieldName:fieldname, Logger: logger, isMomery: false, idxMmap: idxMmap}
+	return this
+
+}
+
+// addDocument function description : 增加一个doc文档
+// params : docid docid的编号
+//			contentstr string  文档内容
+// return : error 成功返回Nil，否则返回相应的错误信息
+func (this *invert) addDocument(docid uint32, content interface{}) error {
+
+	if docid != this.curDocId {
+		return errors.New("invert --> AddDocument :: Wrong DocId Number")
+	}
+	this.Logger.Trace("[TRACE] invert --> AddDocument :: docid %v content %v", docid, content)
+	contentstr := fmt.Sprintf("%v", content)
+	//根据type进行分词
+	var terms []string
+	switch this.fieldType {
+	case utils.IDX_TYPE_STRING, utils.GATHER_TYPE: //全词匹配模式
+		terms = append(terms, contentstr)
+	case utils.IDX_TYPE_STRING_LIST: //分号切割模式
+		terms = strings.Split(contentstr, ";")
+	case utils.IDX_TYPE_STRING_SEG: //分词模式
+		terms = utils.GSegmenter.Segment(contentstr, true)
+	}
+
+	for _, term := range terms {
+		docidNode := utils.DocIdNode(docid)
+		if _, inTmp := this.tempHashTable[term]; !inTmp {
+			var docidNodes []utils.DocIdNode
+			docidNodes = append(docidNodes, docidNode)
+			this.tempHashTable[term] = docidNodes
+		} else {
+			this.tempHashTable[term] = append(this.tempHashTable[term], docidNode)
+		}
+	}
+
+	this.curDocId++
+	return nil
+}
+
+// serialization function description : 序列化倒排索引（标准操作）
+// params :
+// return : error 正确返回Nil，否则返回错误类型
+func (this *invert) serialization(fullsegmentname string, btdb *tree.BTreedb)  error {
+
+	//打开倒排文件
+	idxFileName := fmt.Sprintf("%v.idx", fullsegmentname)
+	idxFd, err := os.OpenFile(idxFileName, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0644)
+	if err != nil {
+		return err
+	}
+	defer idxFd.Close()
+	fi, _ := idxFd.Stat()
+	totalOffset := int(fi.Size())
+
+
+	this.btree = btdb
+    
+    
+	for key, value := range this.tempHashTable {
+		lens := len(value)
+		//offset := /*len(value)*DOCNODE_SIZE + */ totalOffset
+		lenBufer := make([]byte, 8)
+        binary.LittleEndian.PutUint64(lenBufer, uint64(lens))
+		
+		idxFd.Write(lenBufer)
+		buffer := new(bytes.Buffer)
+		err = binary.Write(buffer, binary.LittleEndian, value)
+		if err != nil {
+			this.Logger.Error("[ERROR] invert --> Serialization :: Error %v", err)
+			return err
+		}
+		idxFd.Write(buffer.Bytes())
+        //this.Logger.Info("[INFO] key :%v totalOffset: %v len:%v value:%v",key,totalOffset,lens,value)
+		this.btree.Set(this.fieldName, key, uint64(totalOffset))
+        totalOffset = totalOffset + 8 + lens * utils.DOCNODE_SIZE
+
+	}
+    this.tempHashTable = nil
+	this.isMomery = false
+	this.Logger.Trace("[TRACE] invert --> Serialization :: Writing to File : [%v.bt] ", fullsegmentname)
+	this.Logger.Trace("[TRACE] invert --> Serialization :: Writing to File : [%v.idx] ", fullsegmentname)
+	return nil
+
+}
+
+// Query function description : 给定一个查询词query，找出doc的列表（标准操作）
+// params : key string 查询的key值
+// return : docid结构体列表  bool 是否找到相应结果
+func (this *invert) queryTerm(keystr string) ([]utils.DocIdNode, bool) {
+
+	if this.isMomery == true {
+		docids, ok := this.tempHashTable[keystr]
+		if ok {
+			return docids, true
+		}
+	} else if this.idxMmap != nil{
+		
+        ok,offset:=this.btree.Search(this.fieldName,keystr)
+        //this.Logger.Info("[INFO] found  %v this.FullName %v offset %v",keystr,this.fieldName,offset)
+        if !ok{
+            return nil,false
+        }
+        lens:=this.idxMmap.ReadInt64(int64(offset))
+        //this.Logger.Info("[INFO] found  %v offset %v lens %v",keystr,offset,int(lens))
+        res := this.idxMmap.ReadUInt32Arry(uint64(offset+8),uint64(lens))
+        return res,true
+        
+	}
+
+	return nil, false
+
+}
+
+func (this *invert) query(key interface{}) ([]utils.DocIdNode, bool) {
+
+	//this.Logger.Info("[DEBUG] invert Query %v", key)
+	keystr, ok := key.(string)
+	if !ok {
+		return nil, false
+	}
+
+	//全词匹配模式
+	if this.fieldType == utils.IDX_TYPE_STRING || this.fieldType == utils.GATHER_TYPE {
+		this.queryTerm(keystr)
+	}
+
+	var queryterms []string
+	switch this.fieldType {
+	case utils.IDX_TYPE_STRING_LIST: //分号切割模式
+		queryterms = strings.Split(keystr, ";")
+	case utils.IDX_TYPE_STRING_SEG: //分词模式
+		queryterms = utils.GSegmenter.Segment(keystr, false)
+	default:
+		return this.queryTerm(keystr)
+	}
+	if len(queryterms) == 1 {
+		return this.queryTerm(queryterms[0])
+	}
+	var fDocids []utils.DocIdNode
+	var hasRes bool
+	var match bool
+	fDocids, match = this.queryTerm(queryterms[0])
+	if match {
+		for _, term := range queryterms[1:] {
+			subDocids, ok := this.queryTerm(term)
+			if !ok {
+				return nil, false
+			}
+			fDocids, hasRes = utils.Interaction(fDocids, subDocids)
+			if !hasRes {
+				return nil, false
+			}
+		}
+	}
+
+	if len(fDocids) == 0 {
+		return nil, false
+	}
+	return fDocids, true
+
+}
+
+// Destroy function description : 销毁段
+// params :
+// return :
+func (this *invert) destroy() error {
+	this.tempHashTable = nil
+	return nil
+}
+
+func (this *invert) setIdxMmap(mmap *utils.Mmap) {
+	this.idxMmap = mmap
+}
+
+
+func (this *invert) setBtree(btdb *tree.BTreedb) {
+	this.btree = btdb
+}
+

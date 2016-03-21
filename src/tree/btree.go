@@ -9,12 +9,15 @@
 
 package tree
 
+//#include <sys/mman.h>
+//import "C"
 import (
 	"errors"
 	"fmt"
 	"os"
+	"reflect"
 	"sort"
-	//"sort"
+	//"strconv"
 	"syscall"
 	"unsafe"
 )
@@ -25,57 +28,46 @@ const (
 	tleaf     uint8 = 3
 )
 
-const pagesize int64 = 1024 * 4
+const pagesize int64 = 1024 * 4 * 2
 
 const pageheadOffset int64 = int64(unsafe.Offsetof(((*page)(nil)).elementsptr))
 const elementSize int64 = int64(unsafe.Sizeof(element{}))
 const maxitems int64 = 100
 const pageheaadlen int64 = pageheadOffset + elementSize*maxitems //4*8 + 24*100
-const maxkeylen uint32 = 32
+const maxkeylen uint32 = 64
+
 type element struct {
-	//key   string
-	bkey   [maxkeylen]byte
+	bkey  [maxkeylen]byte
 	ksize uint32
-	value uint32
+	value uint64
 }
 
-func (e *element) key() string { return string(e.bkey[:e.ksize])}
-func (e *element) setkv(key string,value uint32){ 
-    if len(key) > int(maxkeylen) {
-        copy(e.bkey[:],[]byte(key)[:maxkeylen])
-        e.ksize=maxkeylen
-        e.value=value
-        return
-    }
-    copy(e.bkey[:len(key)],[]byte(key)[:])
-    e.ksize=uint32(len(key))
-    e.value=value
-    return 
+func (e *element) key() string { return string(e.bkey[:e.ksize]) }
+func (e *element) setkv(key string, value uint64) {
+	if len(key) > int(maxkeylen) {
+		copy(e.bkey[:], []byte(key)[:maxkeylen])
+		e.ksize = maxkeylen
+		e.value = value
+		return
+	}
+	copy(e.bkey[:len(key)], []byte(key)[:])
+	e.ksize = uint32(len(key))
+	e.value = value
+	return
 }
 
 type sorteles []element
 
 func (s sorteles) Len() int           { return len(s) }
-func (s sorteles) Swap(i, j int)      { s[i], s[j] = s[j], s[i]}
+func (s sorteles) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }
 func (s sorteles) Less(i, j int) bool { return s[i].key() > s[j].key() }
-/*
-     //s[i], s[j] = s[j], s[i]    
-     jpos:=(uint32(uintptr(unsafe.Pointer(&s[i])))+s[i].pos)-uint32(uintptr(unsafe.Pointer(&s[j])))  
-     ipos:=(uint32(uintptr(unsafe.Pointer(&s[j])))+s[j].pos)-uint32(uintptr(unsafe.Pointer(&s[i])))
-     //fmt.Printf("ipos :%v %v %v %v jpos :%v  %v %v %v \n",s[i].ksize,s[i].value,s[i].pos,ipos,s[j].ksize,s[j].value,s[j].pos,jpos)
-     s[j].pos=jpos
-     s[i].pos=ipos
-     s[j].ksize,s[i].ksize = s[i].ksize,s[j].ksize
-     s[j].value,s[i].value = s[i].value,s[j].value
-}
 
+//
+//	ii, _ := strconv.Atoi(s[i].key())
+//	jj, _ := strconv.Atoi(s[j].key())
+//	return ii > jj
+//}
 
-func (s sorteles) Less(i, j int) bool { 
-    //fmt.Printf("i : %v j : %v\n",i,j)
-    return s[i].key() > s[j].key() 
-
-}
-*/
 // page description:页的基本单位
 type page struct {
 	curid       uint32
@@ -89,34 +81,30 @@ type page struct {
 }
 
 type pagestack struct {
-	page  *page
-	index int
+	pageid uint32
+	index  int
 }
 
+func (p *page) display(bt *btree) {
 
+	elements := p.getElements()
+	fmt.Printf("[INFO]==>display :: ELEMENTS ")
+	for i := range elements[:p.count] {
+		e := &elements[i]
 
-func (p *page) display(bt *btree){
-    
-    elements := p.getElements()
-    fmt.Printf("[INFO]==>display :: ELEMENTS ")
-    for i:=range elements[:p.count] {
-        e:=&elements[i]
-        
-        if p.pgtype == tinterior {
-            fmt.Printf("::: key[%v]  %v\n", e.key(), e.value)
-            child:=bt.getpage(e.value)
-            child.display(bt)
-        }else{
-            fmt.Printf("::: key[%v]  %v\t", e.key(), e.value)
-        }
-    }
-    fmt.Println()
-    
-    
+		if p.pgtype == tinterior {
+			fmt.Printf("::: key[%v]  %v\n", e.key(), e.value)
+			child := bt.getpage(uint32(e.value))
+			child.display(bt)
+		} else {
+			fmt.Printf("::: key[%v]  %v\t", e.key(), e.value)
+		}
+	}
+	fmt.Println()
+
 }
 
-
-func (p *page) set(key string, value uint32, bt *btree) bool {
+func (p *page) set(key string, value uint64, bt *btree) bool {
 
 	stack := make([]pagestack, 0)
 
@@ -129,249 +117,202 @@ func (p *page) set(key string, value uint32, bt *btree) bool {
 
 	//直接更新
 	if found {
-		//fmt.Printf("FOUND %v %v %v \n", key, v, idx)
-		stack[len(stack)-1].page.getElement(idx).value = value
+		bt.getpage(stack[len(stack)-1].pageid).getElement(idx).value = value
 		return true
 	}
 
-	page := stack[len(stack)-1].page
+	page := bt.getpage(stack[len(stack)-1].pageid)
 	index := stack[len(stack)-1].index
-	p1, p2, err := page.insertleaf(index, key, value,bt)
-    if err!=nil {
-        return false
-    }
+	pg1, pg2, err := page.insertleaf(index, key, value, bt)
+	if err != nil {
+		return false
+	}
 
 	for idx := len(stack) - 2; idx >= 0; idx-- {
 
-		page := stack[idx].page
+		page := bt.getpage(stack[idx].pageid)
 		index := stack[idx].index
-		p1, p2, _ = page.interiorinsert(index, p1, p2,bt)
-		//fmt.Printf("STACK PAGE :::: %v index: %v\n", unsafe.Pointer(stack[idx].page), stack[idx].index)
+		pg1, pg2, _ = page.interiorinsert(index, pg1, pg2, bt)
 	}
-    
-    if p1!=nil && p2!=nil {
 
-        newroot:=bt.newpage(nil,nil,tinterior)
-        newroot.count=2
-        rooteles := newroot.getElements()
-        rooteles[0].setkv(p1.getElement(int(p1.count-1)).key(),p1.curid)
-        rooteles[1].setkv("",p2.curid)
-        bt.root=newroot
-        bt.rootpg=newroot.curid
-        fmt.Printf("new root...%v\n",newroot.curid)
-    }
+	if pg1 != 0 && pg2 != 0 {
+
+		newroot, _, _ := bt.newpage(0, 0, tinterior)
+		p1 := bt.getpage(pg1)
+		p2 := bt.getpage(pg2)
+		newroot.count = 2
+		rooteles := newroot.getElements()
+		rooteles[0].setkv(p1.getElement(int(p1.count-1)).key(), uint64(p1.curid))
+		rooteles[1].setkv("", uint64(p2.curid))
+		bt.root = newroot
+		bt.db.setrootid(bt.name)
+		bt.rootpgid = newroot.curid
+		//bt.rootpg = newroot.curid
+		fmt.Printf("new root...%v\n", newroot.curid)
+	}
 
 	return true
 
 }
 
-func (p *page) interiorinsert(index int, child1, child2 *page,bt *btree) (*page, *page, error) {
+func (p *page) interiorinsert(index int, pg1, pg2 uint32, bt *btree) (uint32, uint32, error) {
 
-	
-    
-    if child1!=nil && child2 == nil {
-        
-        //if p.count < uint32(maxitems) {
-            elements := p.getElements()
-            child1node:=child1.getElement(int(child1.count-1))
-            elements[index].value=child1.curid
-            if elements[index].key()!="" {
-                //fmt.Printf("NNNNNNNNNN:%v %v\n",elements[index].key(),child1node.key())
-                elements[index].setkv(child1node.key(), child1.curid ) //uintptr(unsafe.Pointer(p)))
-            }
-            //sort.Sort(sorteles(elements[:p.count]))
-            return p,nil,nil
-        //}
-        
-        
-        
-    }
-    
-    
-   
-    
-	if child2 != nil && child1 != nil {
-       
-        elements := p.getElements()
-        
-       
-            
-      
-        child1node:=child1.getElement(int(child1.count-1))
-        
-        elements[p.count].setkv(child1node.key(), child1.curid) //uintptr(unsafe.Pointer(p)))
-		p.count++
-        
-        child2node:=child2.getElement(int(child2.count-1))
-        elements[index].value=child2.curid
-        if elements[index].key()!="" {
-            //fmt.Printf("YYYYYY:%v %v\n",elements[index].key(),child2node.key())
-             elements[index].setkv(child2node.key(), child2.curid) //uintptr(unsafe.Pointer(p)))
-        }
-        
-        sort.Sort(sorteles(elements[:p.count]))
-        
-        //fmt.Printf("[INFO]==>INSERT :: INTERIOR ELEMENTS child1 %v child2 %v parent :%v",child1.curid,child2.curid,p.curid)
-       // for i:=range elements[:p.count] {
-       //     e:=&elements[i]
-            //fmt.Printf("::: key[%v]  %v\t", e.key(), e.value)
-       // }
-        //fmt.Println()
-        if p.count < uint32(maxitems) {
-		  return p, nil, nil
-        }
-        
-        //fmt.Printf("inter is full\n")
-        parent:=bt.getpage(p.parentpg)
-        newpage:=bt.newpage(parent,p,tinterior)
-        newpage.count=0
-        ii:=0
-        for i:=int(p.count)/2;i<int(p.count);i++{
-            pele:=p.getElement(i)
-            ele:=newpage.getElement(ii)
-            ele.setkv(pele.key(),pele.value)
-            newpage.count++ 
-            ii++
-            
-        }
-        p.count = p.count/2
-        return p,newpage,nil
-              
-        
+	if pg1 != 0 && pg2 == 0 {
+		child1 := bt.getpage(pg1)
+		elements := p.getElements()
+		child1node := child1.getElement(int(child1.count - 1))
+		elements[index].value = uint64(child1.curid)
+		if elements[index].key() != "" {
+			elements[index].setkv(child1node.key(), uint64(child1.curid)) //uintptr(unsafe.Pointer(p)))
+		}
+		return p.curid, 0, nil
 	}
-    
-	return p, nil, nil
+
+	if pg1 != 0 && pg2 != 0 {
+		child1 := bt.getpage(pg1)
+		child2 := bt.getpage(pg2)
+		elements := p.getElements()
+		child1node := child1.getElement(int(child1.count - 1))
+		elements[p.count].setkv(child1node.key(), uint64(child1.curid)) //uintptr(unsafe.Pointer(p)))
+		p.count++
+
+		child2node := child2.getElement(int(child2.count - 1))
+		elements[index].value = uint64(child2.curid)
+		if elements[index].key() != "" {
+			elements[index].setkv(child2node.key(), uint64(child2.curid)) //uintptr(unsafe.Pointer(p)))
+		}
+
+		sort.Sort(sorteles(elements[:p.count]))
+
+		if p.count < uint32(maxitems) {
+			return p.curid, 0, nil
+		}
+
+		/////////parent := bt.getpage(p.parentpg)
+		var newpage *page
+		newpage, _, p = bt.newpage(0, p.curid, tinterior)
+		newpage.count = 0
+		ii := 0
+		for i := int(p.count) / 2; i < int(p.count); i++ {
+			pele := p.getElement(i)
+			ele := newpage.getElement(ii)
+			ele.setkv(pele.key(), pele.value)
+			newpage.count++
+			ii++
+
+		}
+		p.count = p.count / 2
+		return p.curid, newpage.curid, nil
+
+	}
+
+	return p.curid, 0, nil
 
 }
-
 
 func makeBufferPage(src *page) *page {
-    srcbuf:=(*[0xFFFFFF]byte)(unsafe.Pointer(src))
-    buf:=make([]byte,pagesize)
-    copy(buf,srcbuf[:pagesize])
-    return (*page)(unsafe.Pointer(&buf[0]))
-    
+	srcbuf := (*[0xFFFFFF]byte)(unsafe.Pointer(src))
+	buf := make([]byte, pagesize)
+	copy(buf, srcbuf[:pagesize])
+	return (*page)(unsafe.Pointer(&buf[0]))
+
 }
 
-func (p *page) split(key string,value uint32,bt *btree) (*page,*page,error) {
-    
-    elements := p.getElements()
-    elements[p.count].setkv(key, value) //uintptr(unsafe.Pointer(p)))
-    p.count++
-    //fmt.Printf("[INFO]==>INSERT [used : %v] :: LEAF ELEMENTS ",p.used)
-    sort.Sort(sorteles(elements[:p.count]))
-    
-    parent:=bt.getpage(p.parentpg)
-    newpage:=bt.newpage(parent,p,tleaf)
-    
-    ii:=0
-    for i:=int(p.count)/2;i<int(p.count);i++{
-        pele:=p.getElement(i)
-        ele:=newpage.getElement(ii)
-        ele.setkv(pele.key(),pele.value)
-        newpage.count++ 
-        ii++
-        
-    }
-    p.count = p.count/2
-    
-    return p,newpage,nil
-    
-    
+func (p *page) split(key string, value uint64, bt *btree) (uint32, uint32, error) {
+
+	elements := p.getElements()
+	elements[p.count].setkv(key, value) //uintptr(unsafe.Pointer(p)))
+	p.count++
+	sort.Sort(sorteles(elements[:p.count]))
+
+	///////////parent := bt.getpage(p.parentpg)
+	var newpage *page
+	newpage, _, p = bt.newpage(0, p.curid, tleaf)
+
+	ii := 0
+	for i := int(p.count) / 2; i < int(p.count); i++ {
+		pele := p.getElement(i)
+		ele := newpage.getElement(ii)
+		ele.setkv(pele.key(), pele.value)
+		newpage.count++
+		ii++
+
+	}
+	p.count = p.count / 2
+
+	return p.curid, newpage.curid, nil
+
 }
 
-
-func (p *page) insertleaf(index int, key string, value uint32,bt *btree) (*page, *page, error) {
+func (p *page) insertleaf(index int, key string, value uint64, bt *btree) (uint32, uint32, error) {
 
 	if p.pgtype == tleaf {
-        
-        if  p.count == uint32(maxitems) {
-            //fmt.Printf("[ERROR] ... page is  full split pages\n")
-            return p.split(key,value,bt)//nil,nil,errors.New("page is full")
-        }
-        
+
+		if p.count == uint32(maxitems) {
+			return p.split(key, value, bt) //nil,nil,errors.New("page is full")
+		}
+
 		elements := p.getElements()
-        elements[p.count].setkv(key, value) //uintptr(unsafe.Pointer(p)))
+		elements[p.count].setkv(key, value) //uintptr(unsafe.Pointer(p)))
 		p.count++
 		sort.Sort(sorteles(elements[:p.count]))
-        /*
-		for i:=range elements[:p.count] {
-            e:=&elements[i]
-            fmt.Printf("::: %v  %v\t", e.key(), e.value)
-        }
-        fmt.Println()
-        */
-        //fmt.Printf("[INFO]==>INSERT :: LEAF ELEMENTS ::: %v  %v %v\n", elements[:p.count], p.count, p.used)
-		return p, nil, nil
-	} 
-	return nil, nil, errors.New("insert error")
+		return p.curid, 0, nil
+	}
+	return 0, 0, errors.New("insert error")
 
 }
 
-func (p *page) search(key string, stack *[]pagestack, bt *btree) (bool, uint32, int, error) {
+func (p *page) search(key string, stack *[]pagestack, bt *btree) (bool, uint64, int, error) {
 
 	if p.pgtype == tleaf {
 		if p.count == 0 {
-			*stack = append(*stack, pagestack{page: p, index: 0})
-			//fmt.Printf("[INFO]==>SEARCH :: leaf empty , search key [%v] found !! \n", key)
-			//p.count++
+			*stack = append(*stack, pagestack{pageid: p.curid, index: 0})
 			return false, 0, 0, nil
 		}
 
 		//循环查找
 		elements := p.getElements()
-        c:=func(i int) bool {
-            return elements[i].key() <= key 
-        }
-        idx := sort.Search(int(p.count),c) 
-        if idx<int(p.count){
-            if elements[idx].key() == key {
-                *stack = append(*stack, pagestack{page: p, index: idx})
-				return true, elements[idx].value, idx, nil
-            }
-            *stack = append(*stack, pagestack{page: p, index: idx})
-		    return false, elements[idx].value, idx, nil
-        }
-        
-        /*
-		for idx := 0; idx < int(p.count); idx++ {
-			e := &elements[idx]
-
-			if key == e.key() {
-				//fmt.Printf("[INFO]==>SEARCH :: leaf node key :[%v] , search key [%v] found !! \n", e.key(), key)
-				*stack = append(*stack, pagestack{page: p, index: idx})
-				return true, e.value, idx, nil
-			}
-			if key > e.key() {
-				//fmt.Printf("[INFO]==>SEARCH :: leaf node key :[%v] , search key [%v] append to index[%v] !! \n", e.key(), key, idx)
-				*stack = append(*stack, pagestack{page: p, index: idx})
-				return false, e.value, idx, nil
-			}
+		c := func(i int) bool {
+			// ee,_:=strconv.Atoi(elements[i].key())
+			//kk,_:=strconv.Atoi(key)
+			//return ee<=kk//elements[i].key() <= key
+			return elements[i].key() <= key
 		}
-        */
-		*stack = append(*stack, pagestack{page: p, index: 0})
+		idx := sort.Search(int(p.count), c)
+		if idx < int(p.count) {
+			if elements[idx].key() == key {
+                //fmt.Printf("found : %v %v\n",key,elements[idx].value)
+				*stack = append(*stack, pagestack{pageid: p.curid, index: idx})
+				return true, elements[idx].value, idx, nil
+			}
+			*stack = append(*stack, pagestack{pageid: p.curid, index: idx})
+			return false, elements[idx].value, idx, nil
+		}
+
+		*stack = append(*stack, pagestack{pageid: p.curid, index: 0})
 		return false, 0, 0, nil //errors.New("found error")
 	} else if p.pgtype == tinterior {
 		if p.count == 0 {
-			*stack = append(*stack, pagestack{page: p, index: 0})
+			*stack = append(*stack, pagestack{pageid: p.curid, index: 0})
 			return false, 0, -1, errors.New("ERROR")
 		}
 
 		//循环查找
 		elements := p.getElements()
-        
-        c:=func(i int) bool {
-            return elements[i].key() <= key 
-        }
-        idx := sort.Search(int(p.count),c) 
-        if idx<int(p.count){
-            *stack = append(*stack, pagestack{page: p, index: idx})
-            sub := bt.getpage(elements[idx].value)
-            return sub.search(key, stack, bt)
-        }
-        
+		c := func(i int) bool {
+			//ee,_:=strconv.Atoi(elements[i].key())
+			//kk,_:=strconv.Atoi(key)
+			return elements[i].key() <= key
+		}
+		idx := sort.Search(int(p.count), c)
+		if idx < int(p.count) {
+			*stack = append(*stack, pagestack{pageid: p.curid, index: idx})
+			sub := bt.getpage(uint32(elements[idx].value))
+			return sub.search(key, stack, bt)
+		}
+
 		//没有找到,需要添加
-		*stack = append(*stack, pagestack{page: p, index: -1})
+		*stack = append(*stack, pagestack{pageid: p.curid, index: -1})
 		return false, 0, -1, errors.New("found error")
 	}
 	fmt.Printf("[ERROR]==>SEARCH :: b+tree error \n")
@@ -391,452 +332,447 @@ func (p *page) getElement(index int) *element {
 
 // btree function description : b+树
 type btree struct {
-	filename  string
-	rootpg    uint32
-	root      *page
-	mmapbytes []byte
-	maxpgid   uint32
-	fd        *os.File
+	db       *BTreedb
+	name     string
+	root     *page
+	rootpgid uint32
+	//cache map[uint32]*page
 }
 
-func NewEmptyBTree(filename string) *btree {
+func loadbtree(name string, root *page, db *BTreedb) *btree {
+
+	bt := &btree{db: db, name: name, root: root, rootpgid: root.curid}
+	return bt
+
+}
+
+func newbtree(name string, db *BTreedb) *btree {
+	bt := &btree{db: db, name: name}
+	bt.root, _, _ = bt.newpage(0, 0, tinterior)
+	var leaf *page
+	leaf, bt.root, _ = bt.newpage(bt.root.curid, 0, tleaf)
+	ele := bt.root.getElement(0)
+	ele.value = uint64(leaf.curid)
+	bt.rootpgid = bt.root.curid
+	return bt
+}
+
+func (bt *btree) Set(key string, value uint64) error {
+	bt.root = bt.db.getpage(bt.rootpgid)
+	res := bt.root.set(key, value, bt)
+	if res {
+        //bt.db.Sync()
+		return nil
+	}
+    
+	return errors.New("update fail")
+}
+
+func (bt *btree) checkmmap() error {
+	return bt.db.checkmmap()
+}
+
+func (bt *btree) newpage(parentid, preid uint32, pagetype uint8) (*page, *page, *page) {
+
+	return bt.db.newpage(parentid, preid, pagetype)
+}
+
+func (bt *btree) getpage(pgid uint32) *page {
+
+	// if _,ok:=bt.cache[pgid];ok{
+	//      return bt.cache[pgid]
+	//  }
+	//pg:= bt.db.getpage(pgid)
+	//  bt.cache[pgid]=pg
+	//  return pg
+	return bt.db.getpage(pgid)
+}
+
+func (bt *btree) Search(key string) (bool,  uint64) {
+	bt.root = bt.db.getpage(bt.rootpgid)
+	stack := make([]pagestack, 0)
+	ok, value, _, _ := bt.root.search(key, &stack, bt)
+
+	return ok, value
+}
+
+func (bt *btree) Range(start, end string) (bool, []uint64) {
+
+	if len(start) == 0 {
+		bt.root = bt.db.getpage(bt.rootpgid)
+		stack1 := make([]pagestack, 0)
+		ok, _, _, _ := bt.root.search(end, &stack1, bt)
+		if !ok {
+			return false, nil
+		}
+		startpgid := stack1[len(stack1)-1].pageid
+		startpg := bt.db.getpage(startpgid)
+		res := make([]uint64, 0)
+		for idx := stack1[len(stack1)-1].index - 1; idx >= 0; idx-- {
+			res = append(res, startpg.getElement(idx).value)
+		}
+
+		pgid := startpg.preid
+		for pgid != 0 {
+			pg := bt.db.getpage(pgid)
+			for idx := int(pg.count) - 1; idx > 0; idx-- {
+				res = append(res, pg.getElement(idx).value)
+			}
+			pgid = pg.preid
+		}
+		return true, res
+	}
+
+	if len(end) == 0 {
+		bt.root = bt.db.getpage(bt.rootpgid)
+		stack1 := make([]pagestack, 0)
+		ok, _, _, _ := bt.root.search(start, &stack1, bt)
+		if !ok {
+			return false, nil
+		}
+		startpgid := stack1[len(stack1)-1].pageid
+		startpg := bt.db.getpage(startpgid)
+		res := make([]uint64, 0)
+		for idx := stack1[len(stack1)-1].index; idx < int(startpg.count); idx++ {
+			res = append(res, startpg.getElement(idx).value)
+		}
+
+		pgid := startpg.nextid
+		for pgid != 0 {
+			pg := bt.db.getpage(pgid)
+			for idx := 0; idx < int(pg.count); idx++ {
+				res = append(res, pg.getElement(idx).value)
+			}
+			pgid = pg.nextid
+		}
+		return true, res
+	}
+
+	bt.root = bt.db.getpage(bt.rootpgid)
+	stack1 := make([]pagestack, 0)
+	ok, _, _, _ := bt.root.search(start, &stack1, bt)
+	if !ok {
+		return false, nil
+	}
+	startpgid := stack1[len(stack1)-1].pageid
+
+	stack2 := make([]pagestack, 0)
+	ok, _, _, _ = bt.root.search(end, &stack2, bt)
+	if !ok {
+		return false, nil
+	}
+	endpgid := stack2[len(stack2)-1].pageid
+
+	res := make([]uint64, 0)
+	endpg := bt.db.getpage(endpgid)
+	for idx := stack2[len(stack2)-1].index; idx < int(endpg.count); idx++ {
+		res = append(res, endpg.getElement(idx).value)
+	}
+
+	pgid := endpg.nextid
+	for pgid != startpgid && pgid != 0 {
+		pg := bt.db.getpage(pgid)
+		for idx := 0; idx < int(pg.count); idx++ {
+			res = append(res, pg.getElement(idx).value)
+		}
+		pgid = pg.nextid
+	}
+
+	startpg := bt.db.getpage(startpgid)
+
+	for idx := 0; idx < stack1[len(stack1)-1].index; idx++ {
+		res = append(res, startpg.getElement(idx).value)
+	}
+
+	return true, res
+
+}
+
+func (bt *btree) Display() {
+	bt.root.display(bt)
+}
+
+type metaBT struct {
+	btname    [32]byte
+	btnamelen uint32
+	maxkeylen uint32
+	rootpgid  uint32
+}
+
+func (mt *metaBT) key() string {
+	return string(mt.btname[:mt.btnamelen])
+}
+
+func (mt *metaBT) setkey(key string) {
+	if len(key) == 0 {
+		return
+	}
+	if len(key) > 32 {
+		copy(mt.btname[:], []byte(key)[:32])
+		mt.btnamelen = 32
+		return
+	}
+	copy(mt.btname[:len(key)], []byte(key)[:])
+	mt.btnamelen = uint32(len(key))
+	return
+}
+
+type metaInfo struct {
+	magic   uint32
+	maxpgid uint32
+	btnum   uint32
+	btinfos [64]metaBT
+}
+
+func (mi *metaInfo) addbt(name string, rootpgid uint32) error {
+
+	mi.btinfos[mi.btnum].setkey(name)
+	mi.btinfos[mi.btnum].rootpgid = rootpgid
+	mi.btnum++
+	return nil
+
+}
+
+const magicnum uint32 = 0x9EDFEDFA
+
+type BTreedb struct {
+	btmap     map[string]*btree // btree集合
+	filename  string
+	mmapbytes []byte
+	//maxpgid   uint32
+	fd   *os.File
+	meta *metaInfo
+}
+
+func exist(filename string) bool {
+	_, err := os.Stat(filename)
+	return err == nil || os.IsExist(err)
+}
+
+func NewBTDB(dbname string) *BTreedb {
 
 	fmt.Printf("headoffset : %v \n", pageheadOffset)
 	fmt.Printf("elementSize: %v \n", elementSize)
 	fmt.Printf("pageheaadlen: %v \n", pageheaadlen)
-
+	fmt.Printf("btdbname : %v \n", dbname)
 	file_create_mode := os.O_RDWR | os.O_CREATE | os.O_TRUNC
-	this := &btree{filename: filename, rootpg: 0, maxpgid: 1}
+	this := &BTreedb{filename: dbname, btmap: make(map[string]*btree)}
 
-	file_create_mode = os.O_RDWR | os.O_CREATE | os.O_TRUNC
-	f, err := os.OpenFile(filename, file_create_mode, 0664)
+	if exist(dbname) {
+		file_create_mode = os.O_RDWR
+	} else {
+		file_create_mode = os.O_RDWR | os.O_CREATE | os.O_TRUNC
+	}
+
+	f, err := os.OpenFile(dbname, file_create_mode, 0664)
 	if err != nil {
 		return nil
 	}
+
+	fi, _ := f.Stat()
+	filelen := fi.Size()
+	fmt.Printf("filelen : %v, %v \n", filelen, pagesize*2)
+	if filelen < pagesize*2 {
+		syscall.Ftruncate(int(f.Fd()), pagesize*2)
+		filelen = pagesize * 2
+		this.fd = f
+		//var addr = unsafe.Pointer(&this.mmapbytes[0])
+		this.mmapbytes, err = syscall.Mmap(int(f.Fd()), 0, int(filelen), syscall.PROT_READ|syscall.PROT_WRITE, syscall.MAP_SHARED)
+		//ptr, err := C.mmap(addr, C.size_t(filelen), C.PROT_READ|C.PROT_WRITE, C.MAP_SHARED, C.int(f.Fd()), 0)
+
+		if err != nil {
+			fmt.Printf("MAPPING ERROR  %v \n", err)
+			return nil
+		}
+		//this.mmapbytes = ([]byte)(unsafe.Pointer(ptr))
+		this.meta = (*metaInfo)(unsafe.Pointer(&this.mmapbytes[0]))
+		this.meta.magic = magicnum
+		this.meta.maxpgid = 1
+		this.meta.btnum = 0
+		return this
+	}
 	this.fd = f
-	//defer f.Close()
-	syscall.Ftruncate(int(f.Fd()), pagesize*2)
-	this.mmapbytes, err = syscall.Mmap(int(f.Fd()), 0, int(pagesize*2), syscall.PROT_READ|syscall.PROT_WRITE, syscall.MAP_SHARED)
+	this.mmapbytes, err = syscall.Mmap(int(f.Fd()), 0, int(filelen), syscall.PROT_READ|syscall.PROT_WRITE, syscall.MAP_SHARED)
 	if err != nil {
 		fmt.Printf("MAPPING ERROR  %v \n", err)
 		return nil
 	}
-	if this.init() != nil {
+	this.meta = (*metaInfo)(unsafe.Pointer(&this.mmapbytes[0]))
+	if this.meta.magic != magicnum {
+		fmt.Printf("FILE TYPE ERROR \n")
 		return nil
 	}
+
+	for i := uint32(0); i < this.meta.btnum; i++ {
+		btname := this.meta.btinfos[i].key()
+		root := this.getpage(this.meta.btinfos[i].rootpgid)
+		this.btmap[btname] = loadbtree(btname, root, this)
+	}
+
 	return this
-
 }
 
-func (bt *btree) init() error {
+func (db *BTreedb) AddBTree(name string) error {
 
-	bt.root = bt.newpage(nil, nil, tinterior)
-	bt.rootpg = bt.root.curid
-	leaf := bt.newpage(bt.root, nil, tleaf)
-	ele := bt.root.getElement(0)
-	ele.value = leaf.curid
-
-	fmt.Printf("LEAF COUNT INIT:%v\n", leaf.count)
-	//leafele := leaf.getElement(0)
-	//leafele.key = "hello"
-	//leafele.value = 33
-	//leaf.count++
+	if _, ok := db.btmap[name]; ok {
+		fmt.Printf("ERROR:::%v\n", db.filename)
+		return nil
+	}
+	//fmt.Printf("FILE:::%v\n", db.filename)
+	bt := newbtree(name, db)
+	if bt == nil {
+		fmt.Printf("create error:::%v\n", name)
+		return errors.New("create error")
+	}
+	db.btmap[name] = bt
+	db.meta.addbt(name, bt.root.curid)
+    db.Sync()
 	return nil
-
 }
 
-func (bt *btree) Set(key string, value uint32) bool {
-    //fmt.Printf("new root id ...%v %v\n",bt.root.curid,bt.root.getElement(int(bt.root.count-1)).key())
-	return bt.root.set(key, value, bt)
-
+func (db *BTreedb) header() *reflect.SliceHeader {
+	return (*reflect.SliceHeader)(unsafe.Pointer(&db.mmapbytes))
 }
 
-func (bt *btree) checkmmap() error {
-	if int(int64(bt.maxpgid)*pagesize) >= len(bt.mmapbytes) {
-		//bp.maxpgid++
-		err := syscall.Ftruncate(int(bt.fd.Fd()), int64(bt.maxpgid+1)*pagesize)
-		if err != nil {
-			fmt.Printf("ftruncate error : %v\n", err)
-			return err
-		}
-		syscall.Munmap(bt.mmapbytes)
-		bt.mmapbytes, err = syscall.Mmap(int(bt.fd.Fd()), 0, int(int64(bt.maxpgid+1)*pagesize), syscall.PROT_READ|syscall.PROT_WRITE, syscall.MAP_SHARED)
-
-		if err != nil {
-			fmt.Printf("MAPPING ERROR  %v \n", err)
-			return err
-		}
-
+func (db *BTreedb) Sync() error {
+	dh := db.header()
+	_, _, err := syscall.Syscall(syscall.SYS_MSYNC, dh.Data, uintptr(dh.Len), syscall.MS_SYNC)
+	if err != 0 {
+		fmt.Printf("Sync Error ")
+		return errors.New("Sync Error")
 	}
 	return nil
 }
 
-func (bt *btree) newpage(parent, pre *page, pagetype uint8) *page {
+func (db *BTreedb) Set(btname, key string, value  uint64) error {
+
+	if _, ok := db.btmap[btname]; !ok {
+		return errors.New("has one")
+	}
+
+	return db.btmap[btname].Set(key, value)
+    
+}
+
+func (db *BTreedb) Search(btname, key string) (bool, uint64) {
+	if _, ok := db.btmap[btname]; !ok {
+		return false, 0
+	}
+
+	return db.btmap[btname].Search(key)
+
+}
+
+func (db *BTreedb) Range(btname, start, end string) (bool, []uint64) {
+
+	if _, ok := db.btmap[btname]; !ok {
+		return false, nil
+	}
+
+	if start >= end && len(end) > 0 && len(start) > 0 {
+		fmt.Printf("START OVER END\n")
+		return false, nil
+	}
+
+	return db.btmap[btname].Range(start, end)
+
+}
+
+func (db *BTreedb) Close() error {
+
+	syscall.Munmap(db.mmapbytes)
+	db.fd.Close()
+	return nil
+}
+
+func (bt *BTreedb) newpage( /*parent, pre *page*/ parentid, preid uint32, pagetype uint8) (*page, *page, *page) {
 
 	if bt.checkmmap() != nil {
-        fmt.Printf("check error \n")
-		return nil
+		fmt.Printf("check error \n")
+		return nil, nil, nil
 	}
-
-	lpage := (*page)(unsafe.Pointer(&bt.mmapbytes[(int64(bt.maxpgid) * pagesize)]))
-	lpage.curid = bt.maxpgid
+	var parent *page
+	var pre *page
+	lpage := (*page)(unsafe.Pointer(&bt.mmapbytes[(int64(bt.meta.maxpgid) * pagesize)]))
+	//fmt.Printf("lapge:%v\n", unsafe.Pointer(lpage))
+	lpage.curid = bt.meta.maxpgid
 	lpage.pgtype = pagetype
 	lpage.nextid = 0
 	lpage.preid = 0
 	if pagetype == tinterior {
 		lpage.count = 1
-		ele := (*[0xFFFF]element)(unsafe.Pointer(&bt.mmapbytes[(int64(bt.maxpgid)*pagesize + pageheadOffset)]))
+		ele := (*[0xFFFF]element)(unsafe.Pointer(&bt.mmapbytes[(int64(bt.meta.maxpgid)*pagesize + pageheadOffset)]))
 		lpage.used = uint32(pageheaadlen)
 		ele[0].setkv("", 0)
 		lpage.elementsptr = uintptr(unsafe.Pointer(ele))
 
 	} else {
 		lpage.count = 0
-		ele := (*[0xFFFF]element)(unsafe.Pointer(&bt.mmapbytes[(int64(bt.maxpgid)*pagesize + pageheadOffset)]))
-		//ele[0].key="hello"
-		//ele[0].value=345
+		ele := (*[0xFFFF]element)(unsafe.Pointer(&bt.mmapbytes[(int64(bt.meta.maxpgid)*pagesize + pageheadOffset)]))
 		lpage.elementsptr = uintptr(unsafe.Pointer(ele))
 		lpage.used = uint32(pageheaadlen)
 	}
-
-	if parent != nil {
+	//fmt.Printf("lapge:%v\n", unsafe.Pointer(lpage))
+	//fmt.Printf("parent:%v\n", unsafe.Pointer(parent))
+	if parentid != 0 {
+		parent = bt.getpage(parentid)
 		lpage.parentpg = parent.curid
 	} else {
 		lpage.parentpg = 0
 	}
 
-	if pre != nil {
+	if preid != 0 {
+		pre = bt.getpage(preid)
 		lpage.nextid = pre.nextid
 		pre.nextid = lpage.curid
 		lpage.preid = pre.curid
 	}
 
-	bt.maxpgid++
-	return lpage
+	bt.meta.maxpgid++
+	return lpage, parent, pre
 }
 
-func (bt *btree) getpage(pgid uint32) *page {
+func (bt *BTreedb) checkmmap() error {
+	if int(int64(bt.meta.maxpgid)*pagesize) >= len(bt.mmapbytes) {
+		err := syscall.Ftruncate(int(bt.fd.Fd()), int64(bt.meta.maxpgid+1)*pagesize)
+		if err != nil {
+			fmt.Printf("ftruncate error : %v\n", err)
+			return err
+		}
+		maxpgid := bt.meta.maxpgid
+		syscall.Munmap(bt.mmapbytes)
+		//fmt.Printf(".meta.maxpgid:%v\n",bt.meta.maxpgid)
+		bt.mmapbytes, err = syscall.Mmap(int(bt.fd.Fd()), 0, int(int64( /*bt.meta.maxpgid*/ maxpgid+1)*pagesize), syscall.PROT_READ|syscall.PROT_WRITE, syscall.MAP_SHARED)
 
+		if err != nil {
+			fmt.Printf("MAPPING ERROR  %v \n", err)
+			return err
+		}
+
+		bt.meta = (*metaInfo)(unsafe.Pointer(&bt.mmapbytes[0]))
+
+	}
+	return nil
+}
+
+func (bt *BTreedb) getpage(pgid uint32) *page {
+	//fmt.Printf("pgid:%v\n",pgid)
 	return (*page)(unsafe.Pointer(&bt.mmapbytes[(int64(pgid) * pagesize)]))
 
 }
 
-func (bt *btree) Search(key string) (bool, uint32) {
+func (db *BTreedb) setrootid(btname string) error {
 
-	stack := make([]pagestack, 0)
-	ok, value, _, _ := bt.root.search(key, &stack, bt)
-
-	for idx := len(stack) - 1; idx >= 0; idx-- {
-
-		//fmt.Printf("STACK PAGE :::: %v index: %v\n", unsafe.Pointer(stack[idx].page), stack[idx].index)
+	if _, ok := db.btmap[btname]; !ok {
+		return errors.New("no bt")
 	}
 
-	return ok, value
-}
-
-
-func (bt *btree) Display(){
-    
-    bt.root.display(bt)
-    
-}
-
-type eee struct {
-	key []byte
-	// pos     uint32
-	len   uint8
-	value uint32
-}
-
-func ttttt() {
-
-	e := eee{value: 20}
-	copy(e.key[:20], []byte("he"))
-	fmt.Printf("%v %v\n", unsafe.Sizeof(e), e.key)
-
-}
-
-/*
-
-type pages []*page
-
-type nodes []*node
-
-type inode struct {
-	pgid  uint32
-	key   string
-	value uint32
-}
-
-type inodes []inode
-
-type node struct {
-	nodetype uint8
-	pageid   uint32
-	parent   *node
-	key      string
-	children nodes
-	inodes   inodes
-	pgids    pages
-}
-
-func (n *node) getKey(index int) string {
-	if n.nodetype == tleaf && index < len(n.inodes) {
-		return n.inodes[index].key
-	}
-	if n.nodetype == tinterior && index < len(n.children) && n.children[index] != nil {
-		return n.children[index].key
-	}
-
-	return ""
-}
-
-func (n *node) display(deep int) {
-
-	for i := 0; i < deep; i++ {
-		fmt.Printf("\t")
-	}
-
-	if n.nodetype == tleaf {
-		fmt.Printf("[%v] ", unsafe.Pointer(n))
-		for _, in := range n.inodes {
-
-			fmt.Printf(" leafkey:%v == %v \t", in.key, in.value)
-
+	for i := uint32(0); i < db.meta.btnum; i++ {
+		if db.meta.btinfos[i].key() == btname {
+			db.meta.btinfos[i].rootpgid = db.btmap[btname].root.curid
 		}
-	}
-
-	if n.nodetype == tinterior {
-		fmt.Printf("[%v] ", unsafe.Pointer(n))
-		for _, in := range n.children {
-
-			fmt.Printf(" interkey:%v == %v \n", in.key, unsafe.Pointer(in))
-			in.display(deep + 1)
-
-		}
-	}
-	fmt.Println()
-
-}
-
-func (n *node) put(key string, value uint32, bt *btree) bool {
-
-	stack := make([]*node, 0)
-
-	ok, v, index, err := n.search(key, &stack)
-
-	if err != nil {
-		fmt.Printf("[ERROR] node is nil...\n")
-		return false
-	}
-
-	if ok && v != value {
-		stack[len(stack)-1].inodes[index].value = value
-		fmt.Printf("[INFO] update value[%v] ok...\n", value)
-		return ok
-	}
-
-	//没有key ，需要添加key,value
-	if !ok {
-		for idx := len(stack) - 1; idx >= 0; idx-- {
-			n := stack[idx]
-			fmt.Printf("STACK::::%v\n", unsafe.Pointer(stack[idx]))
-			n.add(key, value, bt)
-
-		}
-
-	}
-
-	return true
-}
-
-func (n *node) addpage(bt *btree, pre *page, ptype uint8) *page {
-
-	if bt.checkmmap() != nil {
-		return nil
-	}
-
-	lpage := (*page)(unsafe.Pointer(&bt.mmapbytes[(int64(bt.maxpgid) * pagesize)]))
-	lpage.curid = bt.maxpgid
-	lpage.pgtype = tinterior
-	lpage.nextid = 0
-	lpage.preid = pre.curid
-	lpage.ismaster = false
-	lpage.parentpg = pre.parentpg
-	pre.nextid = lpage.curid
-
-	if ptype == tleaf {
-		lpage.pgtype = tleaf
-		leafp := (*leafpage)(unsafe.Pointer(&bt.mmapbytes[(int64(bt.maxpgid)*pagesize + pageheaadlen)]))
-		leafp.count = 0
-		lpage.ptr = uintptr(unsafe.Pointer(leafp))
-	} else {
-		lpage.pgtype = tinterior
-		interp := (*interpage)(unsafe.Pointer(&bt.mmapbytes[(int64(bt.maxpgid)*pagesize + pageheaadlen)]))
-		interp.count = 0
-		lpage.ptr = uintptr(unsafe.Pointer(interp))
-	}
-
-	bt.maxpgid++
-	return lpage
-
-}
-
-func (n *node) add(key string, value uint32, bt *btree) error {
-
-	if n.nodetype == tleaf {
-		fmt.Printf("add : %v %v leaf\n", key, value)
-		lpg := (*leafpage)(unsafe.Pointer(n.pgids[len(n.pgids)-1].ptr))
-		if lpg.count == 0 {
-			lpg.leafeles = append(lpg.leafeles, leafelement{key: key, value: value})
-			lpg.count++
-			return nil
-		} else {
-			lpage := n.addpage(bt, n.pgids[len(n.pgids)-1], tleaf)
-			lpg := (*leafpage)(unsafe.Pointer(lpage.ptr))
-			lpg.leafeles = append(lpg.leafeles, leafelement{key: key, value: value})
-			lpg.count++
-			n.pgids = append(n.pgids, lpage)
-			return nil
-		}
-	} else {
-		fmt.Printf("add : %v %v inter\n", key, value)
 
 	}
 
 	return nil
-
 }
-
-func (n *node) search(key string, stack *[]*node) (bool, uint32, int, error) {
-
-	if n.nodetype == tleaf {
-		//循环查找
-		for idx, in := range n.pgids {
-			lpg := (*leafpage)(unsafe.Pointer(in.ptr))
-			if lpg.count == 0 {
-				*stack = append(*stack, n)
-				return false, 0, -1, nil
-			}
-			if key == lpg.leafeles[0].key {
-				*stack = append(*stack, n)
-				return true, lpg.leafeles[0].value, idx, nil
-			}
-		}
-		*stack = append(*stack, n)
-		return false, 0, -1, nil
-	}
-
-	if n.nodetype == tinterior {
-
-		for _, in := range n.children {
-
-			if key >= in.key {
-				fmt.Printf("less key : %v , %v \n", key, in.key)
-				*stack = append(*stack, n)
-				return in.search(key, stack)
-			}
-		}
-		fmt.Printf("tinterior\n")
-	}
-	fmt.Printf("ERROR\n")
-	return false, 0, -1, errors.New("ERROR")
-
-}
-
-func (bt *btree) search(key string) (bool, uint32, int, error) {
-
-	stack := make([]*node, 0)
-
-	a, b, c, err := bt.root.search(key, &stack)
-
-	for idx := len(stack) - 1; idx >= 0; idx-- {
-		fmt.Printf("STACK::::%v\n", unsafe.Pointer(stack[idx]))
-	}
-
-	return a, b, c, err
-
-}
-
-func (bt *btree) display() {
-
-	bt.root.display(0)
-
-}
-
-func (bt *btree) put(key string, value uint32) bool {
-
-	return bt.root.put(key, value, bt)
-
-}
-
-func (bt *btree) newleafnode(parent *node) *node {
-
-	if bt.checkmmap() != nil {
-		return nil
-	}
-
-	lpage := (*page)(unsafe.Pointer(&bt.mmapbytes[(int64(bt.maxpgid) * pagesize)]))
-	lpage.curid = bt.maxpgid
-	lpage.pgtype = tleaf
-	lpage.nextid = 0
-	lpage.preid = 0
-	lpage.ismaster = true
-	if parent != nil {
-		lpage.parentpg = parent.pageid
-	} else {
-		lpage.parentpg = 0
-	}
-
-	leafp := (*leafpage)(unsafe.Pointer(&bt.mmapbytes[(int64(bt.maxpgid)*pagesize + pageheaadlen)]))
-	leafp.count = 0
-	lpage.ptr = uintptr(unsafe.Pointer(leafp))
-
-	leafnode := &node{nodetype: tleaf, pageid: bt.maxpgid, parent: parent, pgids: make(pages, 0)}
-	leafnode.pgids = append(leafnode.pgids, lpage)
-
-	if parent != nil {
-		parent.children = append(parent.children, leafnode)
-	}
-
-	bt.maxpgid++
-	return leafnode
-
-}
-
-func (bt *btree) newinternode(parent *node) *node {
-
-	if bt.checkmmap() != nil {
-		return nil
-	}
-
-	lpage := (*page)(unsafe.Pointer(&bt.mmapbytes[(int64(bt.maxpgid) * pagesize)]))
-	lpage.curid = bt.maxpgid
-	lpage.pgtype = tinterior
-	lpage.nextid = 0
-	lpage.preid = 0
-	lpage.ismaster = true
-	if parent != nil {
-		lpage.parentpg = parent.pageid
-
-	} else {
-		lpage.parentpg = 0
-	}
-
-	interp := (*interpage)(unsafe.Pointer(&bt.mmapbytes[(int64(bt.maxpgid)*pagesize + pageheaadlen)]))
-	interp.count = 0
-	lpage.ptr = uintptr(unsafe.Pointer(interp))
-
-	intnode := &node{nodetype: tinterior, pageid: bt.maxpgid, parent: parent, pgids: make(pages, 0)}
-	intnode.pgids = append(intnode.pgids, lpage)
-
-	if parent != nil {
-		parent.children = append(parent.children, intnode)
-	}
-
-	bt.maxpgid++
-
-	return intnode
-
-}
-*/
