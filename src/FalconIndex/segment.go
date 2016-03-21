@@ -73,7 +73,7 @@ func NewSegmentWithLocalFile(segmentname string, logger *utils.Log4FE) *Segment 
 
 	this := &Segment{btdb: nil, StartDocId: 0, MaxDocId: 0, SegmentName: segmentname,
 		idxMmap: nil, dtlMmap: nil, pflMmap: nil, Logger: logger, fields: make(map[string]*FSField),
-		FieldInfos: make(map[string]utils.SimpleFieldInfo), isMemory: true}
+		FieldInfos: make(map[string]utils.SimpleFieldInfo), isMemory: false}
 
 	metaFileName := fmt.Sprintf("%v.meta", segmentname)
 	buffer, err := utils.ReadFromJson(metaFileName)
@@ -123,7 +123,7 @@ func NewSegmentWithLocalFile(segmentname string, logger *utils.Log4FE) *Segment 
 			this.MaxDocId, field.FieldType, field.PflOffset, field.PflLen,
 			this.idxMmap, this.pflMmap, this.dtlMmap, false, this.btdb, logger)
 		this.fields[field.FieldName] = indexer
-		this.Logger.Info("[TRACE] %v", this.FieldInfos[field.FieldName])
+		//this.Logger.Info("[TRACE] %v", this.FieldInfos[field.FieldName])
 	}
 
 	return this
