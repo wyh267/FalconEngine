@@ -9,7 +9,7 @@ import (
 )
 
 func Test_NewEmptySegmentAndAddDocument(t *testing.T) {
-	fmt.Printf("============================  Test_NewEmptySegmentAndAddDocument ======================== ====\n")
+	fmt.Printf("============================  Test_NewEmptySegmentAndAddDocument ============================\n")
 	logger, _ := utils.New("test_log")
 	var err error
 
@@ -65,7 +65,7 @@ func Test_NewEmptySegmentAndAddDocument(t *testing.T) {
 }
 
 func Test_LoadSegment(t *testing.T) {
-	fmt.Printf("============================  Test_LoadSegment ======================== ====\n")
+	fmt.Printf("============================  Test_LoadSegment ============================\n")
 	logger, _ := utils.New("test_log")
 	var err error
 	segment := NewSegmentWithLocalFile("test_segment_111", logger)
@@ -107,7 +107,7 @@ func Test_LoadSegment(t *testing.T) {
 }
 
 func Test_LoadSegmentQuery(t *testing.T) {
-	fmt.Printf("======================== Test_LoadSegmentSecond ======================== ====\n")
+	fmt.Printf("======================== Test_LoadSegmentSecond ============================\n")
 	logger, _ := utils.New("test_log")
 	var err error
 	segment := NewSegmentWithLocalFile("test_segment_111", logger)
@@ -133,7 +133,7 @@ func Test_LoadSegmentQuery(t *testing.T) {
 }
 
 func Test_GetValue(t *testing.T) {
-	fmt.Printf("======================== Test_GetValue ======================== ====\n")
+	fmt.Printf("======================== Test_GetValue ============================\n")
 	logger, _ := utils.New("test_log")
 	var err error
 	segment := NewSegmentWithLocalFile("test_segment_111", logger)

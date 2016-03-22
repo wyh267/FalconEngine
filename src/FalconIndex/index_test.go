@@ -5,16 +5,48 @@ package FalconIndex
 import (
     //"fmt"
     "testing"
-    //"utils"
+    "utils"
    // "math/rand"
     //"tree"
     //fi "FalconIndex"
 )
 
 
-var pflOffset1,pflOffset2 int64
-var pflLen1,pflLen2 int
+func Test_NewIndex(t *testing.T) {
+    logger,_:=utils.New("test_log")
 
-func Test_Index(t *testing.T) {
-    hello()
+    var err error
+     idx := NewEmptyIndex("test_index", "./" , logger)
+     
+     idx.AddField(utils.SimpleFieldInfo{FieldName: "AAA", FieldType: utils.IDX_TYPE_STRING})
+     idx.AddField(utils.SimpleFieldInfo{FieldName: "BBB", FieldType: utils.IDX_TYPE_STRING})
+     idx.AddField(utils.SimpleFieldInfo{FieldName: "AAA", FieldType: utils.IDX_TYPE_STRING})
+     idx.AddField(utils.SimpleFieldInfo{FieldName: "CCC", FieldType: utils.IDX_TYPE_NUMBER})
+     
+     if err != nil {
+		t.Error("Fail...", err)
+	} else {
+		t.Log("UnSubscribeEmail OK")
+	}
+     
+}
+
+
+func Test_LoadIndex(t *testing.T) {
+    logger,_:=utils.New("test_log")
+
+    var err error
+     idx := NewIndexWithLocalFile("test_index", "./" , logger)
+     
+     idx.AddField(utils.SimpleFieldInfo{FieldName: "AAA", FieldType: utils.IDX_TYPE_STRING})
+     idx.AddField(utils.SimpleFieldInfo{FieldName: "BBB", FieldType: utils.IDX_TYPE_STRING})
+     idx.AddField(utils.SimpleFieldInfo{FieldName: "AAA", FieldType: utils.IDX_TYPE_STRING})
+     idx.AddField(utils.SimpleFieldInfo{FieldName: "CCC", FieldType: utils.IDX_TYPE_NUMBER})
+     
+     if err != nil {
+		t.Error("Fail...", err)
+	} else {
+		t.Log("UnSubscribeEmail OK")
+	}
+    
 }

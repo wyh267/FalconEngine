@@ -255,6 +255,30 @@ func (this *profile) getValue(pos uint32) (string, bool) {
 
 }
 
+func (this *profile) getIntValue(pos uint32) (int64, bool) {
+    if this.isMomery {
+		if this.fieldType == utils.IDX_TYPE_NUMBER {
+			return this.pflNumber[pos], true
+		}
+		return 0xFFFFFFFF, false
+
+	}
+	if this.pflMmap == nil {
+		return 0xFFFFFFFF, true
+	}
+
+	offset := this.pflOffset + int64(pos*8)
+	if this.fieldType == utils.IDX_TYPE_NUMBER {
+		//ov:=this.pflMmap.ReadInt64(offset)
+		//if this.shift>0{
+		//    return fmt.Sprintf("%v",float64(ov)/(math.Pow10(int(this.shift))) ), true
+		//}
+		return this.pflMmap.ReadInt64(offset), true
+	}
+    
+    return 0xFFFFFFFF, false
+}
+
 // Filter function description : 过滤
 // params :
 // return :
@@ -336,4 +360,92 @@ func (this *profile) updateDocument(docid uint32, content interface{}) error {
 		this.pflMmap.WriteInt64(offset, value)
 	}
 	return nil
+}
+
+
+
+
+func (this *profile) mergeProfiles(srclist []*profile,fullsegmentname string) (int64,int,error) {
+    
+    
+    
+    this.Logger.Info("[INFO] mergeProfiles  %v",fullsegmentname )
+    if this.startDocId != 0 {
+        this.Logger.Error("[ERROR] DocId Wrong %v",this.startDocId)
+        return 0,0,errors.New("DocId Wrong")
+    }
+    //打开正排文件
+	pflFileName := fmt.Sprintf("%v.pfl", fullsegmentname)
+	var pflFd *os.File
+	var err error
+	//this.Logger.Info("[INFO] NumberProfile --> Serialization :: Load NumberProfile pflFileName: %v", pflFileName)
+	pflFd, err = os.OpenFile(pflFileName, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0644)
+	if err != nil {
+		return 0,0,err
+	}
+	defer pflFd.Close()
+	fi, _ := pflFd.Stat()
+	offset := fi.Size()
+	this.pflOffset = offset
+    var lens int
+	if this.fieldType == utils.IDX_TYPE_NUMBER {
+		valueBufer := make([]byte, 8)
+        for _,src:=range srclist{
+            for i:=uint32(0);i<uint32(src.docLen);i++{
+            val,_:=src.getIntValue(i)
+            binary.LittleEndian.PutUint64(valueBufer, uint64(val))
+			_, err = pflFd.Write(valueBufer)
+			if err != nil {
+				this.Logger.Error("[ERROR] NumberProfile --> Serialization :: Write Error %v", err)
+			}
+            this.curDocId++
+            }
+        }
+        
+
+		lens = int(this.curDocId - this.startDocId)
+	} else {
+
+		//打开dtl文件
+		dtlFileName := fmt.Sprintf("%v.dtl", fullsegmentname)
+		//this.Logger.Info("[INFO] StringProfile --> Serialization :: Load StringProfile dtlFileName: %v", dtlFileName)
+		dtlFd, err := os.OpenFile(dtlFileName, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0644)
+		if err != nil {
+			return 0,0,err
+		}
+		defer dtlFd.Close()
+		fi, _ = dtlFd.Stat()
+		dtloffset := fi.Size()
+
+		lenBufer := make([]byte, 8)
+        for _,src:=range srclist{
+        for i:=uint32(0);i<uint32(src.docLen);i++{
+            info,_:=src.getValue(i)
+            infolen := len(info)
+			binary.LittleEndian.PutUint64(lenBufer, uint64(infolen))
+			_, err := dtlFd.Write(lenBufer)
+			cnt, err := dtlFd.WriteString(info)
+			if err != nil || cnt != infolen {
+				this.Logger.Error("[ERROR] StringProfile --> Serialization :: Write Error %v", err)
+			}
+			//存储offset
+			//this.Logger.Info("[INFO] dtloffset %v,%v",dtloffset,infolen)
+			binary.LittleEndian.PutUint64(lenBufer, uint64(dtloffset))
+			_, err = pflFd.Write(lenBufer)
+			if err != nil {
+				this.Logger.Error("[ERROR] StringProfile --> Serialization :: Write Error %v", err)
+			}
+			dtloffset = dtloffset + int64(infolen) + 8
+            this.curDocId++
+        }
+        }
+        
+        lens = int(this.curDocId - this.startDocId)
+
+	}
+    this.isMomery = false
+	this.pflString = nil
+	this.pflNumber = nil
+	return offset,lens,nil
+    
 }

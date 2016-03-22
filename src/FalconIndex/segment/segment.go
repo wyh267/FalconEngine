@@ -140,7 +140,7 @@ func (this *Segment) AddField(sfield utils.SimpleFieldInfo) error {
 		return errors.New("Already has field..")
 	}
 
-	if this.isMemory {
+	if this.isMemory && !this.IsEmpty(){
 		this.Logger.Warn("[WARN] Segment --> AddField field [%v] fail..", sfield.FieldName)
 		return errors.New("memory segment can not add field..")
 	}
@@ -148,9 +148,9 @@ func (this *Segment) AddField(sfield utils.SimpleFieldInfo) error {
 	indexer := newEmptyField(sfield.FieldName, this.MaxDocId, sfield.FieldType, this.Logger)
 	this.FieldInfos[sfield.FieldName] = sfield
 	this.fields[sfield.FieldName] = indexer
-	if err := this.storeStruct(); err != nil {
-		return err
-	}
+	//if err := this.storeStruct(); err != nil {
+	//	return err
+	//}
 	this.Logger.Info("[INFO] Segment --> AddField :: Success ")
 	return nil
 }
@@ -165,7 +165,7 @@ func (this *Segment) DeleteField(fieldname string) error {
 		return errors.New("not found field")
 	}
 
-	if this.isMemory {
+	if this.isMemory && !this.IsEmpty() {
 		this.Logger.Warn("[WARN] Segment --> deleteField field [%v] fail..", fieldname)
 		return errors.New("memory segment can not delete field..")
 	}
@@ -173,9 +173,9 @@ func (this *Segment) DeleteField(fieldname string) error {
 	this.fields[fieldname].destroy()
 	delete(this.FieldInfos, fieldname)
 	delete(this.fields, fieldname)
-	if err := this.storeStruct(); err != nil {
-		return err
-	}
+	//if err := this.storeStruct(); err != nil {
+	//	return err
+	//}
 	this.Logger.Info("[INFO] Segment --> DeleteField[%v] :: Success ", fieldname)
 	// this.Fields[field.FieldName].Indexer=idf
 	return nil
@@ -577,3 +577,19 @@ func (this *Segment) SearchUnitDocIds(querys []utils.FSSearchQuery, filteds []ut
 	return indocids[:index], true
 
 }
+
+
+
+func (this *Segment) IsEmpty() bool {
+    return this.StartDocId == this.MaxDocId 
+}
+
+
+
+
+func (this *Segment)MergeDocument(dest *Segment) error {
+    
+    
+    return  nil
+}
+
