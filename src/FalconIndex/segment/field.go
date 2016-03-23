@@ -30,6 +30,18 @@ type FSField struct {
 	btree      *tree.BTreedb
 }
 
+
+func newEmptyFakeField(fieldname string, start uint32, fieldtype uint64, docLen uint64, logger *utils.Log4FE) *FSField {
+    this := &FSField{fieldName: fieldname, startDocId: start, maxDocId: start,
+		fieldType: fieldtype, Logger: logger,
+		isMomery: true, ivt: nil, pfl: nil, pflOffset: -1, pflLen: -1, btree: nil}
+
+	
+	this.pfl = newEmptyFakeProfile(fieldtype, 0, fieldname, start,docLen, logger)
+	return this
+
+
+}
 // newEmptyField function description : 新建空字段
 // params :
 // return :
@@ -240,4 +252,59 @@ func (this *FSField) setMmap(pfl, dtl, idx *utils.Mmap) {
 	this.setDtlMmap(dtl)
 	this.setIdxMmap(idx)
 
+}
+
+
+
+
+func (this *FSField) mergeField(fields []*FSField,segmentname string, btree *tree.BTreedb) (int64,int,error) {
+ 
+    var err error
+    if this.pfl != nil {
+        pfls := make([]*profile,0)
+        
+        
+        for _,fd:=range fields {
+            //if fd == nil {
+            //    this.Logger.Info("[INFO] fake profile docLen %v",docLen)
+            //    fakepfl:=newEmptyFakeProfile(this.fieldType,0,this.fieldName,0,docLen,this.Logger)
+            //     pfls = append(pfls,fakepfl)
+            //}else{
+                 pfls = append(pfls,fd.pfl)
+            //}
+           
+        }
+        this.pflOffset, this.pflLen, err = this.pfl.mergeProfiles(pfls,segmentname)
+		if err != nil {
+			this.Logger.Error("[ERROR] FSField --> Serialization :: Serialization Error %v", err)
+			return 0,0,err
+		}
+        this.maxDocId+=uint32(this.pflLen)
+        
+    }
+    
+    
+    if this.ivt != nil {
+        this.btree = btree
+		if err := this.btree.AddBTree(this.fieldName); err != nil {
+			this.Logger.Error("[ERROR] invert --> Create BTree Error %v", err)
+			return 0,0,err
+		}
+        ivts := make([]*invert,0)
+        for _,fd:=range fields {
+            if fd.ivt!=nil{
+                ivts = append(ivts,fd.ivt)
+            }else{
+                this.Logger.Info("[INFO] invert is nil ")
+            }
+            
+        }
+        if err:=this.ivt.mergeInvert(ivts,segmentname,btree);err!=nil{
+            return 0,0,err
+        }
+        
+    }
+    
+    
+    return this.pflOffset, this.pflLen,nil
 }

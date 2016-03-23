@@ -29,6 +29,7 @@ type profile struct {
 	docLen     uint64
 	fieldName  string `json:"fullname"` //完整的名字，用来进行文件操作的
 	shift      uint8
+    fake       bool
 	pflNumber  []int64       `json:"-"`
 	pflString  []string      `json:"-"`
 	pflMmap    *utils.Mmap   `json:"-"`
@@ -36,11 +37,19 @@ type profile struct {
 	Logger     *utils.Log4FE `json:"-"` //logger
 }
 
+func newEmptyFakeProfile(fieldType uint64, shift uint8, fieldName string, start uint32,docLen uint64, logger *utils.Log4FE) *profile{
+    this := &profile{docLen: docLen,pflOffset: 0, shift: shift, isMomery: true, fieldType: fieldType, fieldName: fieldName, startDocId: start, curDocId: start, Logger: logger, pflNumber: nil, pflString: nil}
+	this.pflString = make([]string, 0)
+	this.pflNumber = make([]int64, 0)
+    this.fake = true
+    return this
+}
+
 // newEmptyProfile function description : 新建空的字符型正排索引
 // params :
 // return :
 func newEmptyProfile(fieldType uint64, shift uint8, fieldName string, start uint32, logger *utils.Log4FE) *profile {
-	this := &profile{pflOffset: 0, shift: shift, isMomery: true, fieldType: fieldType, fieldName: fieldName, startDocId: start, curDocId: start, Logger: logger, pflNumber: nil, pflString: nil}
+	this := &profile{fake:false,pflOffset: 0, shift: shift, isMomery: true, fieldType: fieldType, fieldName: fieldName, startDocId: start, curDocId: start, Logger: logger, pflNumber: nil, pflString: nil}
 	this.pflString = make([]string, 0)
 	this.pflNumber = make([]int64, 0)
 
@@ -52,7 +61,7 @@ func newEmptyProfile(fieldType uint64, shift uint8, fieldName string, start uint
 // return :
 func newProfileWithLocalFile(fieldType uint64, shift uint8, fullsegmentname string, pflMmap, dtlMmap *utils.Mmap, offset int64, docLen uint64, isMomery bool, logger *utils.Log4FE) *profile {
 
-	this := &profile{docLen: docLen, shift: shift, pflOffset: offset, isMomery: isMomery, fieldType: fieldType, pflMmap: pflMmap, dtlMmap: dtlMmap, Logger: logger}
+	this := &profile{fake:false,docLen: docLen, shift: shift, pflOffset: offset, isMomery: isMomery, fieldType: fieldType, pflMmap: pflMmap, dtlMmap: dtlMmap, Logger: logger}
 
 	/*
 	   	//打开正排文件
@@ -225,8 +234,12 @@ func (this *profile) serialization(fullsegmentname string) (int64, int, error) {
 // params :
 // return :
 func (this *profile) getValue(pos uint32) (string, bool) {
+    
+    if this.fake {
+        return "",true
+    }
 
-	if this.isMomery {
+	if this.isMomery && pos < uint32(len(this.pflNumber)){
 		if this.fieldType == utils.IDX_TYPE_NUMBER {
 			return fmt.Sprintf("%v", this.pflNumber[pos]), true
 		}
@@ -249,6 +262,11 @@ func (this *profile) getValue(pos uint32) (string, bool) {
 	if this.dtlMmap == nil {
 		return "", false
 	}
+    /*
+    if pos > 800000 {
+         this.Logger.Info("[INFO] Offset %v Pos %v  ",offset,pos)
+    }
+   */
 	dtloffset := this.pflMmap.ReadInt64(offset)
 	lens := this.dtlMmap.ReadInt64(dtloffset)
 	return this.dtlMmap.ReadString(dtloffset+8, lens), true
@@ -256,8 +274,13 @@ func (this *profile) getValue(pos uint32) (string, bool) {
 }
 
 func (this *profile) getIntValue(pos uint32) (int64, bool) {
+    
+    if this.fake {
+        return 0xFFFFFFFF, true
+    }
+    
     if this.isMomery {
-		if this.fieldType == utils.IDX_TYPE_NUMBER {
+		if this.fieldType == utils.IDX_TYPE_NUMBER && pos < uint32(len(this.pflNumber)){
 			return this.pflNumber[pos], true
 		}
 		return 0xFFFFFFFF, false
@@ -369,7 +392,7 @@ func (this *profile) mergeProfiles(srclist []*profile,fullsegmentname string) (i
     
     
     
-    this.Logger.Info("[INFO] mergeProfiles  %v",fullsegmentname )
+    //this.Logger.Info("[INFO] mergeProfiles  %v",fullsegmentname )
     if this.startDocId != 0 {
         this.Logger.Error("[ERROR] DocId Wrong %v",this.startDocId)
         return 0,0,errors.New("DocId Wrong")

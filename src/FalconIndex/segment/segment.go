@@ -587,9 +587,61 @@ func (this *Segment) IsEmpty() bool {
 
 
 
-func (this *Segment)MergeDocument(dest *Segment) error {
+func (this *Segment)MergeSegments(sgs []*Segment) error {
     
     
-    return  nil
+    this.Logger.Info("[INFO] Segment >>>>> MergeSegments [%v]",this.SegmentName)
+    btdbname := fmt.Sprintf("%v.bt", this.SegmentName)
+	if this.btdb == nil {
+		this.btdb = tree.NewBTDB(btdbname)
+	}
+  
+    for name, field := range this.FieldInfos {
+        this.Logger.Info("[INFO] Merge Field[%v]",name)
+        fs:=make([]*FSField,0)
+        for _,sg := range sgs {
+            if _,ok:=sg.fields[name];!ok{
+                fakefield := newEmptyFakeField(this.fields[name].fieldName,sg.StartDocId,
+                                this.fields[name].fieldType,
+                                uint64(sg.MaxDocId-sg.StartDocId),this.Logger)
+                fs=append(fs,fakefield)
+                continue
+            }
+            fs=append(fs,sg.fields[name])
+        }
+        this.fields[name].mergeField(fs,this.SegmentName,this.btdb)
+        field.PflOffset = this.fields[name].pflOffset
+		field.PflLen = this.fields[name].pflLen
+		this.FieldInfos[name] = field
+        
+    }
+    this.isMemory=false
+    var err error
+	this.idxMmap, err = utils.NewMmap(fmt.Sprintf("%v.idx", this.SegmentName), utils.MODE_APPEND)
+	if err != nil {
+		this.Logger.Error("[ERROR] mmap error : %v \n", err)
+	}
+	this.idxMmap.SetFileEnd(0)
+
+	this.pflMmap, err = utils.NewMmap(fmt.Sprintf("%v.pfl", this.SegmentName), utils.MODE_APPEND)
+	if err != nil {
+		this.Logger.Error("[ERROR] mmap error : %v \n", err)
+	}
+	this.pflMmap.SetFileEnd(0)
+
+	this.dtlMmap, err = utils.NewMmap(fmt.Sprintf("%v.dtl", this.SegmentName), utils.MODE_APPEND)
+	if err != nil {
+		this.Logger.Error("[ERROR] mmap error : %v \n", err)
+	}
+	this.dtlMmap.SetFileEnd(0)
+
+	for name := range this.fields {
+		this.fields[name].setMmap(this.idxMmap, this.pflMmap, this.dtlMmap)
+	}
+	this.Logger.Info("[INFO] MergeSegments Segment File : %v", this.SegmentName)
+    this.MaxDocId=sgs[len(sgs)-1].MaxDocId
+    
+    return this.storeStruct()
+    
 }
 

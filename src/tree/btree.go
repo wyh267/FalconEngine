@@ -330,6 +330,25 @@ func (p *page) getElement(index int) *element {
 	return &((*[0xFFFF]element)(unsafe.Pointer(&p.elementsptr)))[index]
 }
 
+
+func (p *page)getfristkv(bt *btree) (string,uint32,uint32,int,bool) {
+    
+    if p.pgtype == tinterior {
+        child := bt.getpage(uint32(p.getElement(0).value))
+        return child.getfristkv(bt)
+    }
+    
+    if p.pgtype == tleaf && p.count>0{
+        res:=p.getElement(0)
+        return res.key(),uint32(res.value),uint32(p.curid),0,true
+    }
+    
+    return "",0,0,0,false
+    
+}
+
+
+
 // btree function description : b+树
 type btree struct {
 	db       *BTreedb
@@ -488,6 +507,45 @@ func (bt *btree) Range(start, end string) (bool, []uint64) {
 
 }
 
+
+
+func (bt *btree) GetFristKV() (string,uint32,uint32,int,bool) {
+ 
+    if bt.rootpgid == 0 {
+        return "",0,0,0,false
+    }
+    
+    node := bt.db.getpage(bt.rootpgid)
+    return node.getfristkv(bt)
+    
+ 
+}
+
+
+
+func (bt *btree) GetNextKV(pagenum uint32,index int) (string,uint32,uint32,int,bool) {
+    if bt.rootpgid == 0 {
+        return "",0,0,0,false
+    }
+    
+    node := bt.db.getpage(pagenum)
+    if uint32(index+1) < node.count {
+        ele:=node.getElement(index+1)
+        return ele.key(),uint32(ele.value),node.curid,index+1,true
+    }
+    if node.nextid == 0 {
+        return "",0,0,0,false
+    }
+    next := bt.db.getpage(node.nextid)
+    if next.count>0{
+        ele:=node.getElement(0)
+        return ele.key(),uint32(ele.value),next.curid,0,true
+    }
+    return "",0,0,0,false
+  
+}
+
+
 func (bt *btree) Display() {
 	bt.root.display(bt)
 }
@@ -551,10 +609,10 @@ func exist(filename string) bool {
 
 func NewBTDB(dbname string) *BTreedb {
 
-	fmt.Printf("headoffset : %v \n", pageheadOffset)
-	fmt.Printf("elementSize: %v \n", elementSize)
-	fmt.Printf("pageheaadlen: %v \n", pageheaadlen)
-	fmt.Printf("btdbname : %v \n", dbname)
+	//fmt.Printf("headoffset : %v \n", pageheadOffset)
+	//fmt.Printf("elementSize: %v \n", elementSize)
+	//fmt.Printf("pageheaadlen: %v \n", pageheaadlen)
+	//fmt.Printf("btdbname : %v \n", dbname)
 	file_create_mode := os.O_RDWR | os.O_CREATE | os.O_TRUNC
 	this := &BTreedb{filename: dbname, btmap: make(map[string]*btree)}
 
@@ -571,7 +629,7 @@ func NewBTDB(dbname string) *BTreedb {
 
 	fi, _ := f.Stat()
 	filelen := fi.Size()
-	fmt.Printf("filelen : %v, %v \n", filelen, pagesize*2)
+	//fmt.Printf("filelen : %v, %v \n", filelen, pagesize*2)
 	if filelen < pagesize*2 {
 		syscall.Ftruncate(int(f.Fd()), pagesize*2)
 		filelen = pagesize * 2
@@ -677,6 +735,30 @@ func (db *BTreedb) Range(btname, start, end string) (bool, []uint64) {
 	return db.btmap[btname].Range(start, end)
 
 }
+
+
+
+func (db *BTreedb) GetFristKV(btname string) (string,uint32,uint32,int,bool) {
+    if _, ok := db.btmap[btname]; !ok {
+		return "",0,0,0,false
+	}
+    
+    return db.btmap[btname].GetFristKV()
+    
+}
+
+
+func (db *BTreedb) GetNextKV(btname string,pagenum uint32,index int) (string,uint32,uint32,int,bool) {
+    if _, ok := db.btmap[btname]; !ok {
+		return "",0,0,0,false
+	}
+    
+    return db.btmap[btname].GetNextKV(pagenum,index)
+    
+}
+
+
+
 
 func (db *BTreedb) Close() error {
 

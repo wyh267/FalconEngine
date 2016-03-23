@@ -20,7 +20,7 @@ func Test_AddDocumentNumberPfl(t *testing.T) {
     poffset,plens,err:=numpfl.serialization("test_segment_pfl")
     pflMmap, err := utils.NewMmap("test_segment_pfl.pfl", utils.MODE_APPEND)
 	if err != nil {
-		fmt.Printf("mmap error : %v \n", err)
+		fmt.Printf("[TEST] >>>>> mmap error : %v \n", err)
 	}
 	pflMmap.SetFileEnd(0)
     
@@ -28,12 +28,12 @@ func Test_AddDocumentNumberPfl(t *testing.T) {
     numpfl1:=newProfileWithLocalFile(utils.IDX_TYPE_NUMBER,0,"test_segment_pfl",pflMmap,nil,poffset,uint64(plens),false,logger)
     
     res,_:=numpfl1.getValue(32)
-	fmt.Printf("res::: %v \n",res)
+	fmt.Printf("[TEST] >>>>> res::: %v \n",res)
     
     numpfl1.updateDocument(32,"567")
     
     res2,_:=numpfl1.getValue(32)
-	fmt.Printf("res::: %v \n",res2)
+	fmt.Printf("[TEST] >>>>> res::: %v \n",res2)
     
     if err != nil {
 		t.Error("Fail...", err)
@@ -56,13 +56,13 @@ func Test_AddDocumentStringPfl(t *testing.T) {
     poffset,plens,err:=strpfl.serialization("test_segment_pfl")
     pflMmap, err := utils.NewMmap("test_segment_pfl.pfl", utils.MODE_APPEND)
 	if err != nil {
-		fmt.Printf("mmap error : %v \n", err)
+		fmt.Printf("[TEST] >>>>> mmap error : %v \n", err)
 	}
 	pflMmap.SetFileEnd(0)
     
     dtlMmap, err := utils.NewMmap("test_segment_pfl.dtl", utils.MODE_APPEND)
 	if err != nil {
-		fmt.Printf("mmap error : %v \n", err)
+		fmt.Printf("[TEST] >>>>> mmap error : %v \n", err)
 	}
 	dtlMmap.SetFileEnd(0)
     
@@ -70,7 +70,7 @@ func Test_AddDocumentStringPfl(t *testing.T) {
     strpfl1:=newProfileWithLocalFile(utils.IDX_TYPE_STRING,0,"test_segment_pfl",pflMmap,dtlMmap,poffset,uint64(plens),false,logger)
     
     res,_:=strpfl1.getValue(32)
-	fmt.Printf("res::: %v \n",res)
+	fmt.Printf("[TEST] >>>>> res::: %v \n",res)
     
     strpfl1.updateDocument(32,"hello")
     
@@ -147,31 +147,31 @@ func Test_MergePfl(t *testing.T) {
     
     pflMmap, err := utils.NewMmap("test_merge_segment.pfl", utils.MODE_APPEND)
 	if err != nil {
-		fmt.Printf("mmap error : %v \n", err)
+		fmt.Printf("[TEST] >>>>> mmap error : %v \n", err)
 	}
 	pflMmap.SetFileEnd(0)
     
     dtlMmap, err := utils.NewMmap("test_merge_segment.dtl", utils.MODE_APPEND)
 	if err != nil {
-		fmt.Printf("mmap error : %v \n", err)
+		fmt.Printf("[TEST] >>>>> mmap error : %v \n", err)
 	}
 	dtlMmap.SetFileEnd(0)
     nmerge:=newProfileWithLocalFile(utils.IDX_TYPE_STRING,0,"test_merge_segment",pflMmap,dtlMmap,poffset,uint64(plens),false,logger)
     
     res,_:=nmerge.getValue(32)
-	fmt.Printf("res::: %v \n",res)
+	fmt.Printf("[TEST] >>>>> res::: %v \n",res)
     
     
     nmerge.updateDocument(32,"hello")
     
     res2,_:=nmerge.getValue(32)
-	fmt.Printf("res::: %v \n",res2)
+	fmt.Printf("[TEST] >>>>> res::: %v \n",res2)
     
     res,_=nmerge.getValue(1232)
-	fmt.Printf("res::: %v \n",res)
+	fmt.Printf("[TEST] >>>>> res::: %v \n",res)
     
     res,_=nmerge.getValue(329)
-	fmt.Printf("res::: %v \n",res)
+	fmt.Printf("[TEST] >>>>> res::: %v \n",res)
     
     
     
