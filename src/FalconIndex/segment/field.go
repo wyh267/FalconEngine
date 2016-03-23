@@ -208,6 +208,7 @@ func (this *FSField) filter(docid uint32, filtertype uint64, start, end int64) b
 // params :
 // return :
 func (this *FSField) destroy() error {
+    
 
 	if this.pfl != nil {
 		this.pfl.destroy()
