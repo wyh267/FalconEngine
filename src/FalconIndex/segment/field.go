@@ -277,7 +277,7 @@ func (this *FSField) mergeField(fields []*FSField,segmentname string, btree *tre
         }
         this.pflOffset, this.pflLen, err = this.pfl.mergeProfiles(pfls,segmentname)
 		if err != nil {
-			this.Logger.Error("[ERROR] FSField --> Serialization :: Serialization Error %v", err)
+			this.Logger.Error("[ERROR] FSField --> mergeField :: Serialization Error %v", err)
 			return 0,0,err
 		}
         this.maxDocId+=uint32(this.pflLen)

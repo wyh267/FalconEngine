@@ -320,6 +320,20 @@ func (this *Index)SyncMemorySegment() error {
 
 func (this *Index)MergeSegments() error {
     
+    var startIdx int = -1
+    for idx:= range this.segments {
+        if this.segments[idx].MaxDocId - this.segments[idx].StartDocId < 20000 {
+            startIdx = idx
+            break
+        }
+    }
+    if startIdx == -1 {
+        return nil
+    }
+
+    mergeSegments := this.segments[startIdx:]
+    
+    
     segmentname := fmt.Sprintf("%v%v_%v", this.Pathname, this.Name, this.PrefixSegment)
     var fields []utils.SimpleFieldInfo
     for _, f := range this.Fields {
@@ -328,31 +342,38 @@ func (this *Index)MergeSegments() error {
         }
 
     }
-   tmpSegment := fis.NewEmptySegmentWithFieldsInfo(segmentname,0, fields, this.Logger)
+   tmpSegment := fis.NewEmptySegmentWithFieldsInfo(segmentname,mergeSegments[0].StartDocId, fields, this.Logger)
    this.PrefixSegment++
     if err:=this.storeStruct();err!=nil{
         return err
     }
-    tmpSegment.MergeSegments(this.segments)
-    tmpname:=tmpSegment.SegmentName
+    tmpSegment.MergeSegments(mergeSegments)
+    //tmpname:=tmpSegment.SegmentName
     tmpSegment.Close()
     tmpSegment=nil
     
-    for _,sg:=range this.segments{
+    for _,sg:=range mergeSegments{
         sg.Destroy()
     }
     
-    tmpSegment = fis.NewSegmentWithLocalFile(tmpname,this.Logger)
-    this.segments=make([]*fis.Segment,0)
-    this.SegmentNames=make([]string,0)
+    tmpSegment = fis.NewSegmentWithLocalFile(segmentname,this.Logger)
+    if startIdx>0{
+        this.segments=this.segments[:startIdx]//make([]*fis.Segment,0)
+        this.SegmentNames=this.SegmentNames[:startIdx]//make([]string,0)
+    }else{
+        this.segments=make([]*fis.Segment,0)
+        this.SegmentNames=make([]string,0)
+    }
+    
     this.segments=append(this.segments,tmpSegment)
-    this.SegmentNames=append(this.SegmentNames,tmpname)
+    this.SegmentNames=append(this.SegmentNames,segmentname)
     return this.storeStruct()
     
 }
 
 func (this *Index) GetDocument(docid uint32) (map[string]string, bool) {
 
+    
 	for _, segment := range this.segments {
 		if docid >= segment.StartDocId && docid < segment.MaxDocId {
 			return segment.GetDocument(docid)

@@ -393,10 +393,10 @@ func (this *profile) mergeProfiles(srclist []*profile,fullsegmentname string) (i
     
     
     //this.Logger.Info("[INFO] mergeProfiles  %v",fullsegmentname )
-    if this.startDocId != 0 {
-        this.Logger.Error("[ERROR] DocId Wrong %v",this.startDocId)
-        return 0,0,errors.New("DocId Wrong")
-    }
+    //if this.startDocId != 0 {
+    //    this.Logger.Error("[ERROR] DocId Wrong %v",this.startDocId)
+    //    return 0,0,errors.New("DocId Wrong")
+    //}
     //打开正排文件
 	pflFileName := fmt.Sprintf("%v.pfl", fullsegmentname)
 	var pflFd *os.File
