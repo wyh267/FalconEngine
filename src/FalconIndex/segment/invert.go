@@ -79,7 +79,22 @@ func (this *invert) addDocument(docid uint32, content interface{}) error {
 	case utils.IDX_TYPE_STRING_LIST: //分号切割模式
 		terms = strings.Split(contentstr, ";")
 	case utils.IDX_TYPE_STRING_SEG: //分词模式
-		terms = utils.GSegmenter.Segment(contentstr, true)
+		terminfos := utils.GSegmenter.SegmentWithTf(contentstr, true)
+        for _, terminfo := range terminfos {
+            docidNode := utils.DocIdNode{Docid:docid,Weight:uint32(terminfo.Tf)}
+            if _, inTmp := this.tempHashTable[terminfo.Term]; !inTmp {
+                var docidNodes []utils.DocIdNode
+                docidNodes = append(docidNodes, docidNode)
+                this.tempHashTable[terminfo.Term] = docidNodes
+            } else {
+                this.tempHashTable[terminfo.Term] = append(this.tempHashTable[terminfo.Term], docidNode)
+            }
+        }
+
+        this.curDocId++
+        return nil
+        
+        
 	}
 
 	for _, term := range terms {

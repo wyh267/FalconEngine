@@ -42,6 +42,26 @@ func (this *Segmenter) Segment(content string, search_mode bool) []string {
 	text := []byte(content)
 	segments := this.segmenter.Segment(text)
 	res := sego.SegmentsToSlice(segments, search_mode)
+    
 	//fmt.Println("SEGMENT::: ",res)
 	return res
+}
+
+
+
+func (this *Segmenter) SegmentWithTf(content string,search_mode bool) []TermInfo {
+    
+	segments := this.segmenter.Segment([]byte(content))
+    if len(segments) == 0 {
+        return nil
+    }
+    terms := make([]TermInfo,len(segments))
+    for i:=range terms{
+        terms[i].Term=segments[i].Token().Text()
+        terms[i].Tf=segments[i].Token().Frequency()
+    }
+	
+	return terms
+    
+    
 }

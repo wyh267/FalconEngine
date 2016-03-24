@@ -65,6 +65,12 @@ type SimpleFieldInfo struct {
 
 
 
+type TermInfo struct{
+    Term   string
+    Tf     int
+}
+
+
 /*************************************************************************
 索引查询接口
 索引查询分为 查询和过滤,统计，子查询四种
@@ -153,6 +159,16 @@ type FEResultAutomaticSingle struct {
 	HasContact int    `json:"_hascontact"`
 	Condition  int    `json:"_condition"`
 }
+
+
+
+
+type Engine interface {
+    Search() error
+    
+}
+
+
 
 
 /*****************************************************************************

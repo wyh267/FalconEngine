@@ -10,13 +10,14 @@ import (
 
 func Test_NewIndex(t *testing.T) {
 	logger, _ := utils.New("test_log")
+    utils.GSegmenter=utils.NewSegmenter("/Users/wuyinghao/Desktop/FalconEngine/data/dictionary.txt")
 
 	var err error
 	idx := NewEmptyIndex("test_index", "./", logger)
 
 	//idx.AddField(utils.SimpleFieldInfo{FieldName: "AAA", FieldType: utils.IDX_TYPE_PK})
 	idx.AddField(utils.SimpleFieldInfo{FieldName: "BBB", FieldType: utils.IDX_TYPE_STRING})
-	idx.AddField(utils.SimpleFieldInfo{FieldName: "AAA", FieldType: utils.IDX_TYPE_STRING})
+	idx.AddField(utils.SimpleFieldInfo{FieldName: "AAA", FieldType: utils.IDX_TYPE_STRING_SEG})
 	idx.AddField(utils.SimpleFieldInfo{FieldName: "CCC", FieldType: utils.IDX_TYPE_NUMBER})
 
 	if err != nil {
@@ -35,11 +36,11 @@ func Test_MergeIndex(t *testing.T) {
 
 	//idx.AddField(utils.SimpleFieldInfo{FieldName: "AAA", FieldType: utils.IDX_TYPE_STRING})
 	idx.AddField(utils.SimpleFieldInfo{FieldName: "BBB", FieldType: utils.IDX_TYPE_STRING})
-	idx.AddField(utils.SimpleFieldInfo{FieldName: "AAA", FieldType: utils.IDX_TYPE_STRING})
+	idx.AddField(utils.SimpleFieldInfo{FieldName: "AAA", FieldType: utils.IDX_TYPE_STRING_SEG})
 	idx.AddField(utils.SimpleFieldInfo{FieldName: "CCC", FieldType: utils.IDX_TYPE_NUMBER})
     
     mycontent := make(map[string]string)
-    //content["AAA"] = fmt.Sprintf("%v", docid)
+    mycontent["AAA"] = "你好，世界"
     mycontent["BBB"] = fmt.Sprintf("%v", 33333)
     mycontent["YYY"] = fmt.Sprintf("%v", 33333)
     mycontent["CCC"] = fmt.Sprintf("%v", 33333)
@@ -156,6 +157,13 @@ func Test_LoadIndex(t *testing.T) {
 	docinfo, _ = idx.GetDocument(uint32(docid))
 	fmt.Printf(">>>>>>>>>>  GetDocument COST TIME:%v <<<<<<<<<\n", time.Now().Sub(start))
 	fmt.Printf("[TEST] >>>>>  GetDocument docid[%v] : %v\n", docid, docinfo)
+
+
+    res, _ = idx.SimpleSearch([]utils.FSSearchQuery{utils.FSSearchQuery{FieldName: "AAA", Value: "，"}},
+		nil,
+		10, 1)
+	fmt.Printf(">>>>>>>>>>  SimpleSearch COST TIME:%v <<<<<<<<<\n", time.Now().Sub(start))
+	fmt.Printf("[TEST] >>>>>  SimpleSearch PG[1] : %v\n", res)
 
 
 	if err != nil {

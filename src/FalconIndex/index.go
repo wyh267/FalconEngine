@@ -14,9 +14,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"sync"
 	"tree"
 	"utils"
-    "sync"
 )
 
 type Index struct {
@@ -34,8 +34,8 @@ type Index struct {
 	primary       *tree.BTreedb
 	bitmap        *utils.Bitmap
 
-    idxSegmentMutex *sync.Mutex         //段锁，当段序列化到磁盘或者段合并时使用或者新建段时使用
-	Logger *utils.Log4FE `json:"-"`
+	idxSegmentMutex *sync.Mutex   //段锁，当段序列化到磁盘或者段合并时使用或者新建段时使用
+	Logger          *utils.Log4FE `json:"-"`
 }
 
 func NewEmptyIndex(name, pathname string, logger *utils.Log4FE) *Index {
@@ -43,7 +43,7 @@ func NewEmptyIndex(name, pathname string, logger *utils.Log4FE) *Index {
 	this := &Index{Name: name, Logger: logger, StartDocId: 0, MaxDocId: 0, PrefixSegment: 1000,
 		SegmentNames: make([]string, 0), PrimaryKey: "", segments: make([]*fis.Segment, 0),
 		memorySegment: nil, primary: nil, bitmap: nil, Pathname: pathname,
-		Fields: make(map[string]utils.SimpleFieldInfo),idxSegmentMutex:new(sync.Mutex)}
+		Fields: make(map[string]utils.SimpleFieldInfo), idxSegmentMutex: new(sync.Mutex)}
 
 	bitmapname := fmt.Sprintf("%v%v.bitmap", pathname, name)
 	utils.MakeBitmapFile(bitmapname)
@@ -55,7 +55,7 @@ func NewIndexWithLocalFile(name, pathname string, logger *utils.Log4FE) *Index {
 	this := &Index{Name: name, Logger: logger, StartDocId: 0, MaxDocId: 0, PrefixSegment: 1000,
 		SegmentNames: make([]string, 0), PrimaryKey: "", segments: make([]*fis.Segment, 0),
 		memorySegment: nil, primary: nil, bitmap: nil, Pathname: pathname,
-		Fields: make(map[string]utils.SimpleFieldInfo),idxSegmentMutex:new(sync.Mutex)}
+		Fields: make(map[string]utils.SimpleFieldInfo), idxSegmentMutex: new(sync.Mutex)}
 
 	metaFileName := fmt.Sprintf("%v%v.meta", pathname, name)
 	buffer, err := utils.ReadFromJson(metaFileName)
@@ -114,9 +114,9 @@ func (this *Index) AddField(field utils.SimpleFieldInfo) error {
 		this.primary = tree.NewBTDB(primaryname)
 		this.primary.AddBTree(field.FieldName)
 	} else {
-        this.idxSegmentMutex.Lock()
-        defer this.idxSegmentMutex.Unlock()
-        
+		this.idxSegmentMutex.Lock()
+		defer this.idxSegmentMutex.Unlock()
+
 		if this.memorySegment == nil {
 			segmentname := fmt.Sprintf("%v%v_%v", this.Pathname, this.Name, this.PrefixSegment)
 			var fields []utils.SimpleFieldInfo
@@ -174,9 +174,9 @@ func (this *Index) DeleteField(fieldname string) error {
 		this.Logger.Warn("[WARN] field %v is primary key can not delete ", fieldname)
 		return nil
 	}
-    
-    this.idxSegmentMutex.Lock()
-    defer this.idxSegmentMutex.Unlock()
+
+	this.idxSegmentMutex.Lock()
+	defer this.idxSegmentMutex.Unlock()
 
 	if this.memorySegment == nil {
 		this.memorySegment.DeleteField(fieldname)
@@ -234,7 +234,7 @@ func (this *Index) UpdateDocument(content map[string]string) error {
 	}
 
 	if this.memorySegment == nil {
-        this.idxSegmentMutex.Lock()
+		this.idxSegmentMutex.Lock()
 		segmentname := fmt.Sprintf("%v%v_%v", this.Pathname, this.Name, this.PrefixSegment)
 		var fields []utils.SimpleFieldInfo
 		for _, f := range this.Fields {
@@ -245,45 +245,37 @@ func (this *Index) UpdateDocument(content map[string]string) error {
 		}
 		this.memorySegment = fis.NewEmptySegmentWithFieldsInfo(segmentname, this.MaxDocId, fields, this.Logger)
 		this.PrefixSegment++
-		if err:=this.storeStruct();err!=nil{
-            this.idxSegmentMutex.Unlock()
-            return err
-        }
-        this.idxSegmentMutex.Unlock()
+		if err := this.storeStruct(); err != nil {
+			this.idxSegmentMutex.Unlock()
+			return err
+		}
+		this.idxSegmentMutex.Unlock()
 	}
 
-    
-    docid := this.MaxDocId
+	docid := this.MaxDocId
 	this.MaxDocId++
-    
-    //无主键的表直接添加
-    
+
+	//无主键的表直接添加
+
 	if this.PrimaryKey == "" {
-        return this.memorySegment.AddDocument(docid, content)
+		return this.memorySegment.AddDocument(docid, content)
 	}
-    
-    if _, hasPrimary := content[this.PrimaryKey]; !hasPrimary {
+
+	if _, hasPrimary := content[this.PrimaryKey]; !hasPrimary {
 		this.Logger.Error("[ERROR] Primary Key Not Found %v", this.PrimaryKey)
 		return errors.New("No Primary Key")
 	}
-    
-    
-	
-    if err := this.updatePrimaryKey(content[this.PrimaryKey], docid); err != nil {
+
+	if err := this.updatePrimaryKey(content[this.PrimaryKey], docid); err != nil {
 		return err
 	}
-    
-    return this.memorySegment.AddDocument(docid, content)
-    
-    
-    
+
+	return this.memorySegment.AddDocument(docid, content)
 
 }
 
-
 func (this *Index) updatePrimaryKey(key string, docid uint32) error {
 
-	
 	err := this.primary.Set(this.PrimaryKey, key, uint64(docid))
 
 	if err != nil {
@@ -296,115 +288,105 @@ func (this *Index) updatePrimaryKey(key string, docid uint32) error {
 
 func (this *Index) findPrimaryKey(key string) (utils.DocIdNode, bool) {
 
-	
 	ok, val := this.primary.Search(this.PrimaryKey, key)
 	if !ok || val >= uint64(this.memorySegment.StartDocId) {
 		return utils.DocIdNode{}, false
 	}
-	return utils.DocIdNode{Docid:uint32(val)}, true
+	return utils.DocIdNode{Docid: uint32(val)}, true
 
-	
 }
 
+func (this *Index) SyncMemorySegment() error {
 
-func (this *Index)SyncMemorySegment() error {
-    
-    if this.memorySegment == nil {
-        return nil
-    }
-    this.idxSegmentMutex.Lock()
-    defer this.idxSegmentMutex.Unlock()
-    
-    if err:=this.memorySegment.Serialization();err!=nil{
-        this.Logger.Error("[ERROR] SyncMemorySegment Error %v",err)
-        return err
-    }
-    segmentname:=this.memorySegment.SegmentName
-    this.memorySegment.Close()
-    this.memorySegment=nil
-    newSegment := fis.NewSegmentWithLocalFile(segmentname,this.Logger)
-    this.segments=append(this.segments,newSegment)
-    this.SegmentNames=append(this.SegmentNames,segmentname)
-    
-    return this.storeStruct()
-    
-    
+	if this.memorySegment == nil {
+		return nil
+	}
+	this.idxSegmentMutex.Lock()
+	defer this.idxSegmentMutex.Unlock()
+
+	if err := this.memorySegment.Serialization(); err != nil {
+		this.Logger.Error("[ERROR] SyncMemorySegment Error %v", err)
+		return err
+	}
+	segmentname := this.memorySegment.SegmentName
+	this.memorySegment.Close()
+	this.memorySegment = nil
+	newSegment := fis.NewSegmentWithLocalFile(segmentname, this.Logger)
+	this.segments = append(this.segments, newSegment)
+	this.SegmentNames = append(this.SegmentNames, segmentname)
+
+	return this.storeStruct()
+
 }
 
+func (this *Index) checkMerge() (int, int, bool) {
+	var start int = -1
+	var end int = -1
+	docLens := make([]uint32, 0)
+	for _, sg := range this.segments {
+		docLens = append(docLens, sg.MaxDocId-sg.StartDocId)
+	}
 
+	return start, end, false
 
-func (this *Index)checkMerge() (int,int,bool) {
-    var start int = -1
-    var end int = -1
-    docLens := make([]uint32,0)
-    for _,sg:= range this.segments {
-        docLens = append(docLens,sg.MaxDocId - sg.StartDocId)
-    }
-    
-    return start,end,false
-    
-    
 }
 
+func (this *Index) MergeSegments() error {
 
-func (this *Index)MergeSegments() error {
-    
-    var startIdx int = -1
-    this.idxSegmentMutex.Lock()
-    defer this.idxSegmentMutex.Unlock()
-    for idx:= range this.segments {
-        if this.segments[idx].MaxDocId - this.segments[idx].StartDocId < 1000000 {
-            startIdx = idx
-            break
-        }
-    }
-    if startIdx == -1 {
-        return nil
-    }
+	var startIdx int = -1
+	this.idxSegmentMutex.Lock()
+	defer this.idxSegmentMutex.Unlock()
+	for idx := range this.segments {
+		if this.segments[idx].MaxDocId-this.segments[idx].StartDocId < 1000000 {
+			startIdx = idx
+			break
+		}
+	}
+	if startIdx == -1 {
+		return nil
+	}
 
-    mergeSegments := this.segments[startIdx:]
-    
-    
-    segmentname := fmt.Sprintf("%v%v_%v", this.Pathname, this.Name, this.PrefixSegment)
-    var fields []utils.SimpleFieldInfo
-    for _, f := range this.Fields {
-        if f.FieldType != utils.IDX_TYPE_PK {
-            fields = append(fields, f)
-        }
+	mergeSegments := this.segments[startIdx:]
 
-    }
-   tmpSegment := fis.NewEmptySegmentWithFieldsInfo(segmentname,mergeSegments[0].StartDocId, fields, this.Logger)
-   this.PrefixSegment++
-    if err:=this.storeStruct();err!=nil{
-        return err
-    }
-    tmpSegment.MergeSegments(mergeSegments)
-    //tmpname:=tmpSegment.SegmentName
-    tmpSegment.Close()
-    tmpSegment=nil
-    
-    for _,sg:=range mergeSegments{
-        sg.Destroy()
-    }
-    
-    tmpSegment = fis.NewSegmentWithLocalFile(segmentname,this.Logger)
-    if startIdx>0{
-        this.segments=this.segments[:startIdx]//make([]*fis.Segment,0)
-        this.SegmentNames=this.SegmentNames[:startIdx]//make([]string,0)
-    }else{
-        this.segments=make([]*fis.Segment,0)
-        this.SegmentNames=make([]string,0)
-    }
-    
-    this.segments=append(this.segments,tmpSegment)
-    this.SegmentNames=append(this.SegmentNames,segmentname)
-    return this.storeStruct()
-    
+	segmentname := fmt.Sprintf("%v%v_%v", this.Pathname, this.Name, this.PrefixSegment)
+	var fields []utils.SimpleFieldInfo
+	for _, f := range this.Fields {
+		if f.FieldType != utils.IDX_TYPE_PK {
+			fields = append(fields, f)
+		}
+
+	}
+	tmpSegment := fis.NewEmptySegmentWithFieldsInfo(segmentname, mergeSegments[0].StartDocId, fields, this.Logger)
+	this.PrefixSegment++
+	if err := this.storeStruct(); err != nil {
+		return err
+	}
+	tmpSegment.MergeSegments(mergeSegments)
+	//tmpname:=tmpSegment.SegmentName
+	tmpSegment.Close()
+	tmpSegment = nil
+
+	for _, sg := range mergeSegments {
+		sg.Destroy()
+	}
+
+	tmpSegment = fis.NewSegmentWithLocalFile(segmentname, this.Logger)
+	if startIdx > 0 {
+		this.segments = this.segments[:startIdx]         //make([]*fis.Segment,0)
+		this.SegmentNames = this.SegmentNames[:startIdx] //make([]string,0)
+	} else {
+		this.segments = make([]*fis.Segment, 0)
+		this.SegmentNames = make([]string, 0)
+	}
+
+	this.segments = append(this.segments, tmpSegment)
+	this.SegmentNames = append(this.SegmentNames, segmentname)
+	return this.storeStruct()
+
 }
 
 func (this *Index) GetDocument(docid uint32) (map[string]string, bool) {
 
-    
 	for _, segment := range this.segments {
 		if docid >= segment.StartDocId && docid < segment.MaxDocId {
 			return segment.GetDocument(docid)
@@ -413,54 +395,49 @@ func (this *Index) GetDocument(docid uint32) (map[string]string, bool) {
 	return nil, false
 }
 
-
 func (this *Index) SearchUnitDocIds(querys []utils.FSSearchQuery, filteds []utils.FSSearchFilted) ([]utils.DocIdNode, bool) {
 
-    docids := make([]utils.DocIdNode, 0)
+	docids := make([]utils.DocIdNode, 0)
 	for _, segment := range this.segments {
-		docids, _ = segment.SearchUnitDocIds(querys,filteds, this.bitmap, docids)
+		docids, _ = segment.SearchUnitDocIds(querys, filteds, this.bitmap, docids)
 		//this.Logger.Info("[INFO] segment[%v] docids %v", segment.SegmentName, docids)
 	}
-    
-    if len(docids)>0 {
-        return docids,true
-    }
-    
-    return nil,false
+
+	if len(docids) > 0 {
+		return docids, true
+	}
+
+	return nil, false
 }
 
+func (this *Index) SimpleSearch(querys []utils.FSSearchQuery, filteds []utils.FSSearchFilted, ps, pg int) ([]map[string]string, bool) {
 
-
-
-
-func (this *Index) SimpleSearch(querys []utils.FSSearchQuery, filteds []utils.FSSearchFilted,ps,pg int) ([]map[string]string, bool) {
-
-    docids := make([]utils.DocIdNode, 0)
+	docids := make([]utils.DocIdNode, 0)
 	for _, segment := range this.segments {
-		docids, _ = segment.SearchUnitDocIds(querys,filteds, this.bitmap, docids)
+		docids, _ = segment.SearchUnitDocIds(querys, filteds, this.bitmap, docids)
 		//this.Logger.Info("[INFO] segment[%v] docids %v", segment.SegmentName, docids)
 	}
-    lens := len(docids)
-    
-    if ps*(pg-1) >= lens {
-        return nil,false
-    }
-    
-    start:=ps*(pg-1)
-    end:=ps*pg
-    
-    if end>=lens{
-        end=lens
-    }
-    
-    res := make([]map[string]string,0)
-    for _,docid := range docids[start:end]{
-        val,ok := this.GetDocument(docid.Docid)
-        if ok{
-            res=append(res,val)
-        }
-    }
-    
-    return res,true
+	lens := len(docids)
+
+	if ps*(pg-1) >= lens {
+		return nil, false
+	}
+
+	start := ps * (pg - 1)
+	end := ps * pg
+
+	if end >= lens {
+		end = lens
+	}
+
+	res := make([]map[string]string, 0)
+	for _, docid := range docids[start:end] {
+		val, ok := this.GetDocument(docid.Docid)
+		if ok {
+			res = append(res, val)
+		}
+	}
+
+	return res, true
 
 }

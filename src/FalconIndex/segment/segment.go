@@ -140,7 +140,7 @@ func (this *Segment) AddField(sfield utils.SimpleFieldInfo) error {
 		return errors.New("Already has field..")
 	}
 
-	if this.isMemory && !this.IsEmpty(){
+	if this.isMemory && !this.IsEmpty() {
 		this.Logger.Warn("[WARN] Segment --> AddField field [%v] fail..", sfield.FieldName)
 		return errors.New("memory segment can not add field..")
 	}
@@ -504,7 +504,7 @@ func (this *Segment) SearchUnitDocIds(querys []utils.FSSearchQuery, filteds []ut
 	if len(querys) == 0 || querys == nil {
 		docids := make([]utils.DocIdNode, 0)
 		for i := this.StartDocId; i < this.MaxDocId; i++ {
-			docids = append(docids, utils.DocIdNode{Docid:i})
+			docids = append(docids, utils.DocIdNode{Docid: i})
 		}
 		indocids = append(indocids, docids...)
 	} else {
@@ -578,45 +578,39 @@ func (this *Segment) SearchUnitDocIds(querys []utils.FSSearchQuery, filteds []ut
 
 }
 
-
-
 func (this *Segment) IsEmpty() bool {
-    return this.StartDocId == this.MaxDocId 
+	return this.StartDocId == this.MaxDocId
 }
 
+func (this *Segment) MergeSegments(sgs []*Segment) error {
 
-
-
-func (this *Segment)MergeSegments(sgs []*Segment) error {
-    
-    
-    this.Logger.Info("[INFO] Segment >>>>> MergeSegments [%v]",this.SegmentName)
-    btdbname := fmt.Sprintf("%v.bt", this.SegmentName)
+	this.Logger.Info("[INFO] Segment >>>>> MergeSegments [%v]", this.SegmentName)
+	btdbname := fmt.Sprintf("%v.bt", this.SegmentName)
 	if this.btdb == nil {
 		this.btdb = tree.NewBTDB(btdbname)
 	}
-  
-    for name, field := range this.FieldInfos {
-        this.Logger.Info("[INFO] Merge Field[%v]",name)
-        fs:=make([]*FSField,0)
-        for _,sg := range sgs {
-            if _,ok:=sg.fields[name];!ok{
-                fakefield := newEmptyFakeField(this.fields[name].fieldName,sg.StartDocId,
-                                this.fields[name].fieldType,
-                                uint64(sg.MaxDocId-sg.StartDocId),this.Logger)
-                fs=append(fs,fakefield)
-                continue
-            }
-            fs=append(fs,sg.fields[name])
-        }
-        this.fields[name].mergeField(fs,this.SegmentName,this.btdb)
-        field.PflOffset = this.fields[name].pflOffset
+
+	for name, field := range this.FieldInfos {
+		this.Logger.Info("[INFO] Merge Field[%v]", name)
+		fs := make([]*FSField, 0)
+		for _, sg := range sgs {
+			if _, ok := sg.fields[name]; !ok {
+				fakefield := newEmptyFakeField(this.fields[name].fieldName, sg.StartDocId,
+					this.fields[name].fieldType,
+					uint64(sg.MaxDocId-sg.StartDocId), this.Logger)
+				fs = append(fs, fakefield)
+				continue
+			}
+			fs = append(fs, sg.fields[name])
+		}
+		this.fields[name].mergeField(fs, this.SegmentName, this.btdb)
+		field.PflOffset = this.fields[name].pflOffset
 		field.PflLen = this.fields[name].pflLen
 		this.FieldInfos[name] = field
-        
-    }
-    this.isMemory=false
-    var err error
+
+	}
+	this.isMemory = false
+	var err error
 	this.idxMmap, err = utils.NewMmap(fmt.Sprintf("%v.idx", this.SegmentName), utils.MODE_APPEND)
 	if err != nil {
 		this.Logger.Error("[ERROR] mmap error : %v \n", err)
@@ -639,9 +633,8 @@ func (this *Segment)MergeSegments(sgs []*Segment) error {
 		this.fields[name].setMmap(this.idxMmap, this.pflMmap, this.dtlMmap)
 	}
 	this.Logger.Info("[INFO] MergeSegments Segment File : %v", this.SegmentName)
-    this.MaxDocId=sgs[len(sgs)-1].MaxDocId
-    
-    return this.storeStruct()
-    
-}
+	this.MaxDocId = sgs[len(sgs)-1].MaxDocId
 
+	return this.storeStruct()
+
+}
