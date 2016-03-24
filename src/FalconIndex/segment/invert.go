@@ -83,7 +83,7 @@ func (this *invert) addDocument(docid uint32, content interface{}) error {
 	}
 
 	for _, term := range terms {
-		docidNode := utils.DocIdNode(docid)
+		docidNode := utils.DocIdNode{Docid:docid}
 		if _, inTmp := this.tempHashTable[term]; !inTmp {
 			var docidNodes []utils.DocIdNode
 			docidNodes = append(docidNodes, docidNode)
@@ -163,7 +163,7 @@ func (this *invert) queryTerm(keystr string) ([]utils.DocIdNode, bool) {
 		}
 		lens := this.idxMmap.ReadInt64(int64(offset))
 		//this.Logger.Info("[INFO] found  %v offset %v lens %v",keystr,offset,int(lens))
-		res := this.idxMmap.ReadUInt32Arry(uint64(offset+8), uint64(lens))
+		res := this.idxMmap.ReadDocIdsArry(uint64(offset+8), uint64(lens))
 		return res, true
 
 	}

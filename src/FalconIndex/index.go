@@ -16,6 +16,7 @@ import (
 	"fmt"
 	"tree"
 	"utils"
+    "sync"
 )
 
 type Index struct {
@@ -33,6 +34,7 @@ type Index struct {
 	primary       *tree.BTreedb
 	bitmap        *utils.Bitmap
 
+    idxSegmentMutex *sync.Mutex         //段锁，当段序列化到磁盘或者段合并时使用或者新建段时使用
 	Logger *utils.Log4FE `json:"-"`
 }
 
@@ -41,7 +43,7 @@ func NewEmptyIndex(name, pathname string, logger *utils.Log4FE) *Index {
 	this := &Index{Name: name, Logger: logger, StartDocId: 0, MaxDocId: 0, PrefixSegment: 1000,
 		SegmentNames: make([]string, 0), PrimaryKey: "", segments: make([]*fis.Segment, 0),
 		memorySegment: nil, primary: nil, bitmap: nil, Pathname: pathname,
-		Fields: make(map[string]utils.SimpleFieldInfo)}
+		Fields: make(map[string]utils.SimpleFieldInfo),idxSegmentMutex:new(sync.Mutex)}
 
 	bitmapname := fmt.Sprintf("%v%v.bitmap", pathname, name)
 	utils.MakeBitmapFile(bitmapname)
@@ -53,7 +55,7 @@ func NewIndexWithLocalFile(name, pathname string, logger *utils.Log4FE) *Index {
 	this := &Index{Name: name, Logger: logger, StartDocId: 0, MaxDocId: 0, PrefixSegment: 1000,
 		SegmentNames: make([]string, 0), PrimaryKey: "", segments: make([]*fis.Segment, 0),
 		memorySegment: nil, primary: nil, bitmap: nil, Pathname: pathname,
-		Fields: make(map[string]utils.SimpleFieldInfo)}
+		Fields: make(map[string]utils.SimpleFieldInfo),idxSegmentMutex:new(sync.Mutex)}
 
 	metaFileName := fmt.Sprintf("%v%v.meta", pathname, name)
 	buffer, err := utils.ReadFromJson(metaFileName)
@@ -112,6 +114,9 @@ func (this *Index) AddField(field utils.SimpleFieldInfo) error {
 		this.primary = tree.NewBTDB(primaryname)
 		this.primary.AddBTree(field.FieldName)
 	} else {
+        this.idxSegmentMutex.Lock()
+        defer this.idxSegmentMutex.Unlock()
+        
 		if this.memorySegment == nil {
 			segmentname := fmt.Sprintf("%v%v_%v", this.Pathname, this.Name, this.PrefixSegment)
 			var fields []utils.SimpleFieldInfo
@@ -169,6 +174,9 @@ func (this *Index) DeleteField(fieldname string) error {
 		this.Logger.Warn("[WARN] field %v is primary key can not delete ", fieldname)
 		return nil
 	}
+    
+    this.idxSegmentMutex.Lock()
+    defer this.idxSegmentMutex.Unlock()
 
 	if this.memorySegment == nil {
 		this.memorySegment.DeleteField(fieldname)
@@ -226,6 +234,7 @@ func (this *Index) UpdateDocument(content map[string]string) error {
 	}
 
 	if this.memorySegment == nil {
+        this.idxSegmentMutex.Lock()
 		segmentname := fmt.Sprintf("%v%v_%v", this.Pathname, this.Name, this.PrefixSegment)
 		var fields []utils.SimpleFieldInfo
 		for _, f := range this.Fields {
@@ -237,8 +246,10 @@ func (this *Index) UpdateDocument(content map[string]string) error {
 		this.memorySegment = fis.NewEmptySegmentWithFieldsInfo(segmentname, this.MaxDocId, fields, this.Logger)
 		this.PrefixSegment++
 		if err:=this.storeStruct();err!=nil{
+            this.idxSegmentMutex.Unlock()
             return err
         }
+        this.idxSegmentMutex.Unlock()
 	}
 
     
@@ -288,9 +299,9 @@ func (this *Index) findPrimaryKey(key string) (utils.DocIdNode, bool) {
 	
 	ok, val := this.primary.Search(this.PrimaryKey, key)
 	if !ok || val >= uint64(this.memorySegment.StartDocId) {
-		return 0, false
+		return utils.DocIdNode{}, false
 	}
-	return utils.DocIdNode(val), true
+	return utils.DocIdNode{Docid:uint32(val)}, true
 
 	
 }
@@ -301,9 +312,12 @@ func (this *Index)SyncMemorySegment() error {
     if this.memorySegment == nil {
         return nil
     }
+    this.idxSegmentMutex.Lock()
+    defer this.idxSegmentMutex.Unlock()
     
     if err:=this.memorySegment.Serialization();err!=nil{
         this.Logger.Error("[ERROR] SyncMemorySegment Error %v",err)
+        return err
     }
     segmentname:=this.memorySegment.SegmentName
     this.memorySegment.Close()
@@ -318,11 +332,28 @@ func (this *Index)SyncMemorySegment() error {
 }
 
 
+
+func (this *Index)checkMerge() (int,int,bool) {
+    var start int = -1
+    var end int = -1
+    docLens := make([]uint32,0)
+    for _,sg:= range this.segments {
+        docLens = append(docLens,sg.MaxDocId - sg.StartDocId)
+    }
+    
+    return start,end,false
+    
+    
+}
+
+
 func (this *Index)MergeSegments() error {
     
     var startIdx int = -1
+    this.idxSegmentMutex.Lock()
+    defer this.idxSegmentMutex.Unlock()
     for idx:= range this.segments {
-        if this.segments[idx].MaxDocId - this.segments[idx].StartDocId < 20000 {
+        if this.segments[idx].MaxDocId - this.segments[idx].StartDocId < 1000000 {
             startIdx = idx
             break
         }
@@ -424,7 +455,7 @@ func (this *Index) SimpleSearch(querys []utils.FSSearchQuery, filteds []utils.FS
     
     res := make([]map[string]string,0)
     for _,docid := range docids[start:end]{
-        val,ok := this.GetDocument(uint32(docid))
+        val,ok := this.GetDocument(docid.Docid)
         if ok{
             res=append(res,val)
         }

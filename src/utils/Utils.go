@@ -8,7 +8,11 @@ const IDX_ROOT_PATH string = "./index/"
 // FALCONENGINENAME base名称
 const FALCONSEARCHERNAME string = "FALCONENGINE"
 
-type DocIdNode uint32
+type DocIdNode struct {
+    Docid  uint32
+    Weight uint32
+    //Pos    uint32
+}
 
 type DocIdSort []DocIdNode
 
@@ -16,12 +20,12 @@ func (a DocIdSort) Len() int      { return len(a) }
 func (a DocIdSort) Swap(i, j int) { a[i], a[j] = a[j], a[i] }
 func (a DocIdSort) Less(i, j int) bool {
 	if a[i] == a[j] {
-		return a[i] < a[j]
+		return a[i].Docid < a[j].Docid
 	}
-	return a[i] < a[j]
+	return a[i].Docid < a[j].Docid
 }
 
-const DOCNODE_SIZE int = 4
+const DOCNODE_SIZE int = 8//12
 
 const BASE_PREFIX_SEGMENT uint64 = 1000
 
@@ -183,7 +187,7 @@ func Merge(a []DocIdNode, b []DocIdNode) ([]DocIdNode, bool) {
 			continue
 		}
 
-		if a[ia] < b[ib] {
+		if a[ia].Docid < b[ib].Docid {
 			//	fmt.Printf("ia : %v ======== ib : %v \n",ia,ib)
 			//c = append(c, a[ia])
 			c[lenc] = a[ia]
@@ -240,7 +244,7 @@ func InteractionWithStart(a []DocIdNode, b []DocIdNode, start int) ([]DocIdNode,
 			//c = append(c, a[ia])
 		}
 
-		if a[ia] < b[ib] {
+		if a[ia].Docid < b[ib].Docid {
 			ia++
 		} else {
 			ib++
@@ -281,7 +285,7 @@ func Interaction(a []DocIdNode, b []DocIdNode) ([]DocIdNode, bool) {
 	ib := 0
 	for ia < lena && ib < lenb {
 
-		if a[ia] == b[ib] {
+		if a[ia].Docid == b[ib].Docid {
 			c[lenc] = a[ia]
 			lenc++
 			ia++
@@ -290,7 +294,7 @@ func Interaction(a []DocIdNode, b []DocIdNode) ([]DocIdNode, bool) {
 			//c = append(c, a[ia])
 		}
 
-		if a[ia] < b[ib] {
+		if a[ia].Docid < b[ib].Docid {
 			ia++
 		} else {
 			ib++
@@ -315,11 +319,11 @@ func BinSearch(docids []DocIdNode, item DocIdNode) int {
 
 	mid := (low + high) / 2
 	midValue := docids[mid]
-	if docids[mid] > item {
+	if docids[mid].Docid > item.Docid {
 		return BinSearch(docids[low:mid], item)
 	}
 
-	if docids[mid] < item {
+	if docids[mid].Docid < item.Docid {
 		return BinSearch(docids[mid+1:high+1], item)
 	}
 

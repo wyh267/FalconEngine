@@ -148,7 +148,7 @@ func (this *Mmap) ReadUInt64Arry(start, len uint64) []DocIdNode {
 	return arry
 }
 
-func (this *Mmap) ReadUInt32Arry(start, len uint64) []DocIdNode {
+func (this *Mmap) ReadDocIdsArry(start, len uint64) []DocIdNode {
 
 	arry := *(*[]DocIdNode)(unsafe.Pointer(&reflect.SliceHeader{
 		Data: uintptr(unsafe.Pointer(&this.MmapBytes[start])),

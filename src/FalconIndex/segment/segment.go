@@ -409,10 +409,10 @@ func (this *Segment) Filter(fieldname string, filtertype uint64, start, end int6
 		return nil
 	}
 
-	if !(uint32(docids[0]) < this.MaxDocId &&
-		uint32(docids[0]) >= this.StartDocId &&
-		uint32(docids[len(docids)-1]) < this.MaxDocId &&
-		uint32(docids[len(docids)-1]) >= this.StartDocId) {
+	if !(uint32(docids[0].Docid) < this.MaxDocId &&
+		uint32(docids[0].Docid) >= this.StartDocId &&
+		uint32(docids[len(docids)-1].Docid) < this.MaxDocId &&
+		uint32(docids[len(docids)-1].Docid) >= this.StartDocId) {
 		return nil
 	}
 
@@ -420,7 +420,7 @@ func (this *Segment) Filter(fieldname string, filtertype uint64, start, end int6
 
 	for _, docid := range docids {
 
-		if this.fields[fieldname].filter(uint32(docid), filtertype, start, end) {
+		if this.fields[fieldname].filter(docid.Docid, filtertype, start, end) {
 			res = append(res, docid)
 		}
 
@@ -504,7 +504,7 @@ func (this *Segment) SearchUnitDocIds(querys []utils.FSSearchQuery, filteds []ut
 	if len(querys) == 0 || querys == nil {
 		docids := make([]utils.DocIdNode, 0)
 		for i := this.StartDocId; i < this.MaxDocId; i++ {
-			docids = append(docids, utils.DocIdNode(i))
+			docids = append(docids, utils.DocIdNode{Docid:i})
 		}
 		indocids = append(indocids, docids...)
 	} else {
@@ -537,7 +537,7 @@ func (this *Segment) SearchUnitDocIds(querys []utils.FSSearchQuery, filteds []ut
 	if filteds == nil && bitmap != nil {
 		for _, docid := range indocids[start:] {
 			//去掉bitmap删除的
-			if bitmap.GetBit(uint64(docid)) == 0 {
+			if bitmap.GetBit(uint64(docid.Docid)) == 0 {
 				indocids[index] = docid
 				index++
 			}
@@ -554,7 +554,7 @@ func (this *Segment) SearchUnitDocIds(querys []utils.FSSearchQuery, filteds []ut
 		match := true
 		for _, filter := range filteds {
 			if _, hasField := this.fields[filter.FieldName]; hasField {
-				if (bitmap != nil && bitmap.GetBit(uint64(docidinfo)) == 1) || (!this.fields[filter.FieldName].filter(uint32(docidinfo), filter.Type, filter.Start, filter.End)) {
+				if (bitmap != nil && bitmap.GetBit(uint64(docidinfo.Docid)) == 1) || (!this.fields[filter.FieldName].filter(docidinfo.Docid, filter.Type, filter.Start, filter.End)) {
 					match = false
 					break
 				}
