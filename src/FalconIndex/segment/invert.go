@@ -39,13 +39,14 @@ type invert struct {
 	tempHashTable map[string][]utils.DocIdNode
 	Logger        *utils.Log4FE
 	btree         *tree.BTreedb
+    dict          *tree.BTreedb
 }
 
 // newEmptyInvert function description : 新建空的字符型倒排索引
 // params :
 // return :
-func newEmptyInvert(fieldType uint64, startDocId uint32, fieldname string, logger *utils.Log4FE) *invert {
-	this := &invert{btree: nil, curDocId: startDocId, fieldName: fieldname, fieldType: fieldType, tempHashTable: make(map[string][]utils.DocIdNode), Logger: logger, isMomery: true}
+func newEmptyInvert(fieldType uint64, startDocId uint32, fieldname string,dict *tree.BTreedb, logger *utils.Log4FE) *invert {
+	this := &invert{dict:dict,btree: nil, curDocId: startDocId, fieldName: fieldname, fieldType: fieldType, tempHashTable: make(map[string][]utils.DocIdNode), Logger: logger, isMomery: true}
 	return this
 }
 
@@ -53,9 +54,9 @@ func newEmptyInvert(fieldType uint64, startDocId uint32, fieldname string, logge
 // params :
 // return :
 func newInvertWithLocalFile(btdb *tree.BTreedb, fieldType uint64, fieldname, fullsegmentname string,
-	idxMmap *utils.Mmap, logger *utils.Log4FE) *invert {
+	idxMmap *utils.Mmap, dict *tree.BTreedb,logger *utils.Log4FE) *invert {
 
-	this := &invert{btree: btdb, fieldType: fieldType, fieldName: fieldname, Logger: logger, isMomery: false, idxMmap: idxMmap}
+	this := &invert{dict:dict,btree: btdb, fieldType: fieldType, fieldName: fieldname, Logger: logger, isMomery: false, idxMmap: idxMmap}
 	return this
 
 }
@@ -79,9 +80,10 @@ func (this *invert) addDocument(docid uint32, content interface{}) error {
 	case utils.IDX_TYPE_STRING_LIST: //分号切割模式
 		terms = strings.Split(contentstr, ";")
 	case utils.IDX_TYPE_STRING_SEG: //分词模式
-		terminfos := utils.GSegmenter.SegmentWithTf(contentstr, true)
+		terminfos,termcount := utils.GSegmenter.SegmentWithTf(contentstr, true)
         for _, terminfo := range terminfos {
-            docidNode := utils.DocIdNode{Docid:docid,Weight:uint32(terminfo.Tf)}
+            
+            docidNode := utils.DocIdNode{Docid:docid,Weight:uint32((float64(terminfo.Tf)/float64(termcount))*10000)}
             if _, inTmp := this.tempHashTable[terminfo.Term]; !inTmp {
                 var docidNodes []utils.DocIdNode
                 docidNodes = append(docidNodes, docidNode)
@@ -89,8 +91,12 @@ func (this *invert) addDocument(docid uint32, content interface{}) error {
             } else {
                 this.tempHashTable[terminfo.Term] = append(this.tempHashTable[terminfo.Term], docidNode)
             }
+            if err:=this.dict.IncValue(this.fieldName,terminfo.Term);err!=nil{
+                return err
+            }
         }
 
+        
         this.curDocId++
         return nil
         
@@ -146,6 +152,8 @@ func (this *invert) serialization(fullsegmentname string, btdb *tree.BTreedb) er
 		//this.Logger.Info("[INFO] key :%v totalOffset: %v len:%v value:%v",key,totalOffset,lens,value)
 		this.btree.Set(this.fieldName, key, uint64(totalOffset))
 		totalOffset = totalOffset + 8 + lens*utils.DOCNODE_SIZE
+        
+        
 
 	}
 	this.tempHashTable = nil
@@ -213,9 +221,11 @@ func (this *invert) query(key interface{}) ([]utils.DocIdNode, bool) {
 		return this.queryTerm(queryterms[0])
 	}
 	var fDocids []utils.DocIdNode
+   // var sDocids []utils.DocIdNode
 	var hasRes bool
 	var match bool
 	fDocids, match = this.queryTerm(queryterms[0])
+    //fDocids=append(fDocids,sDocids...)
 	if match {
 		for _, term := range queryterms[1:] {
 			subDocids, ok := this.queryTerm(term)

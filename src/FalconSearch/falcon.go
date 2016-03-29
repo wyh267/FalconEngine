@@ -3,6 +3,8 @@ package main
 import (
 	"flag"
 	"fmt"
+	"log"
+	"net/http"
 	_ "net/http/pprof"
 	"runtime"
 	//"runtime/debug"
@@ -29,7 +31,7 @@ func main() {
 	flag.IntVar(&new, "r", 0, "是否从日志恢复数据")
 	flag.IntVar(&closetime, "t", 600, "数据库关闭时间")
 	flag.Parse()
-	//runtime.GOMAXPROCS(1)
+	runtime.GOMAXPROCS(runtime.NumCPU())
 	//debug.SetGCPercent(0)
 	fmt.Printf("CORES:%v\n", runtime.NumCPU())
 	//启动日志系统
@@ -46,11 +48,13 @@ func main() {
 	//初始化Manager
 	engine := fe.NewDefaultEngine(logger)
 
-	
 	//启动性能监控
-	//go func() {
-	//	log.Println(http.ListenAndServe(":6060", nil))
-	//}()
+	go func() {
+		log.Println(http.ListenAndServe(":6060", nil))
+	}()
+    
+    
+    utils.GetDocIDsChan, utils.GiveDocIDsChan = utils.DocIdsMaker()
 
 	//启动全局缓存
 	// utils.Cache,err = cache.NewCache("memory", `{"interval":60}`)

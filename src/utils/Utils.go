@@ -1,6 +1,11 @@
 package utils
 
-import "os"
+import (
+	"container/list"
+	"math"
+	"os"
+	"time"
+)
 
 // IDX_ROOT_PATH 默认索引存放位置
 const IDX_ROOT_PATH string = "./index/"
@@ -9,9 +14,9 @@ const IDX_ROOT_PATH string = "./index/"
 const FALCONSEARCHERNAME string = "FALCONENGINE"
 
 type DocIdNode struct {
-    Docid  uint32
-    Weight uint32
-    //Pos    uint32
+	Docid  uint32
+	Weight uint32
+	//Pos    uint32
 }
 
 type DocIdSort []DocIdNode
@@ -25,7 +30,18 @@ func (a DocIdSort) Less(i, j int) bool {
 	return a[i].Docid < a[j].Docid
 }
 
-const DOCNODE_SIZE int = 8//12
+type DocWeightSort []DocIdNode
+
+func (a DocWeightSort) Len() int      { return len(a) }
+func (a DocWeightSort) Swap(i, j int) { a[i], a[j] = a[j], a[i] }
+func (a DocWeightSort) Less(i, j int) bool {
+	if a[i] == a[j] {
+		return a[i].Weight > a[j].Weight
+	}
+	return a[i].Weight > a[j].Weight
+}
+
+const DOCNODE_SIZE int = 8 //12
 
 const BASE_PREFIX_SEGMENT uint64 = 1000
 
@@ -59,17 +75,20 @@ const (
 type SimpleFieldInfo struct {
 	FieldName string `json:"fieldname"`
 	FieldType uint64 `json:"fieldtype"`
-	PflOffset int64          `json:"pfloffset"` //正排索引的偏移量
-	PflLen    int            `json:"pfllen"`    //正排索引长度
+	PflOffset int64  `json:"pfloffset"` //正排索引的偏移量
+	PflLen    int    `json:"pfllen"`    //正排索引长度
 }
 
-
-
-type TermInfo struct{
-    Term   string
-    Tf     int
+// IndexStrct 索引构造结构，包含字段信息
+type IndexStrct struct {
+	IndexName    string            `json:"indexname"`
+	IndexMapping []SimpleFieldInfo `json:"indexmapping"`
 }
 
+type TermInfo struct {
+	Term string
+	Tf   int
+}
 
 /*************************************************************************
 索引查询接口
@@ -94,10 +113,41 @@ type FSSearchFilted struct {
 	Type      uint64 `json:"_type"`
 }
 
+//FSSearchSort description : 排序
+type FSSearchSort struct {
+	FieldName string `json:"_sortfield"`
+	SortType  string `json:"_sorttype"`
+}
+
+// FSSearchGather description : 汇总
+type FSSearchGather struct {
+	FieldNames []string `json:"_gatherfields"`
+}
+
+type FSSearchConfig struct {
+	ShowFields []string `json:"_showfields"`
+	PageSize   int      `json:"_pagesize"`
+	PageNumber int      `json:"_pagenum"`
+}
+
+type FSSearchQueryUnit struct {
+	Querys []FSSearchQuery `json:"_querys"`
+}
+
 type FSSearchUnit struct {
-    IndexName  string           `json:"indexname"`
-	Querys     []FSSearchQuery  `json:"_querys"`
-	Filters    []FSSearchFilted `json:"_filters"`
+	QueryUnits []FSSearchQueryUnit `json:"_queryunit"`
+	Filters    []FSSearchFilted    `json:"_filters"`
+	Gather     FSSearchGather      `json:"_gather"`
+	Sort       FSSearchSort        `json:"_sort"`
+	Config     FSSearchConfig      `json:"_config"`
+}
+
+type FSSearchFrontend struct {
+	Query   string           `json:"query"`
+	Filters []FSSearchFilted `json:"_filters"`
+	Gather  FSSearchGather   `json:"_gather"`
+	Sort    FSSearchSort     `json:"_sort"`
+	Config  FSSearchConfig   `json:"_config"`
 }
 
 //统计类型
@@ -160,16 +210,18 @@ type FEResultAutomaticSingle struct {
 	Condition  int    `json:"_condition"`
 }
 
-
-
-
-type Engine interface {
-    Search() error
-    
+type FSLoadStruct struct {
+	Split    string   `json:"_split"`
+	Fields   []string `json:"_fields"`
+	Filename string   `json:"_filename"`
 }
 
-
-
+type Engine interface {
+	Search(method string, parms map[string]string, body []byte) (string, error)
+	CreateIndex(method string, parms map[string]string, body []byte) error
+	UpdateDocument(method string, parms map[string]string, body []byte) (string, error)
+	LoadData(method string, parms map[string]string, body []byte) (string, error)
+}
 
 /*****************************************************************************
 *  function name : Merge
@@ -236,6 +288,50 @@ func Merge(a []DocIdNode, b []DocIdNode) ([]DocIdNode, bool) {
 
 }
 
+func ComputeTfIdf(res []DocIdNode, a []DocIdNode, df int, maxdoc uint32) []DocIdNode {
+
+	for ia := 0; ia < len(a); ia++ {
+		weight := uint32((float64(a[ia].Weight) / 10000 * math.Log10(float64(maxdoc)/float64(df))) * 1000)
+		docid := a[ia].Docid
+		res = append(res, DocIdNode{Docid: docid, Weight: weight})
+	}
+	return res
+}
+
+func InteractionWithStartAndDf(a []DocIdNode, b []DocIdNode, start int, df int, maxdoc uint32) ([]DocIdNode, bool) {
+
+	if a == nil || b == nil {
+		return a, false
+	}
+
+	lena := len(a)
+	lenb := len(b)
+	lenc := start
+	ia := start
+	ib := 0
+
+	for ia < lena && ib < lenb {
+
+		if a[ia].Docid == b[ib].Docid {
+			a[lenc] = a[ia]
+			a[lenc].Weight += uint32((float64(a[ia].Weight) / 10000 * math.Log10(float64(maxdoc)/float64(df))) * 1000)
+			lenc++
+			ia++
+			ib++
+			continue
+			//c = append(c, a[ia])
+		}
+
+		if a[ia].Docid < b[ib].Docid {
+			ia++
+		} else {
+			ib++
+		}
+	}
+
+	return a[:lenc], true
+}
+
 func InteractionWithStart(a []DocIdNode, b []DocIdNode, start int) ([]DocIdNode, bool) {
 
 	if a == nil || b == nil {
@@ -251,7 +347,7 @@ func InteractionWithStart(a []DocIdNode, b []DocIdNode, start int) ([]DocIdNode,
 	//fmt.Printf("a:%v,b:%v,c:%v\n",lena,lenb,lenc)
 	for ia < lena && ib < lenb {
 
-		if a[ia] == b[ib] {
+		if a[ia].Docid == b[ib].Docid {
 			a[lenc] = a[ia]
 			lenc++
 			ia++
@@ -353,4 +449,115 @@ func BinSearch(docids []DocIdNode, item DocIdNode) int {
 func Exist(filename string) bool {
 	_, err := os.Stat(filename)
 	return err == nil || os.IsExist(err)
+}
+
+type queued struct {
+	when  time.Time
+	slice []DocIdNode
+}
+
+type docqueued struct {
+	when  time.Time
+	slice []DocIdNode
+}
+
+const MAX_DOCID_LEN = 1000
+
+func makeDocIdSlice() []DocIdNode {
+
+	//fmt.Printf("[WARN] ========Malloc Buffer...\n")
+	return make([]DocIdNode, 0, MAX_DOCID_LEN)
+
+}
+
+var GetDocIDsChan chan []DocIdNode
+var GiveDocIDsChan chan []DocIdNode
+
+//var GetDocInfoChan chan []DocIdNode
+//var GiveDocInfoChan chan []DocIdNode
+
+// DocIdsMaker function description : DocId的内存池
+// params :
+// return :
+func DocIdsMaker() (get, give chan []DocIdNode) {
+	get = make(chan []DocIdNode)
+	give = make(chan []DocIdNode)
+
+	go func() {
+		q := new(list.List)
+
+		for {
+			if q.Len() == 0 {
+				q.PushFront(queued{when: time.Now(), slice: makeDocIdSlice()})
+			}
+
+			e := q.Front()
+
+			timeout := time.NewTimer(time.Minute)
+			select {
+			case b := <-give:
+				timeout.Stop()
+				//fmt.Printf("Recive Buffer...\n")
+				//b=b[:MAX_DOCID_LEN]
+				q.PushFront(queued{when: time.Now(), slice: b})
+
+			case get <- e.Value.(queued).slice[:0]:
+				timeout.Stop()
+				//fmt.Printf("Sent Buffer...\n")
+				q.Remove(e)
+
+			case <-timeout.C:
+				e := q.Front()
+				for e != nil {
+					n := e.Next()
+					if time.Since(e.Value.(queued).when) > time.Minute {
+						q.Remove(e)
+						e.Value = nil
+					}
+					e = n
+				}
+
+			}
+		}
+
+	}()
+
+	return
+}
+
+
+
+// IsDateTime function description : 判断是否是日期时间格式
+// params : 字符串
+// return : 是否是日期时间格式
+func IsDateTime(datetime string) (int64, error) {
+
+	var timestamp time.Time
+	var err error
+
+	if len(datetime) > 10 {
+		timestamp, err = time.ParseInLocation("2006-01-02 15:04:05", datetime, time.Local)
+		if err != nil {
+			return 0, err
+		}
+	} else {
+		timestamp, err = time.ParseInLocation("2006-01-02", datetime, time.Local)
+		if err != nil {
+			return 0, err
+		}
+	}
+
+	return timestamp.Unix(), nil
+
+}
+
+
+func FormatDateTime(timestamp int64) (string,bool) {
+    
+    if timestamp == 0 {
+        return "",false
+    }
+    tm:=time.Unix(timestamp, 0)
+    return tm.Format("2006-01-02 15:04:05"),true
+    
 }

@@ -712,6 +712,23 @@ func (db *BTreedb) Set(btname, key string, value uint64) error {
 
 }
 
+
+
+func (db *BTreedb) IncValue(btname,key string) error {
+    if _, ok := db.btmap[btname]; !ok {
+		return errors.New("has one")
+	}
+    
+    found,value:= db.btmap[btname].Search(key)
+    if found {
+        return db.btmap[btname].Set(key,value+1)
+    }
+        return db.btmap[btname].Set(key,1)
+   
+}
+
+
+
 func (db *BTreedb) Search(btname, key string) (bool, uint64) {
 	if _, ok := db.btmap[btname]; !ok {
 		return false, 0

@@ -14,6 +14,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"sort"
 	"sync"
 	"tree"
 	"utils"
@@ -33,6 +34,7 @@ type Index struct {
 	memorySegment *fis.Segment
 	primary       *tree.BTreedb
 	bitmap        *utils.Bitmap
+	dict          *tree.BTreedb
 
 	idxSegmentMutex *sync.Mutex   //段锁，当段序列化到磁盘或者段合并时使用或者新建段时使用
 	Logger          *utils.Log4FE `json:"-"`
@@ -43,11 +45,16 @@ func NewEmptyIndex(name, pathname string, logger *utils.Log4FE) *Index {
 	this := &Index{Name: name, Logger: logger, StartDocId: 0, MaxDocId: 0, PrefixSegment: 1000,
 		SegmentNames: make([]string, 0), PrimaryKey: "", segments: make([]*fis.Segment, 0),
 		memorySegment: nil, primary: nil, bitmap: nil, Pathname: pathname,
-		Fields: make(map[string]utils.SimpleFieldInfo), idxSegmentMutex: new(sync.Mutex)}
+		Fields: make(map[string]utils.SimpleFieldInfo), idxSegmentMutex: new(sync.Mutex),
+		dict: nil}
 
 	bitmapname := fmt.Sprintf("%v%v.bitmap", pathname, name)
 	utils.MakeBitmapFile(bitmapname)
 	this.bitmap = utils.NewBitmap(bitmapname)
+
+	dictfilename := fmt.Sprintf("%v%v_dict.dic", this.Pathname, this.Name)
+	this.dict = tree.NewBTDB(dictfilename)
+
 	return this
 }
 
@@ -55,7 +62,8 @@ func NewIndexWithLocalFile(name, pathname string, logger *utils.Log4FE) *Index {
 	this := &Index{Name: name, Logger: logger, StartDocId: 0, MaxDocId: 0, PrefixSegment: 1000,
 		SegmentNames: make([]string, 0), PrimaryKey: "", segments: make([]*fis.Segment, 0),
 		memorySegment: nil, primary: nil, bitmap: nil, Pathname: pathname,
-		Fields: make(map[string]utils.SimpleFieldInfo), idxSegmentMutex: new(sync.Mutex)}
+		Fields: make(map[string]utils.SimpleFieldInfo), idxSegmentMutex: new(sync.Mutex),
+		dict: nil}
 
 	metaFileName := fmt.Sprintf("%v%v.meta", pathname, name)
 	buffer, err := utils.ReadFromJson(metaFileName)
@@ -68,8 +76,14 @@ func NewIndexWithLocalFile(name, pathname string, logger *utils.Log4FE) *Index {
 		return this
 	}
 
+    dictfilename := fmt.Sprintf("%v%v_dict.dic", this.Pathname, this.Name)
+	if utils.Exist(dictfilename) {
+        this.Logger.Info("[INFO] Load dictfilename %v",dictfilename)
+		this.dict = tree.NewBTDB(dictfilename)
+	}
+
 	for _, segmentname := range this.SegmentNames {
-		segment := fis.NewSegmentWithLocalFile(segmentname, logger)
+		segment := fis.NewSegmentWithLocalFile(segmentname, this.dict, logger)
 		this.segments = append(this.segments, segment)
 
 	}
@@ -83,7 +97,10 @@ func NewIndexWithLocalFile(name, pathname string, logger *utils.Log4FE) *Index {
 		}
 
 	}
-	this.memorySegment = fis.NewEmptySegmentWithFieldsInfo(segmentname, this.MaxDocId, fields, this.Logger)
+    
+    
+    
+	this.memorySegment = fis.NewEmptySegmentWithFieldsInfo(segmentname, this.MaxDocId, fields, this.dict, this.Logger)
 	this.PrefixSegment++
 
 	//读取bitmap
@@ -94,6 +111,8 @@ func NewIndexWithLocalFile(name, pathname string, logger *utils.Log4FE) *Index {
 		primaryname := fmt.Sprintf("%v%v_primary.pk", this.Pathname, this.Name)
 		this.primary = tree.NewBTDB(primaryname)
 	}
+
+	
 
 	this.Logger.Info("[INFO] Load Index %v success", this.Name)
 	return this
@@ -108,6 +127,9 @@ func (this *Index) AddField(field utils.SimpleFieldInfo) error {
 	}
 
 	this.Fields[field.FieldName] = field
+	if field.FieldType == utils.IDX_TYPE_STRING_SEG {
+		this.dict.AddBTree(field.FieldName)
+	}
 	if field.FieldType == utils.IDX_TYPE_PK {
 		this.PrimaryKey = field.FieldName
 		primaryname := fmt.Sprintf("%v%v_primary.pk", this.Pathname, this.Name)
@@ -126,7 +148,7 @@ func (this *Index) AddField(field utils.SimpleFieldInfo) error {
 				}
 
 			}
-			this.memorySegment = fis.NewEmptySegmentWithFieldsInfo(segmentname, this.MaxDocId, fields, this.Logger)
+			this.memorySegment = fis.NewEmptySegmentWithFieldsInfo(segmentname, this.MaxDocId, fields, this.dict, this.Logger)
 			this.PrefixSegment++
 
 		} else if this.memorySegment.IsEmpty() {
@@ -154,7 +176,7 @@ func (this *Index) AddField(field utils.SimpleFieldInfo) error {
 				}
 
 			}
-			this.memorySegment = fis.NewEmptySegmentWithFieldsInfo(segmentname, this.MaxDocId, fields, this.Logger)
+			this.memorySegment = fis.NewEmptySegmentWithFieldsInfo(segmentname, this.MaxDocId, fields, this.dict, this.Logger)
 			this.PrefixSegment++
 
 		}
@@ -210,7 +232,7 @@ func (this *Index) DeleteField(fieldname string) error {
 		}
 
 	}
-	this.memorySegment = fis.NewEmptySegmentWithFieldsInfo(segmentname, this.MaxDocId, fields, this.Logger)
+	this.memorySegment = fis.NewEmptySegmentWithFieldsInfo(segmentname, this.MaxDocId, fields, this.dict, this.Logger)
 	this.PrefixSegment++
 
 	return this.storeStruct()
@@ -243,7 +265,7 @@ func (this *Index) UpdateDocument(content map[string]string) error {
 			}
 
 		}
-		this.memorySegment = fis.NewEmptySegmentWithFieldsInfo(segmentname, this.MaxDocId, fields, this.Logger)
+		this.memorySegment = fis.NewEmptySegmentWithFieldsInfo(segmentname, this.MaxDocId, fields, this.dict, this.Logger)
 		this.PrefixSegment++
 		if err := this.storeStruct(); err != nil {
 			this.idxSegmentMutex.Unlock()
@@ -311,7 +333,7 @@ func (this *Index) SyncMemorySegment() error {
 	segmentname := this.memorySegment.SegmentName
 	this.memorySegment.Close()
 	this.memorySegment = nil
-	newSegment := fis.NewSegmentWithLocalFile(segmentname, this.Logger)
+	newSegment := fis.NewSegmentWithLocalFile(segmentname, this.dict, this.Logger)
 	this.segments = append(this.segments, newSegment)
 	this.SegmentNames = append(this.SegmentNames, segmentname)
 
@@ -356,7 +378,7 @@ func (this *Index) MergeSegments() error {
 		}
 
 	}
-	tmpSegment := fis.NewEmptySegmentWithFieldsInfo(segmentname, mergeSegments[0].StartDocId, fields, this.Logger)
+	tmpSegment := fis.NewEmptySegmentWithFieldsInfo(segmentname, mergeSegments[0].StartDocId, fields, this.dict, this.Logger)
 	this.PrefixSegment++
 	if err := this.storeStruct(); err != nil {
 		return err
@@ -370,7 +392,7 @@ func (this *Index) MergeSegments() error {
 		sg.Destroy()
 	}
 
-	tmpSegment = fis.NewSegmentWithLocalFile(segmentname, this.Logger)
+	tmpSegment = fis.NewSegmentWithLocalFile(segmentname, this.dict, this.Logger)
 	if startIdx > 0 {
 		this.segments = this.segments[:startIdx]         //make([]*fis.Segment,0)
 		this.SegmentNames = this.SegmentNames[:startIdx] //make([]string,0)
@@ -399,7 +421,7 @@ func (this *Index) SearchUnitDocIds(querys []utils.FSSearchQuery, filteds []util
 
 	docids := make([]utils.DocIdNode, 0)
 	for _, segment := range this.segments {
-		docids, _ = segment.SearchUnitDocIds(querys, filteds, this.bitmap, docids)
+		docids, _ = segment.SearchUnitDocIds(querys, filteds, this.bitmap, docids, this.MaxDocId)
 		//this.Logger.Info("[INFO] segment[%v] docids %v", segment.SegmentName, docids)
 	}
 
@@ -412,9 +434,10 @@ func (this *Index) SearchUnitDocIds(querys []utils.FSSearchQuery, filteds []util
 
 func (this *Index) SimpleSearch(querys []utils.FSSearchQuery, filteds []utils.FSSearchFilted, ps, pg int) ([]map[string]string, bool) {
 
-	docids := make([]utils.DocIdNode, 0)
+	//docids := make([]utils.DocIdNode, 0)
+	docids := <-utils.GetDocIDsChan
 	for _, segment := range this.segments {
-		docids, _ = segment.SearchUnitDocIds(querys, filteds, this.bitmap, docids)
+		docids, _ = segment.SearchUnitDocIds(querys, filteds, this.bitmap, docids, this.MaxDocId)
 		//this.Logger.Info("[INFO] segment[%v] docids %v", segment.SegmentName, docids)
 	}
 	lens := len(docids)
@@ -430,6 +453,7 @@ func (this *Index) SimpleSearch(querys []utils.FSSearchQuery, filteds []utils.FS
 		end = lens
 	}
 
+	sort.Sort(utils.DocWeightSort(docids))
 	res := make([]map[string]string, 0)
 	for _, docid := range docids[start:end] {
 		val, ok := this.GetDocument(docid.Docid)
@@ -437,7 +461,7 @@ func (this *Index) SimpleSearch(querys []utils.FSSearchQuery, filteds []utils.FS
 			res = append(res, val)
 		}
 	}
-
+	utils.GiveDocIDsChan <- docids
 	return res, true
 
 }

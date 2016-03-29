@@ -147,7 +147,12 @@ func (this *profile) addDocument(docid uint32, content interface{}) error {
 			}
 			this.pflNumber = append(this.pflNumber, value)
 			//this.pflString = append(this.pflString, fmt.Sprintf("%v", content))
-		} else {
+		} else if this.fieldType == utils.IDX_TYPE_DATE {
+            
+            value,_ = utils.IsDateTime(fmt.Sprintf("%v", content))
+            this.pflNumber = append(this.pflNumber, value)
+            
+        }else {
 			this.pflString = append(this.pflString, fmt.Sprintf("%v", content))
 		}
 	default:
@@ -176,7 +181,7 @@ func (this *profile) serialization(fullsegmentname string) (int64, int, error) {
 	offset := fi.Size()
 	this.pflOffset = offset
 	var lens int
-	if this.fieldType == utils.IDX_TYPE_NUMBER {
+	if this.fieldType == utils.IDX_TYPE_NUMBER || this.fieldType == utils.IDX_TYPE_DATE {
 		valueBufer := make([]byte, 8)
 		for _, info := range this.pflNumber {
 			binary.LittleEndian.PutUint64(valueBufer, uint64(info))
@@ -242,7 +247,9 @@ func (this *profile) getValue(pos uint32) (string, bool) {
 	if this.isMomery && pos < uint32(len(this.pflNumber)){
 		if this.fieldType == utils.IDX_TYPE_NUMBER {
 			return fmt.Sprintf("%v", this.pflNumber[pos]), true
-		}
+		}else if this.fieldType == utils.IDX_TYPE_DATE {
+            return utils.FormatDateTime(this.pflNumber[pos])
+        }
 		return this.pflString[pos], true
 
 	}
@@ -257,7 +264,10 @@ func (this *profile) getValue(pos uint32) (string, bool) {
 		//    return fmt.Sprintf("%v",float64(ov)/(math.Pow10(int(this.shift))) ), true
 		//}
 		return fmt.Sprintf("%v", this.pflMmap.ReadInt64(offset)), true
-	}
+	}else if this.fieldType == utils.IDX_TYPE_DATE {
+        return utils.FormatDateTime(this.pflMmap.ReadInt64(offset))
+        
+    }
 
 	if this.dtlMmap == nil {
 		return "", false
@@ -280,7 +290,8 @@ func (this *profile) getIntValue(pos uint32) (int64, bool) {
     }
     
     if this.isMomery {
-		if this.fieldType == utils.IDX_TYPE_NUMBER && pos < uint32(len(this.pflNumber)){
+		if (this.fieldType == utils.IDX_TYPE_NUMBER || this.fieldType == utils.IDX_TYPE_DATE) && 
+            pos < uint32(len(this.pflNumber)){
 			return this.pflNumber[pos], true
 		}
 		return 0xFFFFFFFF, false
@@ -291,7 +302,7 @@ func (this *profile) getIntValue(pos uint32) (int64, bool) {
 	}
 
 	offset := this.pflOffset + int64(pos*8)
-	if this.fieldType == utils.IDX_TYPE_NUMBER {
+	if (this.fieldType == utils.IDX_TYPE_NUMBER || this.fieldType == utils.IDX_TYPE_DATE) {
 		//ov:=this.pflMmap.ReadInt64(offset)
 		//if this.shift>0{
 		//    return fmt.Sprintf("%v",float64(ov)/(math.Pow10(int(this.shift))) ), true
@@ -308,7 +319,7 @@ func (this *profile) getIntValue(pos uint32) (int64, bool) {
 func (this *profile) filter(pos uint32, filtertype uint64, start, end int64) bool {
 
 	var value int64
-	if this.fieldType != utils.IDX_TYPE_NUMBER {
+	if this.fieldType != utils.IDX_TYPE_NUMBER || this.fieldType != utils.IDX_TYPE_DATE {
 		return false
 	}
 
@@ -354,7 +365,7 @@ func (this *profile) setDtlMmap(mmap *utils.Mmap) {
 
 func (this *profile) updateDocument(docid uint32, content interface{}) error {
 
-	if this.fieldType != utils.IDX_TYPE_NUMBER {
+	if this.fieldType != utils.IDX_TYPE_NUMBER || this.fieldType != utils.IDX_TYPE_DATE {
 		return errors.New("not support")
 	}
 
@@ -363,10 +374,14 @@ func (this *profile) updateDocument(docid uint32, content interface{}) error {
 	switch vtype.Name() {
 	case "string", "int", "int8", "int16", "int32", "int64", "uint", "uint8", "uint16", "uint32", "uint64":
 		var ok error
+        if this.fieldType == utils.IDX_TYPE_DATE {
+            value,_ = utils.IsDateTime(fmt.Sprintf("%v", content))
+        }
 		value, ok = strconv.ParseInt(fmt.Sprintf("%v", content), 0, 0)
 		if ok != nil {
 			value = 0xFFFFFFFF
 		}
+        
 	case "float32":
 		v, _ := content.(float32)
 		value = int64(v * 100)
@@ -411,7 +426,7 @@ func (this *profile) mergeProfiles(srclist []*profile,fullsegmentname string) (i
 	offset := fi.Size()
 	this.pflOffset = offset
     var lens int
-	if this.fieldType == utils.IDX_TYPE_NUMBER {
+	if this.fieldType == utils.IDX_TYPE_NUMBER || this.fieldType == utils.IDX_TYPE_DATE {
 		valueBufer := make([]byte, 8)
         for _,src:=range srclist{
             for i:=uint32(0);i<uint32(src.docLen);i++{

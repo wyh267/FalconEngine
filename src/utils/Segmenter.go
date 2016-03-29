@@ -49,19 +49,21 @@ func (this *Segmenter) Segment(content string, search_mode bool) []string {
 
 
 
-func (this *Segmenter) SegmentWithTf(content string,search_mode bool) []TermInfo {
+func (this *Segmenter) SegmentWithTf(content string,search_mode bool) ([]TermInfo,int) {
     
 	segments := this.segmenter.Segment([]byte(content))
     if len(segments) == 0 {
-        return nil
+        return nil,0
     }
     terms := make([]TermInfo,len(segments))
+    sumTermCount := 0
     for i:=range terms{
         terms[i].Term=segments[i].Token().Text()
         terms[i].Tf=segments[i].Token().Frequency()
+        sumTermCount += terms[i].Tf
     }
 	
-	return terms
+	return terms,sumTermCount
     
     
 }
