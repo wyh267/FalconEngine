@@ -30,6 +30,8 @@ const (
 	eProcessoUpdateProcessorBusy string = "处理进程繁忙，请稍候提交"
 	eProcessoQueryError          string = "查询条件有问题，请检查查询条件"
 	eDefaultEngineNotFound       string = `{"status":"NotFound"}`
+    eDefaultEngineLoadOk         string = `{"status":"OK"}`
+    eDefaultEngineLoadFail       string = `{"status":"Fail"}`
 )
 
 
@@ -72,11 +74,12 @@ func (this *DefaultEngine) Search(method string, parms map[string]string, body [
 	if len(terms) == 0 {
 		return eDefaultEngineNotFound, nil
 	}
+    //this.Logger.Info("[INFO] SegmentTerms >>>  %v ",terms)
 
 	searchquerys := make([]utils.FSSearchQuery, 0)
 	for _, term := range terms {
 		var queryst utils.FSSearchQuery
-		queryst.FieldName = "content"
+		queryst.FieldName = "title"
 		queryst.Value = term
 		searchquerys = append(searchquerys, queryst)
 	}
@@ -157,14 +160,15 @@ func (this *DefaultEngine) CreateIndex(method string, parms map[string]string, b
 	if !hasindex {
 		return errors.New(eProcessoParms)
 	}
-
+    
+    
 	var indexstruct utils.IndexStrct
 	err := json.Unmarshal(body, &indexstruct)
 	if err != nil {
 		this.Logger.Error("[ERROR]  %v : %v ", eProcessoJsonParse, err)
 		return fmt.Errorf("[ERROR]  %v : %v ", eProcessoJsonParse, err)
 	}
-
+          
 	return this.idxManager.CreateIndex(indexname, indexstruct.IndexMapping)
 
 }
@@ -211,14 +215,14 @@ func (this *DefaultEngine) LoadData(method string, parms map[string]string, body
 	indexname, hasindex := parms["index"]
 
 	if !hasindex || method != "POST" {
-		return "", errors.New(eProcessoParms)
+		return eDefaultEngineLoadFail, errors.New(eProcessoParms)
 	}
 
 	var loadstruct utils.FSLoadStruct
 	err := json.Unmarshal(body, &loadstruct)
 	if err != nil {
 		this.Logger.Error("[ERROR] Parse JSON Fail : %v ", err)
-		return "", errors.New(eProcessoJsonParse)
+		return eDefaultEngineLoadFail, errors.New(eProcessoJsonParse)
 	}
 
 	this.Logger.Info("[INFO] loadstruct %v %v", loadstruct, string(body))
@@ -227,32 +231,55 @@ func (this *DefaultEngine) LoadData(method string, parms map[string]string, body
 	if err != nil {
 		this.Logger.Error("[ERROR] Open File[%v] Error %v", loadstruct.Filename, err)
 
-		return "", errors.New("[ERROR] Open File Error")
+		return eDefaultEngineLoadFail, errors.New("[ERROR] Open File Error")
 	}
 	defer datafile.Close()
 
 	scanner := bufio.NewScanner(datafile)
 	i := 0
+    var isJson bool
+    if loadstruct.Split == "json" {
+        isJson = true
+    }
+    
+    if loadstruct.SyncCount <= 0 {
+        loadstruct.SyncCount = 10000
+    }
+    
 	for scanner.Scan() {
-		sptext := strings.Split(scanner.Text(), loadstruct.Split)
-		content := make(map[string]string)
-		if len(sptext) != len(loadstruct.Fields) {
-			continue
-		}
-		for idx, fname := range loadstruct.Fields {
-			content[fname] = sptext[idx]
-		}
+        content := make(map[string]string)
+        if isJson {
+            
+            if err := json.Unmarshal([]byte(scanner.Text()), &content);err!=nil{
+                this.Logger.Error("[ERROR]  %v",err)
+                continue
+            }
+            
+        }else{
+            sptext := strings.Split(scanner.Text(), loadstruct.Split)
+            if len(sptext) != len(loadstruct.Fields) {
+                continue
+            }
+            for idx, fname := range loadstruct.Fields {
+                content[fname] = sptext[idx]
+            }
+        }
+		
 
 		this.idxManager.updateDocument(indexname, content)
 
 		i++
-		if i%100000 == 0 {
+		if i%loadstruct.SyncCount == 0 {
 			this.idxManager.sync(indexname)
 		}
 		//fmt.Println(sptext)
 	}
 	this.idxManager.sync(indexname)
-
-	return "", this.idxManager.mergeIndex(indexname)
+    if loadstruct.IsMerge {
+        return eDefaultEngineLoadOk, this.idxManager.mergeIndex(indexname)
+    }
+    
+    return eDefaultEngineLoadOk,nil
+	
 
 }

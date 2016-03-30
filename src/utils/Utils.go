@@ -214,6 +214,8 @@ type FSLoadStruct struct {
 	Split    string   `json:"_split"`
 	Fields   []string `json:"_fields"`
 	Filename string   `json:"_filename"`
+    SyncCount int     `json:"_synccount"`
+    IsMerge   bool    `json:"_ismerge"`
 }
 
 type Engine interface {

@@ -319,7 +319,7 @@ func (this *profile) getIntValue(pos uint32) (int64, bool) {
 func (this *profile) filter(pos uint32, filtertype uint64, start, end int64) bool {
 
 	var value int64
-	if this.fieldType != utils.IDX_TYPE_NUMBER || this.fieldType != utils.IDX_TYPE_DATE {
+	if this.fieldType != utils.IDX_TYPE_NUMBER || this.fieldType != utils.IDX_TYPE_DATE || this.fake{
 		return false
 	}
 
