@@ -434,12 +434,51 @@ func (this *Index) SearchUnitDocIds(querys []utils.FSSearchQuery, filteds []util
 
 func (this *Index) SimpleSearch(querys []utils.FSSearchQuery, filteds []utils.FSSearchFilted, ps, pg int) ([]map[string]string, bool) {
 
+    var ok bool
+    docids:= <-utils.GetDocIDsChan
+    if len(querys) >= 1 {
+        for _,segment := range this.segments {
+            docids,_ = segment.SearchDocIds(querys[0],filteds, this.bitmap, docids)
+        }
+        
+        
+        
+        docids = utils.ComputeWeight(docids,len(docids),this.MaxDocId)
+    }
+    
+    if len(querys) == 1 {
+        goto END
+    }
+
+
+    
+    for _,query := range querys[1:] {
+        
+        subdocids := <-utils.GetDocIDsChan
+        for _,segment := range this.segments {
+            subdocids,_ = segment.SearchDocIds(query,filteds, this.bitmap, subdocids)
+        }
+        
+        
+        docids,ok=utils.InteractionWithStartAndDf(docids,subdocids,0,len(subdocids),this.MaxDocId)
+        utils.GiveDocIDsChan <- subdocids
+        if !ok {
+            utils.GiveDocIDsChan <- docids
+            return nil,false
+        }
+        
+    }
+
+/*
 	//docids := make([]utils.DocIdNode, 0)
 	docids := <-utils.GetDocIDsChan
 	for _, segment := range this.segments {
 		docids, _ = segment.SearchUnitDocIds(querys, filteds, this.bitmap, docids, this.MaxDocId)
 		//this.Logger.Info("[INFO] segment[%v] docids %v", segment.SegmentName, docids)
 	}
+*/
+
+END:
 	lens := len(docids)
 
 	if ps*(pg-1) >= lens {

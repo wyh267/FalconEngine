@@ -12,6 +12,7 @@ package utils
 
 import
 //"fmt"
+
 "github.com/huichen/sego"
 
 type Segmenter struct {
@@ -42,28 +43,63 @@ func (this *Segmenter) Segment(content string, search_mode bool) []string {
 	text := []byte(content)
 	segments := this.segmenter.Segment(text)
 	res := sego.SegmentsToSlice(segments, search_mode)
-    
+
 	//fmt.Println("SEGMENT::: ",res)
 	return res
 }
 
+func (this *Segmenter) SegmentWithTf(content string, search_mode bool) ([]TermInfo, int) {
 
+	terms := this.Segment(content, search_mode)
+	termmap := make(map[string]TermInfo)
+	for _, term := range terms {
+		if _, ok := termmap[term]; !ok {
+			termmap[term] = TermInfo{Term: term, Tf: 1}
+		} else {
+			tf := termmap[term].Tf
+			termmap[term] = TermInfo{Term: term, Tf: tf + 1}
+		}
+	}
+	resterms := make([]TermInfo, len(termmap))
+	idx := 0
+	for _, tt := range termmap {
+		resterms[idx] = tt
+		idx++
+	}
+	//fmt.Printf("[TREMSSSSS::::%v] ",resterms)
+	return resterms, len(terms)
 
-func (this *Segmenter) SegmentWithTf(content string,search_mode bool) ([]TermInfo,int) {
-    
-	segments := this.segmenter.Segment([]byte(content))
-    if len(segments) == 0 {
-        return nil,0
-    }
-    terms := make([]TermInfo,len(segments))
-    sumTermCount := 0
-    for i:=range terms{
-        terms[i].Term=segments[i].Token().Text()
-        terms[i].Tf=segments[i].Token().Frequency()
-        sumTermCount += terms[i].Tf
-    }
-	
-	return terms,sumTermCount
-    
-    
+	/*
+	   	segments := this.segmenter.Segment([]byte(content))
+	   	if len(segments) == 0 {
+	   		return nil, 0
+	   	}
+	   	//terms := make([]TermInfo, len(segments))
+	       termmap:=make(map[string]TermInfo)
+	       idx:=0
+	   	for i := range segments {
+	   		if _,ok:=termmap[segments[i].Token().Text()];ok{
+	               t:=termmap[segments[i].Token().Text()]
+	               t.Tf=t.Tf+1
+	               termmap[segments[i].Token().Text()]=t
+	               continue
+	           }
+	   		t:= TermInfo{Term:segments[i].Token().Text(),Tf:1}
+	   		//terms[idx].Tf = 1//segments[i].Token().Frequency()
+	           //termmap[terms[idx].Term]=true
+	           termmap[segments[i].Token().Text()] =t
+	           //fmt.Printf("[TREM:%v,FREQ:%v] ",terms[idx].Term,terms[idx].Tf)
+	   		//idx++
+	   	}
+	       fmt.Printf("[TREM:%v] ",termmap)
+
+	       terms := make([]TermInfo, len(termmap))
+	       for _,tt:=range termmap{
+	           terms[idx] = tt
+	           idx++
+	       }
+	       //this.Segment(content,search_mode)
+	   	//fmt.Println()
+	   	return terms, len(segments)
+	*/
 }

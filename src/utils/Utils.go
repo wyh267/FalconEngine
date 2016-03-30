@@ -288,6 +288,16 @@ func Merge(a []DocIdNode, b []DocIdNode) ([]DocIdNode, bool) {
 
 }
 
+func ComputeWeight(res []DocIdNode, df int, maxdoc uint32) []DocIdNode {
+    idf:=math.Log10(float64(maxdoc)/float64(df))
+    for ia := 0; ia < len(res); ia++ {
+		res[ia].Weight = uint32(float64(res[ia].Weight) * idf )
+	}
+	return res
+    
+}
+
+
 func ComputeTfIdf(res []DocIdNode, a []DocIdNode, df int, maxdoc uint32) []DocIdNode {
 
 	for ia := 0; ia < len(a); ia++ {
@@ -309,12 +319,13 @@ func InteractionWithStartAndDf(a []DocIdNode, b []DocIdNode, start int, df int, 
 	lenc := start
 	ia := start
 	ib := 0
-
+    idf:=math.Log10(float64(maxdoc)/float64(df))
 	for ia < lena && ib < lenb {
 
 		if a[ia].Docid == b[ib].Docid {
 			a[lenc] = a[ia]
-			a[lenc].Weight += uint32((float64(a[ia].Weight) / 10000 * math.Log10(float64(maxdoc)/float64(df))) * 1000)
+            //uint32((float64(a[ia].Weight) / 10000 * idf ) * 10000)
+			a[lenc].Weight += uint32(float64(a[ia].Weight) * idf )
 			lenc++
 			ia++
 			ib++

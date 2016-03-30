@@ -494,6 +494,69 @@ func (this *Segment) GetValueWithFields(docid uint32, fields []string) (map[stri
 
 }
 
+
+
+func (this *Segment) SearchDocIds(query utils.FSSearchQuery,
+                                filteds []utils.FSSearchFilted, 
+                                bitmap *utils.Bitmap, 
+                                indocids []utils.DocIdNode) ([]utils.DocIdNode, bool) {
+                                    
+    start:=len(indocids)
+    //query查询
+     
+    docids, match := this.fields[query.FieldName].query(query.Value)
+   // this.Logger.Info("[INFO] key[%v] len:%v",query.Value,len(docids))
+    if !match {
+        return indocids, false
+    }
+    
+    indocids = append(indocids, docids...)
+    
+    //bitmap去掉数据
+	index := start
+	if filteds == nil && bitmap != nil {
+		for _, docid := range indocids[start:] {
+			//去掉bitmap删除的
+			if bitmap.GetBit(uint64(docid.Docid)) == 0 {
+				indocids[index] = docid
+				index++
+			}
+		}
+		return indocids[:index], true
+	}
+
+	//过滤操作
+	index = start
+	for _, docidinfo := range indocids[start:] {
+		match := true
+		for _, filter := range filteds {
+			if _, hasField := this.fields[filter.FieldName]; hasField {
+				if (bitmap != nil && bitmap.GetBit(uint64(docidinfo.Docid)) == 1) || 
+                (!this.fields[filter.FieldName].filter(docidinfo.Docid, filter.Type, filter.Start, filter.End)) {
+					match = false
+					break
+				}
+				this.Logger.Debug("[DEBUG] SEGMENT[%v] QUERY  %v", this.SegmentName, docidinfo)
+			} else {
+				this.Logger.Error("[ERROR] SEGMENT[%v] FILTER FIELD[%v] NOT FOUND", this.SegmentName, filter.FieldName)
+				return indocids[:start], true
+			}
+		}
+		if match {
+			indocids[index] = docidinfo
+			index++
+		}
+
+	}
+
+	
+	return indocids[:index], true
+
+
+}
+
+
+
 // SearchUnitDocIds function description : 搜索的基本单元
 // params :
 // return :
@@ -516,6 +579,7 @@ func (this *Segment) SearchUnitDocIds(querys []utils.FSSearchQuery, filteds []ut
 				return indocids[:start], false
 			}
 			docids, match := this.fields[query.FieldName].query(query.Value)
+          //  this.Logger.Info("[INFO] key[%v] len:%v",query.Value,len(docids))
 			if !match {
 				return indocids[:start], false
 			}
@@ -561,7 +625,7 @@ func (this *Segment) SearchUnitDocIds(querys []utils.FSSearchQuery, filteds []ut
 		}
 
 	}
-
+    this.Logger.Info("[INFO] ResLen[%v] ",len(indocids))
 	//bitmap去掉数据
 	index := start
 

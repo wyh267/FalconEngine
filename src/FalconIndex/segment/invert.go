@@ -81,8 +81,9 @@ func (this *invert) addDocument(docid uint32, content interface{}) error {
 		terms = strings.Split(contentstr, ";")
 	case utils.IDX_TYPE_STRING_SEG: //分词模式
 		terminfos,termcount := utils.GSegmenter.SegmentWithTf(contentstr, true)
+        //this.Logger.Info("[INFO] SegmentWithTf >>>>>>>>>>>>>>>>>>>>>>>> ")
         for _, terminfo := range terminfos {
-            
+            //this.Logger.Info("[INFO] terminfo.Term %v",terminfo.Term)
             docidNode := utils.DocIdNode{Docid:docid,Weight:uint32((float64(terminfo.Tf)/float64(termcount))*10000)}
             if _, inTmp := this.tempHashTable[terminfo.Term]; !inTmp {
                 var docidNodes []utils.DocIdNode
@@ -91,10 +92,12 @@ func (this *invert) addDocument(docid uint32, content interface{}) error {
             } else {
                 this.tempHashTable[terminfo.Term] = append(this.tempHashTable[terminfo.Term], docidNode)
             }
-            if err:=this.dict.IncValue(this.fieldName,terminfo.Term);err!=nil{
-                return err
-            }
+           /// delete by wuyinghao,不用使用字典了
+           /// if err:=this.dict.IncValue(this.fieldName,terminfo.Term);err!=nil{
+           ///     return err
+           /// }
         }
+        //this.Logger.Info("[INFO] SegmentWithTf <<<<<<<<<<<<<<<<<<<<< ")
 
         
         this.curDocId++
@@ -187,6 +190,7 @@ func (this *invert) queryTerm(keystr string) ([]utils.DocIdNode, bool) {
 		lens := this.idxMmap.ReadInt64(int64(offset))
 		//this.Logger.Info("[INFO] found  %v offset %v lens %v",keystr,offset,int(lens))
 		res := this.idxMmap.ReadDocIdsArry(uint64(offset+8), uint64(lens))
+        //this.Logger.Info("[INFO] KEY[%v] RES ::::: %v",keystr,res)
 		return res, true
 
 	}
