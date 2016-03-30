@@ -432,6 +432,49 @@ func (this *Index) SearchUnitDocIds(querys []utils.FSSearchQuery, filteds []util
 	return nil, false
 }
 
+
+func (this *Index)SearchDocIds(querys []utils.FSSearchQuery, filteds []utils.FSSearchFilted) ([]utils.DocIdNode,bool) {
+    
+    var ok bool
+    docids:= <-utils.GetDocIDsChan
+    if len(querys) >= 1 {
+        for _,segment := range this.segments {
+            docids,_ = segment.SearchDocIds(querys[0],filteds, this.bitmap, docids)
+        }
+        
+        docids = utils.ComputeWeight(docids,len(docids),this.MaxDocId)
+    }
+    
+    if len(querys) == 1 {
+        sort.Sort(utils.DocWeightSort(docids))
+        return docids,true
+    }
+    
+    for _,query := range querys[1:] {
+        
+        subdocids := <-utils.GetDocIDsChan
+        for _,segment := range this.segments {
+            subdocids,_ = segment.SearchDocIds(query,filteds, this.bitmap, subdocids)
+        }
+        
+        
+        docids,ok=utils.InteractionWithStartAndDf(docids,subdocids,0,len(subdocids),this.MaxDocId)
+        utils.GiveDocIDsChan <- subdocids
+        if !ok {
+            utils.GiveDocIDsChan <- docids
+            return nil,false
+        }
+        
+    }
+    
+    sort.Sort(utils.DocWeightSort(docids))
+    return docids,true
+    
+    
+}
+
+
+
 func (this *Index) SimpleSearch(querys []utils.FSSearchQuery, filteds []utils.FSSearchFilted, ps, pg int) ([]map[string]string, bool) {
 
     var ok bool
@@ -440,8 +483,6 @@ func (this *Index) SimpleSearch(querys []utils.FSSearchQuery, filteds []utils.FS
         for _,segment := range this.segments {
             docids,_ = segment.SearchDocIds(querys[0],filteds, this.bitmap, docids)
         }
-        
-        
         
         docids = utils.ComputeWeight(docids,len(docids),this.MaxDocId)
     }
@@ -468,6 +509,8 @@ func (this *Index) SimpleSearch(querys []utils.FSSearchQuery, filteds []utils.FS
         }
         
     }
+    
+    
 
 /*
 	//docids := make([]utils.DocIdNode, 0)

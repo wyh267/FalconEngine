@@ -18,6 +18,7 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
+	"time"
 	"unsafe"
 	"utils"
 )
@@ -28,7 +29,21 @@ const (
 	eProcessoJsonParse           string = "JSON格式解析错误"
 	eProcessoUpdateProcessorBusy string = "处理进程繁忙，请稍候提交"
 	eProcessoQueryError          string = "查询条件有问题，请检查查询条件"
+	eDefaultEngineNotFound       string = `{"status":"NotFound"}`
 )
+
+
+
+type DefaultResult struct {
+    CostTime   string `json:"costTime"`
+    PageSize   int64 `json:"pageSize"`
+    PageNum    int64 `json:"pageNumber"`
+    TotalCount int64 `json:"totalCount"`
+    Status     string `json:"status"`
+    Result     []map[string]string `json:"dataDetail"`
+}
+
+
 
 type DefaultEngine struct {
 	idxManager *IndexMgt
@@ -43,6 +58,7 @@ func NewDefaultEngine(logger *utils.Log4FE) *DefaultEngine {
 func (this *DefaultEngine) Search(method string, parms map[string]string, body []byte) (string, error) {
 
 	//this.Logger.Info("[INFO] DefaultEngine Search >>>>>>>>")
+	startTime := time.Now()
 	indexname, hasindex := parms["index"]
 	query, hasquery := parms["q"]
 	ps, hasps := parms["ps"]
@@ -52,42 +68,85 @@ func (this *DefaultEngine) Search(method string, parms map[string]string, body [
 		return "", errors.New(eProcessoParms)
 	}
 
-    terms:= utils.GSegmenter.Segment(query,false)
-    if len(terms) == 0 {
-        return "not found", nil
+	terms := utils.GSegmenter.Segment(query, false)
+	if len(terms) == 0 {
+		return eDefaultEngineNotFound, nil
+	}
+
+	searchquerys := make([]utils.FSSearchQuery, 0)
+	for _, term := range terms {
+		var queryst utils.FSSearchQuery
+		queryst.FieldName = "content"
+		queryst.Value = term
+		searchquerys = append(searchquerys, queryst)
+	}
+
+	nps, ok1 := strconv.ParseInt(ps, 0, 0)
+	npg, ok2 := strconv.ParseInt(pg, 0, 0)
+	if ok1 != nil || ok2 != nil {
+		nps = 10
+		npg = 1
+	}
+    
+    if nps <= 0 {
+        nps = 10
     }
     
-    searchquerys := make([]utils.FSSearchQuery,0)
-    for _,term:=range terms{
-        var queryst utils.FSSearchQuery
-	    queryst.FieldName = "content"
-	    queryst.Value = term
-        searchquerys=append(searchquerys,queryst)
+    if npg <= 0 {
+        npg = 1
     }
+    
 
-	nps, ok := strconv.ParseInt(ps, 0, 0)
-	npg, ok := strconv.ParseInt(pg, 0, 0)
-	if ok != nil {
-		return "", errors.New(eProcessoParms)
-	}
+	indexer := this.idxManager.GetIndex(indexname)
 
 	//this.queryAnalyse(searchunit)
+	docids, found := indexer.SearchDocIds(searchquerys, nil)
 
-	res, ok1 := this.idxManager.Search(indexname,searchquerys , nil, int(nps), int(npg))
-	if !ok1 {
-		return "not found", nil
+	if !found {
+		return eDefaultEngineNotFound, nil
 	}
 
-	r, err := json.Marshal(res)
+	lens := int64(len(docids))
+
+	start := nps * (npg - 1)
+	end := nps * npg
+
+    if start >= lens {
+        return eDefaultEngineNotFound, nil
+    }
+
+	if end >= lens {
+		end = lens
+	}
+
+    var defaultResult DefaultResult
+
+	defaultResult.Result = make([]map[string]string, 0)
+	for _, docid := range docids[start:end] {
+		val, ok := indexer.GetDocument(docid.Docid)
+		if ok {
+			defaultResult.Result = append(defaultResult.Result, val)
+		}
+	}
+	utils.GiveDocIDsChan <- docids
+    
+    endTime := time.Now()
+    defaultResult.CostTime = fmt.Sprintf("%v", endTime.Sub(startTime))
+    defaultResult.PageNum = npg
+    defaultResult.PageSize = nps
+    defaultResult.Status = "Found"
+    defaultResult.TotalCount = lens
+    
+    
+	r, err := json.Marshal(defaultResult)
 	if err != nil {
-		return "", err
+		return eDefaultEngineNotFound, err
 	}
 
 	bh := (*reflect.SliceHeader)(unsafe.Pointer(&r))
-    sh := reflect.StringHeader{bh.Data, bh.Len}
-    return *(*string)(unsafe.Pointer(&sh)),nil
+	sh := reflect.StringHeader{bh.Data, bh.Len}
+	return *(*string)(unsafe.Pointer(&sh)), nil
 
-	//return string(r), nil
 
 }
 
