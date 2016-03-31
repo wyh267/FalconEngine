@@ -2,52 +2,51 @@
 
 项目地址是：[https://github.com/wyh267/FalconEngine](https://github.com/wyh267/FalconEngine)
 
+## 注意：：：：：项目完全重构，代码基本完成，README稍后完成全部更新
 
 对搜索引擎感兴趣的可以去看看[这本书](http://www.amazon.cn/%E8%BF%99%E5%B0%B1%E6%98%AF%E6%90%9C%E7%B4%A2%E5%BC%95%E6%93%8E-%E6%A0%B8%E5%BF%83%E6%8A%80%E6%9C%AF%E8%AF%A6%E8%A7%A3-%E5%BC%A0%E4%BF%8A%E6%9E%97/dp/B006J9MSD8)，比较浅并且也比较完整的介绍了一个搜索引擎的全部机能。
 
-我的这个搜索引擎原始数据是MySql数据库的，大家可以根据需要进行二次开发，用来支持其他数据库或者本地文件，Detail文件是存储在Redis数据库中，同样这部分也可以根据自己的需要二次开发，使用本地文件或者其他数据库，倒排索引和正排索引本地存储的时候使用的json格式，比较耗磁盘，第一版暂时这样了吧，后续再做优化。
 
 ## 更新列表
   - 去掉Redis,使用本地文件存储所有数据
   - 使用mmap形式进行数据存储
-  - 去掉json格式，太慢了，使用二进制方式存储所有索引和正排文件
   - 可以持久化增量更新，服务挂掉以后数据可以持久化保持
   - 使用go语言自带的map代替我自己实现的hashmap
   - Bitmap可以持久化到本地磁盘，也使用mmap的形式进行加载
-  - 正排字段的判断使用插件的形式进行开发，可以自定义正排字段的判断方法
+  - 实时索引，随时进行索引更新
+  - 使用B+树进行词典的存储
+  - 主键单独用B+树进行存储
+  - 支持搜索，过滤，汇总，统计
+  - 支持连表查询，多个索引互相依赖的查询（还未提交）
+  - 分段进行序列化
+  - 索引不需要先生成一份全量数据，可以启动以后随时更新数据，类似ES
+  - 去掉配置文件
+  - 增加排序模块，按照相关性进行排序
   
 ## TODO列表
-  - 索引不需要先生成一份全量数据，可以启动以后随时更新数据，类似ES
   - 增加选项，可以一次性将所有数据加载进内存
-  - 修改配置文件格式为json格式，方便阅读
   - 索引分片
   - 分布式部署，保存多个副本
   - 集群化搜索引擎
-  - 增加排序模块，按照相关性进行排序
 
 ## 性能测试
-  - 暂无
+  - 进行中
 
 ## 使用方法
 ### 依赖以下几个库
 - [github.com/apsdehal/go-logger](https://github.com/apsdehal/go-logger) log文件
-- [github.com/ewangplay/config](https://github.com/ewangplay/config) 配置文件解析
-- [github.com/go-sql-driver/mysql](https://github.com/go-sql-driver/mysql) mysql驱动
-- [github.com/garyburd/redigo/redis](https://github.com/garyburd/redigo/redis) Redis驱动（已经不用了）
 - [github.com/huichen/sego](https://github.com/huichen/sego) 分词器，作者[主页](https://github.com/huichen)非常感谢他的分析器，他主页上也有个搜索引擎，没看具体实现，大家感兴趣可以去看看。
 
 ### 编译
 - 直接运行`install.sh`
 
 ### 运行
-- 从[github.com/huichen/sego](https://github.com/huichen/sego)获取分词的字典文件
-- 运行索引器，会将索引文件生成到index目录下
+- 从[github.com/huichen/sego](https://github.com/huichen/sego)获取分词的字典文件,存入当前目录的'data'下
+- 新建index文件夹
+- 运行
+> bin/FalconEngine  【默认端口9990】
 
-> bin/FalconEngine -mode=build
-
-- 运行搜索器
-
-> bin/FalconEngine -mode=search
+- 根据http的API进行数据更新和查询
 
 
 ## 基本概念
@@ -101,28 +100,8 @@
 
 正排索引就是一个数组，数组的下标就是`DocId`，文件中的`NumberProfile.go`和`TextProfile.go`是具体的实现文件
 
-### Detail文件
-
-Detail文件使用的是Redis实现的，没有具体的数据结构，实际上就是以主键ID为key来实现的。
 
 ## 增量更新
-
-增量更新使用的是扫描mysql中的一个`last_modify_time`字段，获取数据，然后和`redis`中的数据进行对比，如果更新了就添加到索引中，添加索引按照如下的步骤进行
-
-- 如果是正排字段更新，并且不是新增的数据，只是原来的数据修改
-	- 直接更新DocId对应下标的数据
-
-- 如果是正排字段更新，但是是新增的数据
-	- 新增一个DocId并添加到正排文件的后面
-
-- 如果是倒排字段更新
-	- 将原始的DocId从`BitMap`中删除
-	- 新增一个DocId并添加到倒排文件的后面
-
-因为DocId是连续的，倒排字段更新的话，要修改倒排链表，而目前的倒排链表是数组的，所以直接建立一个BitMap，将对应的DocId删除，后续改成链表形式的话，可以动态的删除。
-
-增量更新使用的一个go的协程来做的，扫描的是数据库字段，后续可以改成从`kafka`获取数据或者其他方式获取增量更新
-
 
 ## 数据检索
 
@@ -133,17 +112,9 @@ Detail文件使用的是Redis实现的，没有具体的数据结构，实际上
 - 最后得到的DocId按照正排文件的条件进行过滤操作，获取最终的DocId链
 - 通过DocId反查出文档的真实ID，并通过Redis获取文档的详细信息用于显示
 
-文件中的`IndexSet.go`主要实现了上述步骤
 
 ## 代码架构说明
 
 ### 模块图
-![API](./API.png)
-
-### 索引器代码架构
-![架构图](./indexer.png)
-
-### 搜索器代码架构
-![架构图](./searcher.png)
 
 ## 部署说明
