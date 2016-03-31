@@ -95,32 +95,27 @@ func (this *IndexMgt) AddField(indexname string, field utils.SimpleFieldInfo) er
 	return this.indexers[indexname].AddField(field)
 }
 
-
-
 func (this *IndexMgt) storeStruct() error {
-    metaFileName := fmt.Sprintf("%v%v.mgt.meta", utils.IDX_ROOT_PATH, utils.FALCONSEARCHERNAME)
+	metaFileName := fmt.Sprintf("%v%v.mgt.meta", utils.IDX_ROOT_PATH, utils.FALCONSEARCHERNAME)
 	if err := utils.WriteToJson(this, metaFileName); err != nil {
 		return err
 	}
 	return nil
 }
 
+func (this *IndexMgt) updateDocument(indexname string, document map[string]string) (string, error) {
 
-
-func (this *IndexMgt) updateDocument(indexname string,document map[string]string) (string, error) {
- 
-    if _, ok := this.indexers[indexname]; !ok {
+	if _, ok := this.indexers[indexname]; !ok {
 		this.Logger.Error("[ERROR] index[%v] not found", indexname)
-		return "",fmt.Errorf("[ERROR] index[%v] not found", indexname)
+		return "", fmt.Errorf("[ERROR] index[%v] not found", indexname)
 	}
 
-	return "{ \"status\":\"OK\" }",this.indexers[indexname].UpdateDocument(document)   
+	return "{ \"status\":\"OK\" }", this.indexers[indexname].UpdateDocument(document)
 }
 
-
 func (this *IndexMgt) sync(indexname string) error {
- 
-    if _, ok := this.indexers[indexname]; !ok {
+
+	if _, ok := this.indexers[indexname]; !ok {
 		this.Logger.Error("[ERROR] index[%v] not found", indexname)
 		return fmt.Errorf("[ERROR] index[%v] not found", indexname)
 	}
@@ -128,10 +123,9 @@ func (this *IndexMgt) sync(indexname string) error {
 	return this.indexers[indexname].SyncMemorySegment()
 }
 
-
 func (this *IndexMgt) mergeIndex(indexname string) error {
- 
-    if _, ok := this.indexers[indexname]; !ok {
+
+	if _, ok := this.indexers[indexname]; !ok {
 		this.Logger.Error("[ERROR] index[%v] not found", indexname)
 		return fmt.Errorf("[ERROR] index[%v] not found", indexname)
 	}
@@ -139,42 +133,34 @@ func (this *IndexMgt) mergeIndex(indexname string) error {
 	return this.indexers[indexname].MergeSegments()
 }
 
+func (this *IndexMgt) Search(indexname string, querys []utils.FSSearchQuery, filters []utils.FSSearchFilted, ps, pg int) ([]map[string]string, bool) {
 
-
-func (this *IndexMgt) Search(indexname string,querys []utils.FSSearchQuery,filters []utils.FSSearchFilted,ps,pg int) ([]map[string]string,bool) {
- 
-    if _, ok := this.indexers[indexname]; !ok {
+	if _, ok := this.indexers[indexname]; !ok {
 		this.Logger.Error("[ERROR] index[%v] not found", indexname)
-		return nil,false//fmt.Errorf("[ERROR] index[%v] not found", indexname)
+		return nil, false //fmt.Errorf("[ERROR] index[%v] not found", indexname)
 	}
 
-	return this.indexers[indexname].SimpleSearch(querys,filters,ps,pg)
+	return this.indexers[indexname].SimpleSearch(querys, filters, ps, pg)
 }
-
-
 
 func (this *IndexMgt) searchDocIds(indexname string,
-                                   querys []utils.FSSearchQuery,
-                                   filters []utils.FSSearchFilted) ([]utils.DocIdNode,bool) {
-                                       
-                                       
-    if _,ok := this.indexers[indexname]; !ok {
-		this.Logger.Error("[ERROR] index[%v] not found", indexname)
-		return nil,false//fmt.Errorf("[ERROR] index[%v] not found", indexname)
-	}
-    
-    return this.indexers[indexname].SearchDocIds(querys,filters)                                    
+	querys []utils.FSSearchQuery,
+	filters []utils.FSSearchFilted) ([]utils.DocIdNode, bool) {
 
+	if _, ok := this.indexers[indexname]; !ok {
+		this.Logger.Error("[ERROR] index[%v] not found", indexname)
+		return nil, false //fmt.Errorf("[ERROR] index[%v] not found", indexname)
+	}
+
+	return this.indexers[indexname].SearchDocIds(querys, filters)
 
 }
 
-
-
 func (this *IndexMgt) GetIndex(indexname string) *fi.Index {
-     if _,ok := this.indexers[indexname]; !ok {
+	if _, ok := this.indexers[indexname]; !ok {
 		this.Logger.Error("[ERROR] index[%v] not found", indexname)
-		return nil//fmt.Errorf("[ERROR] index[%v] not found", indexname)
+		return nil //fmt.Errorf("[ERROR] index[%v] not found", indexname)
 	}
-    
-    return this.indexers[indexname]
+
+	return this.indexers[indexname]
 }
