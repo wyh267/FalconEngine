@@ -1,9 +1,13 @@
 package utils
 
 import (
+
+	"errors"
 	"fmt"
 	"os"
+	"reflect"
 	"syscall"
+	"unsafe"
 )
 
 // 暂时只支持 1 << 32 位（可以扩展到 1 << 64)
@@ -23,11 +27,11 @@ type Bitmap struct {
 }
 
 // NewBitmap 使用默认容量实例化一个 Bitmap
-func NewBitmap() *Bitmap {
-	return NewBitmapSize(BitmapSize)
+func NewBitmap(indexname string) *Bitmap {
+	return NewBitmapSize(BitmapSize, indexname)
 }
 
-func MakeBitmapFile() error {
+func MakeBitmapFile(indexname string) error {
 	size := BitmapSize
 	if size == 0 || size > BitmapSize {
 		size = BitmapSize
@@ -35,8 +39,8 @@ func MakeBitmapFile() error {
 		size += 8 - remainder
 	}
 
-	file_name := "./index/bitmap.bit"
-	fout, err := os.Create(file_name)
+	//file_name := fmt.Sprintf("%v/_bitmap.%v.bit", IDX_ROOT_PATH, indexname)
+	fout, err := os.Create(indexname)
 	defer fout.Close()
 	if err != nil {
 		return err
@@ -52,7 +56,7 @@ func MakeBitmapFile() error {
 }
 
 // NewBitmapSize 根据指定的 size 实例化一个 Bitmap
-func NewBitmapSize(size int) *Bitmap {
+func NewBitmapSize(size int, indexname string) *Bitmap {
 	if size == 0 || size > BitmapSize {
 		size = BitmapSize
 	} else if remainder := size % 8; remainder != 0 {
@@ -60,7 +64,7 @@ func NewBitmapSize(size int) *Bitmap {
 	}
 	this := &Bitmap{Data: make([]byte, size>>3), BitSize: uint64(size - 1)}
 
-	this.ReadBitmapFile()
+	this.ReadBitmapFile(indexname)
 	return this
 	//return &Bitmap{Data: make([]byte, size>>3), BitSize: uint64(size - 1)}
 }
@@ -124,12 +128,14 @@ func (this *Bitmap) String() string {
 	return fmt.Sprintf("%v", numSlice)
 }
 
-func (this *Bitmap) ReadBitmapFile() error {
 
-	f, err := os.OpenFile("./index/bitmap.bit", os.O_RDWR, 0664)
+func (this *Bitmap) ReadBitmapFile(indexname string) error {
+
+	f, err := os.OpenFile(indexname, os.O_RDWR, 0664)
 	if err != nil {
 		return err
 	}
+    defer f.Close()
 	fi, err := f.Stat()
 	if err != nil {
 		fmt.Printf("ERR:%v", err)
@@ -140,7 +146,26 @@ func (this *Bitmap) ReadBitmapFile() error {
 		fmt.Printf("MAPPING ERROR  %v \n", err)
 		return err
 	}
-
+    
 	return nil
 
+}
+
+func (this *Bitmap) Sync() error {
+	dh := (*reflect.SliceHeader)(unsafe.Pointer(&this.Data))
+	_, _, err := syscall.Syscall(syscall.SYS_MSYNC, dh.Data, uintptr(dh.Len), syscall.MS_SYNC)
+	if err != 0 {
+		fmt.Printf("Sync Error ")
+		return errors.New("Sync Error")
+	}
+	return nil
+}
+
+
+
+func (this *Bitmap) Destroy(indexbitmapname string) error {
+    
+    syscall.Munmap(this.Data)
+	os.Remove(indexbitmapname)
+	return nil
 }

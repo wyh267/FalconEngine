@@ -1,6 +1,6 @@
 #!/bin/sh
-
-nohup ./bin/FalconEngine &
+sh install.sh
+./bin/FalconSearch
 
 
 

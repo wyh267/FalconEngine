@@ -10,13 +10,14 @@
 package utils
 
 import (
+	//"bytes"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"os"
-	"syscall"
 	"reflect"
+	"syscall"
 	"unsafe"
-	"errors"
 )
 
 type Mmap struct {
@@ -33,6 +34,8 @@ const (
 	MODE_APPEND = iota
 	MODE_CREATE
 )
+
+
 
 func NewMmap(file_name string, mode int) (*Mmap, error) {
 
@@ -130,6 +133,31 @@ func (this *Mmap) ReadInt64(start int64) int64 {
 	return int64(binary.LittleEndian.Uint64(this.MmapBytes[start : start+8]))
 }
 
+func (this *Mmap) ReadUInt64(start uint64) uint64 {
+
+	return binary.LittleEndian.Uint64(this.MmapBytes[start : start+8])
+}
+
+func (this *Mmap) ReadUInt64Arry(start, len uint64) []DocIdNode {
+
+	arry := *(*[]DocIdNode)(unsafe.Pointer(&reflect.SliceHeader{
+		Data: uintptr(unsafe.Pointer(&this.MmapBytes[start])),
+		Len:  int(len),
+		Cap:  int(len),
+	}))
+	return arry
+}
+
+func (this *Mmap) ReadDocIdsArry(start, len uint64) []DocIdNode {
+
+	arry := *(*[]DocIdNode)(unsafe.Pointer(&reflect.SliceHeader{
+		Data: uintptr(unsafe.Pointer(&this.MmapBytes[start])),
+		Len:  int(len),
+		Cap:  int(len),
+	}))
+	return arry
+}
+
 func (this *Mmap) ReadString(start, lens int64) string {
 
 	return string(this.MmapBytes[start : start+lens])
@@ -141,27 +169,24 @@ func (this *Mmap) Read(start, end int64) []byte {
 }
 
 
+func (this *Mmap) Write(start int64,buffer []byte) error {
+
+    copy(this.MmapBytes[start:int(start)+len(buffer)],buffer)
+
+	return nil//this.MmapBytes[start:end]
+}
 
 
 
+func (this *Mmap) WriteUInt64(start int64, value uint64) error {
 
+	binary.LittleEndian.PutUint64(this.MmapBytes[start:start+8], uint64(value))
 
-
-
-
+	return nil //this.Sync()
+}
 
 func (this *Mmap) WriteInt64(start, value int64) error {
-	/*
-		if err:=this.checkFileCap(start,8);err!= nil {
-			return err
-		}
-	*/
-	//if this.isEndOfFile(start)==false{
 	binary.LittleEndian.PutUint64(this.MmapBytes[start:start+8], uint64(value))
-	//}else{
-	//	this.AppendInt64(value)
-	//}
-
 	return nil //this.Sync()
 }
 
@@ -170,8 +195,18 @@ func (this *Mmap) AppendInt64(value int64) error {
 	if err := this.checkFilePointer(8); err != nil {
 		return err
 	}
-
 	binary.LittleEndian.PutUint64(this.MmapBytes[this.FilePointer:this.FilePointer+8], uint64(value))
+	this.FilePointer += 8
+	return nil //this.Sync()
+}
+
+func (this *Mmap) AppendUInt64(value uint64) error {
+
+	if err := this.checkFilePointer(8); err != nil {
+		return err
+	}
+
+	binary.LittleEndian.PutUint64(this.MmapBytes[this.FilePointer:this.FilePointer+8], value)
 	this.FilePointer += 8
 	return nil //this.Sync()
 }
@@ -227,20 +262,45 @@ func (this *Mmap) GetPointer() int64 {
 	return this.FilePointer
 }
 
-
-
 func (this *Mmap) header() *reflect.SliceHeader {
 	return (*reflect.SliceHeader)(unsafe.Pointer(&this.MmapBytes))
 }
 
-
-
 func (this *Mmap) Sync() error {
-	dh:= this.header()
-	_,_,err:= syscall.Syscall(syscall.SYS_MSYNC,dh.Data,uintptr(dh.Len),syscall.MS_SYNC)
+	dh := this.header()
+	_, _, err := syscall.Syscall(syscall.SYS_MSYNC, dh.Data, uintptr(dh.Len), syscall.MS_SYNC)
 	if err != 0 {
 		fmt.Printf("Sync Error ")
 		return errors.New("Sync Error")
 	}
-	return nil	
+	return nil
+}
+
+func (this *Mmap) AppendStringWith32Bytes(value string, lens int64) error {
+
+	err := this.AppendInt64(lens)
+	if err != nil {
+		return err
+	}
+	if err := this.checkFilePointer(32); err != nil {
+		return err
+	}
+	dst := this.MmapBytes[this.FilePointer : this.FilePointer+32]
+	copy(dst, value)
+	this.FilePointer += 32
+	return nil //this.Sync()
+}
+
+func (this *Mmap) ReadStringWith32Bytes(start int64) string {
+
+	lens := this.ReadInt64(start)
+	return this.ReadString(start+8, lens)
+
+}
+
+func (this *Mmap) WriteStringWith32Bytes(start int64, value string, lens int64) error {
+
+	this.WriteInt64(start, lens)
+	this.WriteBytes(start+4, []byte(value))
+	return nil
 }

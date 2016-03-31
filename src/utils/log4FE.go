@@ -2,10 +2,10 @@ package utils
 
 import (
 	"fmt"
-	"github.com/apsdehal/go-logger"
 	"os"
 	"path"
 	"runtime"
+	"github.com/apsdehal/go-logger"
 )
 
 type Log4FE struct {
@@ -84,9 +84,9 @@ func (this *Log4FE) Info(format string, args ...interface{}) (err error) {
 }
 
 func (this *Log4FE) Debug(format string, args ...interface{}) (err error) {
-	return this.log("DEBUG", format, args...)
+	return //this.log("DEBUG", format, args...)
 }
 
 func (this *Log4FE) Trace(format string, args ...interface{}) (err error) {
-	return this.log("TRACE", format, args...)
+	return //this.log("TRACE", format, args...)
 }

@@ -1,3 +1,3 @@
 #!/bin/sh
 
-killall FalconEngine
+killall FalconSearch

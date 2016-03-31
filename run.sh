@@ -7,8 +7,12 @@
 #!/bin/sh
 sh install.sh
 rm -rf ./index/*
+<<<<<<< HEAD
 
 ./bin/FalconEngine -mode=build
 ./bin/FalconEngine
+=======
+./bin/FalconSearch
+>>>>>>> origin/new_searcher
 
 

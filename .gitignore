@@ -3,12 +3,12 @@
 *github.com*
 *bin/
 *pkg/
-*index/
+index/*
 *data/
 *.log*
 *.json*
 *.dat*
 *.sql*
-*jzlservice/
 .DS_Store
 nohup.out
+*.log

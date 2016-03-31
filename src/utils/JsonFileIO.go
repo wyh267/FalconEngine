@@ -11,24 +11,21 @@ package utils
 
 import (
 	"encoding/json"
-	"os"
 	"io/ioutil"
+	"os"
 	//"sort"
 	"fmt"
 )
 
 
-/*****************************************************************************
-*  function name : WriteToJson
-*  params : interface to tran json ,file_name
-*  return : error
-*
-*  description :  write any struct to json and store to the disk
-*
-******************************************************************************/
+
+
+// WriteToJson function description : 写入json文件
+// params :
+// return :
 func WriteToJson(data interface{}, file_name string) error {
 
-	fmt.Printf("Writing to File [%v]...\n", file_name)
+	//fmt.Printf("Writing to File [%v]...\n", file_name)
 	info_json, err := json.Marshal(data)
 	if err != nil {
 		fmt.Printf("Marshal err %v\n", file_name)
@@ -46,14 +43,11 @@ func WriteToJson(data interface{}, file_name string) error {
 
 }
 
-/*****************************************************************************
-*  function name : ReadFromJson
-*  params : file name
-*  return : all the file content for bytes
-*
-*  description : read bytes in file
-*
-******************************************************************************/
+
+
+// ReadFromJson function description : 读取json文件
+// params :
+// return :
 func ReadFromJson(file_name string) ([]byte, error) {
 
 	fin, err := os.Open(file_name)
