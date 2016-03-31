@@ -133,15 +133,6 @@ func (this *IndexMgt) mergeIndex(indexname string) error {
 	return this.indexers[indexname].MergeSegments()
 }
 
-func (this *IndexMgt) Search(indexname string, querys []utils.FSSearchQuery, filters []utils.FSSearchFilted, ps, pg int) ([]map[string]string, bool) {
-
-	if _, ok := this.indexers[indexname]; !ok {
-		this.Logger.Error("[ERROR] index[%v] not found", indexname)
-		return nil, false //fmt.Errorf("[ERROR] index[%v] not found", indexname)
-	}
-
-	return this.indexers[indexname].SimpleSearch(querys, filters, ps, pg)
-}
 
 func (this *IndexMgt) searchDocIds(indexname string,
 	querys []utils.FSSearchQuery,

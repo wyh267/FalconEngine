@@ -3,7 +3,7 @@
  *  author : Wu Yinghao
  *  email  : wyh817@gmail.com
  *
- *  file description : 数据层之上的引擎层
+ *  file description : 数据层之上的引擎层,都需要实现引擎的接口
  *
 ******************************************************************************/
 
@@ -16,6 +16,7 @@ import (
 	"fmt"
 	"os"
 	"reflect"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -35,14 +36,13 @@ const (
 )
 
 type DefaultResult struct {
-	TotalCount int64               `json:"totalCount"`
-	PageSize   int64               `json:"pageSize"`
-	PageNum    int64               `json:"pageNumber"`
-	Status     string              `json:"status"`
-    CostTime   string              `json:"costTime"`
-    Gater      map[string]map[string]int `json:"Gaters"`
-	Result     []map[string]string `json:"dataDetail"`
-    
+	TotalCount int64                     `json:"totalCount"`
+	PageSize   int64                     `json:"pageSize"`
+	PageNum    int64                     `json:"pageNumber"`
+	Status     string                    `json:"status"`
+	CostTime   string                    `json:"costTime"`
+	Gater      map[string]map[string]int `json:"Gaters"`
+	Result     []map[string]string       `json:"dataDetail"`
 }
 
 type DefaultEngine struct {
@@ -59,29 +59,31 @@ func (this *DefaultEngine) Search(method string, parms map[string]string, body [
 
 	//this.Logger.Info("[INFO] DefaultEngine Search >>>>>>>>")
 	var shows []string
-    startTime := time.Now()
+	startTime := time.Now()
 	indexname, hasindex := parms["index"]
 	query, hasquery := parms["q"]
 	ps, hasps := parms["ps"]
 	pg, haspg := parms["pg"]
-    show,hasshow := parms["show"]
-    gater,hasgater := parms["gater"]
-    
+	show, hasshow := parms["show"]
+	gater, hasgater := parms["gater"]
+	sortfield, hassort := parms["sort"]
 
 	if !hasindex || !hasquery || !haspg || !hasps {
 		return "", errors.New(eProcessoParms)
 	}
     
-    indexer := this.idxManager.GetIndex(indexname)
-    if indexer == nil {
-        return "",errors.New(eDefaultEngineNotFound)
-    }
-    
-    if !hasshow {
-        shows = indexer.GetFields()
-    }else{
-        shows = strings.Split(show,",")
-    }
+    this.Logger.Info("[INFO] parms %v",parms)
+
+	indexer := this.idxManager.GetIndex(indexname)
+	if indexer == nil {
+		return "", errors.New(eDefaultEngineNotFound)
+	}
+
+	if !hasshow {
+		shows = indexer.GetFields()
+	} else {
+		shows = strings.Split(show, ",")
+	}
 
 	terms := utils.GSegmenter.Segment(query, false)
 	if len(terms) == 0 {
@@ -112,10 +114,104 @@ func (this *DefaultEngine) Search(method string, parms map[string]string, body [
 		npg = 1
 	}
 
-	
+    searchfilters := make([]utils.FSSearchFilted, 0)
+    
+    for k,v := range parms {
+        switch k[0] {
+        case '-':
+            ftype,ok:=indexer.GetFieldType(k[1:])
+            if ok {
+                if ftype==utils.IDX_TYPE_NUMBER{
+                    start,err:=strconv.ParseInt(v,0,0)
+                    if err!=nil{
+                        continue
+                    }
+                    searchfilters=append(searchfilters,utils.FSSearchFilted{FieldName:k[1:],
+                                                                            Type:utils.FILT_EQ,
+                                                                            Start:start})
+                }else if ftype ==utils.IDX_TYPE_DATE {
+                    timestmp,err:=utils.IsDateTime(v)
+                    if err!=nil{
+                        continue
+                    }
+                    searchfilters=append(searchfilters,utils.FSSearchFilted{FieldName:k[1:],
+                                                                            Type:utils.FILT_EQ,
+                                                                            Start:timestmp})
+               }
+            }
+        case '>':
+            ftype,ok:=indexer.GetFieldType(k[1:])
+            if ok {
+                if ftype==utils.IDX_TYPE_NUMBER{
+                    start,err:=strconv.ParseInt(v,0,0)
+                    if err!=nil{
+                        continue
+                    }
+                    searchfilters=append(searchfilters,utils.FSSearchFilted{FieldName:k[1:],
+                                                                            Type:utils.FILT_OVER,
+                                                                            Start:start})
+                }else if ftype ==utils.IDX_TYPE_DATE {
+                    timestmp,err:=utils.IsDateTime(v)
+                    if err!=nil{
+                        continue
+                    }
+                    searchfilters=append(searchfilters,utils.FSSearchFilted{FieldName:k[1:],
+                                                                            Type:utils.FILT_OVER,
+                                                                            Start:timestmp})
+               }
+            }
+        case '<':
+            ftype,ok:=indexer.GetFieldType(k[1:])
+            if ok {
+                if ftype==utils.IDX_TYPE_NUMBER{
+                    start,err:=strconv.ParseInt(v,0,0)
+                    if err!=nil{
+                        continue
+                    }
+                    searchfilters=append(searchfilters,utils.FSSearchFilted{FieldName:k[1:],
+                                                                            Type:utils.FILT_LESS,
+                                                                            Start:start})
+                }else if ftype ==utils.IDX_TYPE_DATE {
+                    timestmp,err:=utils.IsDateTime(v)
+                    if err!=nil{
+                        continue
+                    }
+                    searchfilters=append(searchfilters,utils.FSSearchFilted{FieldName:k[1:],
+                                                                            Type:utils.FILT_LESS,
+                                                                            Start:timestmp})
+               }
+            }
+        case '~':
+            ftype,ok:=indexer.GetFieldType(k[1:])
+            if ok {
+                if ftype==utils.IDX_TYPE_NUMBER{
+                    start,err:=strconv.ParseInt(v,0,0)
+                    if err!=nil{
+                        continue
+                    }
+                    searchfilters=append(searchfilters,utils.FSSearchFilted{FieldName:k[1:],
+                                                                            Type:utils.FILT_EQ,
+                                                                            Start:start})
+                }else if ftype ==utils.IDX_TYPE_DATE {
+                    timestmp,err:=utils.IsDateTime(v)
+                    if err!=nil{
+                        continue
+                    }
+                    searchfilters=append(searchfilters,utils.FSSearchFilted{FieldName:k[1:],
+                                                                            Type:utils.FILT_EQ,
+                                                                            Start:timestmp})
+               }
+            }
+        }
+        
+        
+        
+    }
+    
+    this.Logger.Info("[INFO] fileter %v",searchfilters)
 
 	//this.queryAnalyse(searchunit)
-	docids, found := indexer.SearchDocIds(searchquerys, nil)
+	docids, found := indexer.SearchDocIds(searchquerys, searchfilters)
 
 	if !found {
 		return eDefaultEngineNotFound, nil
@@ -134,16 +230,19 @@ func (this *DefaultEngine) Search(method string, parms map[string]string, body [
 		end = lens
 	}
 
+	if !(hassort && sortfield == "false") {
+		sort.Sort(utils.DocWeightSort(docids))
+	}
+
 	var defaultResult DefaultResult
 
 	defaultResult.Result = make([]map[string]string, 0)
 	for _, docid := range docids[start:end] {
-		val, ok := indexer.GetDocumentWithFields(docid.Docid,shows)
+		val, ok := indexer.GetDocumentWithFields(docid.Docid, shows)
 		if ok {
 			defaultResult.Result = append(defaultResult.Result, val)
 		}
 	}
-	
 
 	endTime := time.Now()
 	defaultResult.CostTime = fmt.Sprintf("%v", endTime.Sub(startTime))
@@ -151,13 +250,12 @@ func (this *DefaultEngine) Search(method string, parms map[string]string, body [
 	defaultResult.PageSize = nps
 	defaultResult.Status = "OK"
 	defaultResult.TotalCount = lens
-    if hasgater{
-        gaters:=strings.Split(gater,",")
-        defaultResult.Gater = indexer.GatherFields(docids,gaters)
-    }
-    
-    
-    utils.GiveDocIDsChan <- docids
+	if hasgater {
+		gaters := strings.Split(gater, ",")
+		defaultResult.Gater = indexer.GatherFields(docids, gaters)
+	}
+
+	utils.GiveDocIDsChan <- docids
 	r, err := json.Marshal(defaultResult)
 	if err != nil {
 		return eDefaultEngineNotFound, err
@@ -200,13 +298,6 @@ func (this *DefaultEngine) AddField(indexname string, field utils.SimpleFieldInf
 
 }
 
-func (this *DefaultEngine) queryAnalyse(query utils.FSSearchFrontend) utils.FSSearchUnit {
-
-	var unit utils.FSSearchUnit
-
-	return unit
-
-}
 
 func (this *DefaultEngine) UpdateDocument(method string, parms map[string]string, body []byte) (string, error) {
 	indexname, hasindex := parms["index"]

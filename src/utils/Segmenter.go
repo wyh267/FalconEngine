@@ -65,37 +65,5 @@ func (this *Segmenter) SegmentWithTf(content string, search_mode bool) ([]TermIn
 	//fmt.Printf("[TREMSSSSS::::%v] ",resterms)
 	return resterms, len(terms)
 
-	/*
-	   	segments := this.segmenter.Segment([]byte(content))
-	   	if len(segments) == 0 {
-	   		return nil, 0
-	   	}
-	   	//terms := make([]TermInfo, len(segments))
-	       termmap:=make(map[string]TermInfo)
-	       idx:=0
-	   	for i := range segments {
-	   		if _,ok:=termmap[segments[i].Token().Text()];ok{
-	               t:=termmap[segments[i].Token().Text()]
-	               t.Tf=t.Tf+1
-	               termmap[segments[i].Token().Text()]=t
-	               continue
-	           }
-	   		t:= TermInfo{Term:segments[i].Token().Text(),Tf:1}
-	   		//terms[idx].Tf = 1//segments[i].Token().Frequency()
-	           //termmap[terms[idx].Term]=true
-	           termmap[segments[i].Token().Text()] =t
-	           //fmt.Printf("[TREM:%v,FREQ:%v] ",terms[idx].Term,terms[idx].Tf)
-	   		//idx++
-	   	}
-	       fmt.Printf("[TREM:%v] ",termmap)
-
-	       terms := make([]TermInfo, len(termmap))
-	       for _,tt:=range termmap{
-	           terms[idx] = tt
-	           idx++
-	       }
-	       //this.Segment(content,search_mode)
-	   	//fmt.Println()
-	   	return terms, len(segments)
-	*/
+	
 }

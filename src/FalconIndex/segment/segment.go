@@ -494,7 +494,38 @@ func (this *Segment) GetValueWithFields(docid uint32, fields []string) (map[stri
 
 }
 
-
+/*
+func (this *Segment)SearchCrossFieldsDocIds(query utils.FSSearchCrossFieldsQuery, 
+                                            filteds []utils.FSSearchFilted,
+                                            bitmap *utils.Bitmap, 
+                                            indocids []utils.DocIdNode,) ([]utils.DocIdNode,bool) {
+ 
+    start:=len(indocids)
+    var fn string
+    //query查询
+     
+    for _,fieldname := range query.FieldNames{
+        docids, match := this.fields[fieldname].query(query.Value)
+        if match {
+            fn = fieldname
+            break
+        }
+    }
+    if len(fn)==0{
+        return indocids, false
+    }
+    
+    indocids = append(indocids, docids...)
+    
+    
+    
+    docids, match := this.fields[query.FieldName].query(query.Value)
+ 
+ 
+ 
+ 
+}
+*/
 
 func (this *Segment) SearchDocIds(query utils.FSSearchQuery,
                                 filteds []utils.FSSearchFilted, 
@@ -531,14 +562,19 @@ func (this *Segment) SearchDocIds(query utils.FSSearchQuery,
 		match := true
 		for _, filter := range filteds {
 			if _, hasField := this.fields[filter.FieldName]; hasField {
-				if (bitmap != nil && bitmap.GetBit(uint64(docidinfo.Docid)) == 1) || 
-                (!this.fields[filter.FieldName].filter(docidinfo.Docid, filter.Type, filter.Start, filter.End)) {
-					match = false
+				if  bitmap.GetBit(uint64(docidinfo.Docid)) == 1{
+                    this.Logger.Debug("[INFO] bitmap fail",)
+                    match = false
+                    break
+                } 
+                if !this.fields[filter.FieldName].filter(docidinfo.Docid, filter.Type, filter.Start, filter.End) {
+					this.Logger.Debug("[INFO] not match %v",filter.FieldName)
+                    match = false
 					break
 				}
 				this.Logger.Debug("[DEBUG] SEGMENT[%v] QUERY  %v", this.SegmentName, docidinfo)
 			} else {
-				this.Logger.Error("[ERROR] SEGMENT[%v] FILTER FIELD[%v] NOT FOUND", this.SegmentName, filter.FieldName)
+				this.Logger.Debug("[ERROR] SEGMENT[%v] FILTER FIELD[%v] NOT FOUND", this.SegmentName, filter.FieldName)
 				return indocids[:start], true
 			}
 		}
@@ -673,6 +709,18 @@ func (this *Segment) SearchUnitDocIds(querys []utils.FSSearchQuery, filteds []ut
 	return indocids[:index], true
 
 }
+
+
+
+
+
+
+
+
+
+
+
+
 
 func (this *Segment) IsEmpty() bool {
 	return this.StartDocId == this.MaxDocId
