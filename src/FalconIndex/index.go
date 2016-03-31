@@ -35,7 +35,7 @@ type Index struct {
 	primary       *tree.BTreedb
 	bitmap        *utils.Bitmap
 	dict          *tree.BTreedb
-
+    fieldnames    []string
 	idxSegmentMutex *sync.Mutex   //段锁，当段序列化到磁盘或者段合并时使用或者新建段时使用
 	Logger          *utils.Log4FE `json:"-"`
 }
@@ -46,7 +46,7 @@ func NewEmptyIndex(name, pathname string, logger *utils.Log4FE) *Index {
 		SegmentNames: make([]string, 0), PrimaryKey: "", segments: make([]*fis.Segment, 0),
 		memorySegment: nil, primary: nil, bitmap: nil, Pathname: pathname,
 		Fields: make(map[string]utils.SimpleFieldInfo), idxSegmentMutex: new(sync.Mutex),
-		dict: nil}
+		dict: nil,fieldnames:make([]string,0)}
 
 	bitmapname := fmt.Sprintf("%v%v.bitmap", pathname, name)
 	utils.MakeBitmapFile(bitmapname)
@@ -54,6 +54,11 @@ func NewEmptyIndex(name, pathname string, logger *utils.Log4FE) *Index {
 
 	dictfilename := fmt.Sprintf("%v%v_dict.dic", this.Pathname, this.Name)
 	this.dict = tree.NewBTDB(dictfilename)
+    
+    primaryname := fmt.Sprintf("%v%v_primary.pk", this.Pathname, this.Name)
+    this.primary = tree.NewBTDB(primaryname)
+    this.primary.AddBTree(utils.DEFAULT_PRIMARY_KEY)
+    this.PrimaryKey = utils.DEFAULT_PRIMARY_KEY
 
 	return this
 }
@@ -63,7 +68,7 @@ func NewIndexWithLocalFile(name, pathname string, logger *utils.Log4FE) *Index {
 		SegmentNames: make([]string, 0), PrimaryKey: "", segments: make([]*fis.Segment, 0),
 		memorySegment: nil, primary: nil, bitmap: nil, Pathname: pathname,
 		Fields: make(map[string]utils.SimpleFieldInfo), idxSegmentMutex: new(sync.Mutex),
-		dict: nil}
+		dict: nil,fieldnames:make([]string,0)}
 
 	metaFileName := fmt.Sprintf("%v%v.meta", pathname, name)
 	buffer, err := utils.ReadFromJson(metaFileName)
@@ -94,6 +99,7 @@ func NewIndexWithLocalFile(name, pathname string, logger *utils.Log4FE) *Index {
 	for _, f := range this.Fields {
 		if f.FieldType != utils.IDX_TYPE_PK {
 			fields = append(fields, f)
+            this.fieldnames = append(this.fieldnames,f.FieldName)
 		}
 
 	}
@@ -107,10 +113,10 @@ func NewIndexWithLocalFile(name, pathname string, logger *utils.Log4FE) *Index {
 	bitmapname := fmt.Sprintf("%v%v.bitmap", pathname, name)
 	this.bitmap = utils.NewBitmap(bitmapname)
 
-	if this.PrimaryKey != "" {
-		primaryname := fmt.Sprintf("%v%v_primary.pk", this.Pathname, this.Name)
-		this.primary = tree.NewBTDB(primaryname)
-	}
+	//if this.PrimaryKey != "" {
+    primaryname := fmt.Sprintf("%v%v_primary.pk", this.Pathname, this.Name)
+    this.primary = tree.NewBTDB(primaryname)
+	//}
 
 	
 
@@ -127,13 +133,14 @@ func (this *Index) AddField(field utils.SimpleFieldInfo) error {
 	}
 
 	this.Fields[field.FieldName] = field
+    this.fieldnames = append(this.fieldnames,field.FieldName)
 	if field.FieldType == utils.IDX_TYPE_STRING_SEG {
 		this.dict.AddBTree(field.FieldName)
 	}
 	if field.FieldType == utils.IDX_TYPE_PK {
 		this.PrimaryKey = field.FieldName
-		primaryname := fmt.Sprintf("%v%v_primary.pk", this.Pathname, this.Name)
-		this.primary = tree.NewBTDB(primaryname)
+		//primaryname := fmt.Sprintf("%v%v_primary.pk", this.Pathname, this.Name)
+		//this.primary = tree.NewBTDB(primaryname)
 		this.primary.AddBTree(field.FieldName)
 	} else {
 		this.idxSegmentMutex.Lock()
@@ -199,6 +206,7 @@ func (this *Index) DeleteField(fieldname string) error {
 
 	this.idxSegmentMutex.Lock()
 	defer this.idxSegmentMutex.Unlock()
+    
 
 	if this.memorySegment == nil {
 		this.memorySegment.DeleteField(fieldname)
@@ -278,17 +286,25 @@ func (this *Index) UpdateDocument(content map[string]string) error {
 	this.MaxDocId++
 
 	//无主键的表直接添加
-
-	if this.PrimaryKey == "" {
+	if this.PrimaryKey == utils.DEFAULT_PRIMARY_KEY {
+        uuid,_ := utils.NewV4()
+        //uuid := fmt.Sprintf("%v",buuid)
+        //this.Logger.Info("[INFO] UUID :: %v",uuid.String())
+        if err := this.primary.Set(utils.DEFAULT_PRIMARY_KEY,uuid.String(), uint64(docid)); err != nil {
+            this.MaxDocId--
+		    return err
+	    }
 		return this.memorySegment.AddDocument(docid, content)
 	}
 
 	if _, hasPrimary := content[this.PrimaryKey]; !hasPrimary {
 		this.Logger.Error("[ERROR] Primary Key Not Found %v", this.PrimaryKey)
+        this.MaxDocId--
 		return errors.New("No Primary Key")
 	}
 
 	if err := this.updatePrimaryKey(content[this.PrimaryKey], docid); err != nil {
+        this.MaxDocId--
 		return err
 	}
 
@@ -407,6 +423,23 @@ func (this *Index) MergeSegments() error {
 
 }
 
+
+func (this *Index) GetFields() []string {
+    return this.fieldnames
+}
+
+
+func (this *Index) GetDocumentWithFields(docid uint32,fields []string) (map[string]string, bool) {
+    
+    for _, segment := range this.segments {
+		if docid >= segment.StartDocId && docid < segment.MaxDocId {
+			return segment.GetValueWithFields(docid,fields)
+		}
+	}
+	return nil, false
+    
+}
+
 func (this *Index) GetDocument(docid uint32) (map[string]string, bool) {
 
 	for _, segment := range this.segments {
@@ -510,16 +543,6 @@ func (this *Index) SimpleSearch(querys []utils.FSSearchQuery, filteds []utils.FS
         
     }
     
-    
-
-/*
-	//docids := make([]utils.DocIdNode, 0)
-	docids := <-utils.GetDocIDsChan
-	for _, segment := range this.segments {
-		docids, _ = segment.SearchUnitDocIds(querys, filteds, this.bitmap, docids, this.MaxDocId)
-		//this.Logger.Info("[INFO] segment[%v] docids %v", segment.SegmentName, docids)
-	}
-*/
 
 END:
 	lens := len(docids)
@@ -546,4 +569,31 @@ END:
 	utils.GiveDocIDsChan <- docids
 	return res, true
 
+}
+
+
+
+func (this *Index) GatherFields(docids []utils.DocIdNode,gaters []string) map[string]map[string]int {
+    
+    gaterMap := make(map[string]map[string]int)
+    for _,g:=range gaters{
+        gaterMap[g]=make(map[string]int)
+    }
+    
+    for _,docid := range docids {
+        
+        res,_:=this.GetDocumentWithFields(docid.Docid,gaters)
+        for k,v:=range res{
+            t:=gaterMap[k]
+            if _,ok:=t[v];!ok{
+                t[v]=1
+            }else{
+                t[v]=t[v]+1
+            }
+            gaterMap[k]=t
+        }
+        
+    }
+    
+    return gaterMap
 }

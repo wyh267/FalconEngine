@@ -9,7 +9,7 @@ import (
 
 // IDX_ROOT_PATH 默认索引存放位置
 const IDX_ROOT_PATH string = "./index/"
-
+const DEFAULT_PRIMARY_KEY string = "_id"
 // FALCONENGINENAME base名称
 const FALCONSEARCHERNAME string = "FALCONENGINE"
 

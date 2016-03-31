@@ -35,12 +35,14 @@ const (
 )
 
 type DefaultResult struct {
-	CostTime   string              `json:"costTime"`
+	TotalCount int64               `json:"totalCount"`
 	PageSize   int64               `json:"pageSize"`
 	PageNum    int64               `json:"pageNumber"`
-	TotalCount int64               `json:"totalCount"`
 	Status     string              `json:"status"`
+    CostTime   string              `json:"costTime"`
+    Gater      map[string]map[string]int `json:"Gaters"`
 	Result     []map[string]string `json:"dataDetail"`
+    
 }
 
 type DefaultEngine struct {
@@ -56,15 +58,30 @@ func NewDefaultEngine(logger *utils.Log4FE) *DefaultEngine {
 func (this *DefaultEngine) Search(method string, parms map[string]string, body []byte) (string, error) {
 
 	//this.Logger.Info("[INFO] DefaultEngine Search >>>>>>>>")
-	startTime := time.Now()
+	var shows []string
+    startTime := time.Now()
 	indexname, hasindex := parms["index"]
 	query, hasquery := parms["q"]
 	ps, hasps := parms["ps"]
 	pg, haspg := parms["pg"]
+    show,hasshow := parms["show"]
+    gater,hasgater := parms["gater"]
+    
 
 	if !hasindex || !hasquery || !haspg || !hasps {
 		return "", errors.New(eProcessoParms)
 	}
+    
+    indexer := this.idxManager.GetIndex(indexname)
+    if indexer == nil {
+        return "",errors.New(eDefaultEngineNotFound)
+    }
+    
+    if !hasshow {
+        shows = indexer.GetFields()
+    }else{
+        shows = strings.Split(show,",")
+    }
 
 	terms := utils.GSegmenter.Segment(query, false)
 	if len(terms) == 0 {
@@ -95,7 +112,7 @@ func (this *DefaultEngine) Search(method string, parms map[string]string, body [
 		npg = 1
 	}
 
-	indexer := this.idxManager.GetIndex(indexname)
+	
 
 	//this.queryAnalyse(searchunit)
 	docids, found := indexer.SearchDocIds(searchquerys, nil)
@@ -121,20 +138,26 @@ func (this *DefaultEngine) Search(method string, parms map[string]string, body [
 
 	defaultResult.Result = make([]map[string]string, 0)
 	for _, docid := range docids[start:end] {
-		val, ok := indexer.GetDocument(docid.Docid)
+		val, ok := indexer.GetDocumentWithFields(docid.Docid,shows)
 		if ok {
 			defaultResult.Result = append(defaultResult.Result, val)
 		}
 	}
-	utils.GiveDocIDsChan <- docids
+	
 
 	endTime := time.Now()
 	defaultResult.CostTime = fmt.Sprintf("%v", endTime.Sub(startTime))
 	defaultResult.PageNum = npg
 	defaultResult.PageSize = nps
-	defaultResult.Status = "Found"
+	defaultResult.Status = "OK"
 	defaultResult.TotalCount = lens
-
+    if hasgater{
+        gaters:=strings.Split(gater,",")
+        defaultResult.Gater = indexer.GatherFields(docids,gaters)
+    }
+    
+    
+    utils.GiveDocIDsChan <- docids
 	r, err := json.Marshal(defaultResult)
 	if err != nil {
 		return eDefaultEngineNotFound, err
