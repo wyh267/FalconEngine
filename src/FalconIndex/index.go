@@ -55,9 +55,11 @@ func NewEmptyIndex(name, pathname string, logger *utils.Log4FE) *Index {
 	utils.MakeBitmapFile(bitmapname)
 	this.bitmap = utils.NewBitmap(bitmapname)
 
+    /* delete by wuyinghao,去掉字典支持
 	dictfilename := fmt.Sprintf("%v%v_dict.dic", this.Pathname, this.Name)
 	this.dict = tree.NewBTDB(dictfilename)
-
+    this.dict.Close()
+    */
 	primaryname := fmt.Sprintf("%v%v_primary.pk", this.Pathname, this.Name)
 	this.primary = tree.NewBTDB(primaryname)
 	this.primary.AddBTree(utils.DEFAULT_PRIMARY_KEY)
@@ -87,12 +89,13 @@ func NewIndexWithLocalFile(name, pathname string, logger *utils.Log4FE) *Index {
 	if err != nil {
 		return this
 	}
-
+    /* delete by wuyinghao,去掉字典支持
 	dictfilename := fmt.Sprintf("%v%v_dict.dic", this.Pathname, this.Name)
 	if utils.Exist(dictfilename) {
 		this.Logger.Info("[INFO] Load dictfilename %v", dictfilename)
 		this.dict = tree.NewBTDB(dictfilename)
 	}
+    */
 
 	for _, segmentname := range this.SegmentNames {
 		segment := fis.NewSegmentWithLocalFile(segmentname, this.dict, logger)
@@ -140,13 +143,15 @@ func (this *Index) AddField(field utils.SimpleFieldInfo) error {
 
 	this.Fields[field.FieldName] = field
 	this.fieldnames = append(this.fieldnames, field.FieldName)
+    /* delete by wuyinghao,去掉字典支持
 	if field.FieldType == utils.IDX_TYPE_STRING_SEG {
+        
 		this.dict.AddBTree(field.FieldName)
+        
 	}
+    */
 	if field.FieldType == utils.IDX_TYPE_PK {
 		this.PrimaryKey = field.FieldName
-		//primaryname := fmt.Sprintf("%v%v_primary.pk", this.Pathname, this.Name)
-		//this.primary = tree.NewBTDB(primaryname)
 		this.primary.AddBTree(field.FieldName)
 	} else {
 		this.idxSegmentMutex.Lock()
@@ -300,7 +305,8 @@ func (this *Index) UpdateDocument(content map[string]string) error {
 	this.MaxDocId++
 
 	//无主键的表直接添加
-	if this.PrimaryKey == utils.DEFAULT_PRIMARY_KEY {
+    _, hasPrimary := content[this.PrimaryKey]
+	if this.PrimaryKey == utils.DEFAULT_PRIMARY_KEY && !hasPrimary{
 		uuid, _ := utils.NewV4()
 		//uuid := fmt.Sprintf("%v",buuid)
 		//this.Logger.Info("[INFO] UUID :: %v",uuid.String())
@@ -308,23 +314,88 @@ func (this *Index) UpdateDocument(content map[string]string) error {
 			this.MaxDocId--
 			return err
 		}
+        //content[this.PrimaryKey]=uuid.String()
 		return this.memorySegment.AddDocument(docid, content)
 	}
 
-	if _, hasPrimary := content[this.PrimaryKey]; !hasPrimary {
+	if !hasPrimary {
 		this.Logger.Error("[ERROR] Primary Key Not Found %v", this.PrimaryKey)
 		this.MaxDocId--
 		return errors.New("No Primary Key")
 	}
-
-	if err := this.updatePrimaryKey(content[this.PrimaryKey], docid); err != nil {
+    
+    //查找主键
+    oldDocid,found:=this.findPrimaryKey(content[this.PrimaryKey])
+    if !found {
+        if err := this.updatePrimaryKey(content[this.PrimaryKey], docid); err != nil {
 		this.MaxDocId--
 		return err
-	}
+	    }
+	    return this.memorySegment.AddDocument(docid, content)
+    }
+    
+    //获取老的docid所有字段的信息
+    oldinfo,_:=this.GetDocument(oldDocid.Docid)
+    //找到主键,判断是否只有正排更新
+    onlyProfile:=true
+    for k,_ := range content {
+        if this.Fields[k].FieldType != utils.IDX_TYPE_DATE &&
+           this.Fields[k].FieldType != utils.IDX_TYPE_DATE {
+            onlyProfile=false
+            break          
+        }
+        /*
+        if this.Fields[k].FieldType == utils.IDX_ONLYSTORE {
+            oldonlystore,_:=this.GetDocumentWithField(oldDocid.Docid,k)
+            if len(oldonlystore) < len(v){
+                onlyProfile=false
+                break
+            }
+        }
+        */
+        
+    }
+    
+    //直接更新正排文件
+    if onlyProfile {
+        this.MaxDocId--
+        return this.updateProfileDocument(uint32(oldDocid.Docid), content)
+    }
 
-	return this.memorySegment.AddDocument(docid, content)
+    //合并文档并进行更新
+    for k,v:=range content{
+        oldinfo[k]=v
+    }
+    //删除老文档
+    this.bitmap.SetBit(uint64(oldDocid.Docid),1)
+    //更新主键对应的docid
+    if err := this.updatePrimaryKey(content[this.PrimaryKey], docid); err != nil {
+        this.MaxDocId--
+        return err
+    }
+    return this.memorySegment.AddDocument(docid, oldinfo)
+    
+	
 
 }
+
+
+func (this *Index) updateProfileDocument(docid uint32, content map[string]string) error {
+
+	for _, segment := range this.segments {
+		if docid >= segment.StartDocId && docid < segment.MaxDocId {
+			return segment.UpdateDocument(docid, content)
+		}
+
+	}
+	if docid >= this.memorySegment.StartDocId && docid < this.memorySegment.MaxDocId {
+		return this.memorySegment.UpdateDocument(docid, content)
+	}
+	this.Logger.Error("[ERROR] updateDocument DocId[%v] not found", docid)
+	return errors.New("updateDocument:docid not found")
+}
+
+
 
 // updatePrimaryKey function description : 更新主键对应的docid
 // params : 主键，docid
@@ -459,6 +530,22 @@ func (this *Index) GetFields() []string {
 	return this.fieldnames
 }
 
+
+// GetDocumentWithField function description : 根据字段获取docid的详情
+// params : docid，字段列表
+// return : docid详情，是否找到
+func (this *Index) GetDocumentWithField(docid uint32, field string) (string, bool) {
+
+	for _, segment := range this.segments {
+		if docid >= segment.StartDocId && docid < segment.MaxDocId {
+			return segment.GetFieldValue(docid, field)
+		}
+	}
+	return "", false
+
+}
+
+
 // GetDocumentWithFields function description : 根据字段获取docid的详情
 // params : docid，字段列表
 // return : docid详情，是否找到
@@ -467,8 +554,6 @@ func (this *Index) GetDocumentWithFields(docid uint32, fields []string) (map[str
 	for _, segment := range this.segments {
 		if docid >= segment.StartDocId && docid < segment.MaxDocId {
 			return segment.GetValueWithFields(docid, fields)
-			//res["DocID"]=fmt.Sprintf("%d",docid)
-			//return res,ok
 		}
 	}
 	return nil, false
@@ -641,12 +726,10 @@ func (this *Index) SearchDocIds(querys []utils.FSSearchQuery, filteds []utils.FS
 		for _, segment := range this.segments {
 			docids, _ = segment.SearchDocIds(querys[0], filteds, this.bitmap, docids)
 		}
-		//this.Logger.Info("[INFO] key[%v] doclens:%v",querys[0].Value,len(docids))
 		docids = utils.ComputeWeight(docids, len(docids), this.MaxDocId)
 	}
 
 	if len(querys) == 1 {
-		//sort.Sort(utils.DocWeightSort(docids))
 		if len(docids) > 0 {
 			return docids, true
 		}
@@ -661,7 +744,6 @@ func (this *Index) SearchDocIds(querys []utils.FSSearchQuery, filteds []utils.FS
 			subdocids, _ = segment.SearchDocIds(query, filteds, this.bitmap, subdocids)
 		}
 
-		//this.Logger.Info("[INFO] key[%v] doclens:%v",query.Value,len(subdocids))
 		docids, ok = utils.InteractionWithStartAndDf(docids, subdocids, 0, len(subdocids), this.MaxDocId)
 		utils.GiveDocIDsChan <- subdocids
 		if !ok {

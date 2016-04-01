@@ -13,6 +13,7 @@ import (
 	fi "FalconIndex"
 	"encoding/json"
 	"fmt"
+	"sync"
 	"utils"
 )
 
@@ -22,16 +23,17 @@ type IndexInfo struct {
 }
 
 type IndexMgt struct {
-	indexers   map[string]*fi.Index
-	IndexInfos map[string]IndexInfo `json:"indexinfos"`
-	Logger     *utils.Log4FE        `json"-"`
+	indexers       map[string]*fi.Index
+	indexMapLocker *sync.RWMutex
+	IndexInfos     map[string]IndexInfo `json:"indexinfos"`
+	Logger         *utils.Log4FE        `json"-"`
 }
 
 func newIndexMgt(logger *utils.Log4FE) *IndexMgt {
 
 	this := &IndexMgt{indexers: make(map[string]*fi.Index),
-		IndexInfos: make(map[string]IndexInfo),
-		Logger:     logger}
+		IndexInfos: make(map[string]IndexInfo), indexMapLocker: new(sync.RWMutex),
+		Logger: logger}
 
 	if utils.Exist(fmt.Sprintf("%v%v.mgt.meta", utils.IDX_ROOT_PATH, utils.FALCONSEARCHERNAME)) {
 
@@ -58,6 +60,8 @@ func newIndexMgt(logger *utils.Log4FE) *IndexMgt {
 
 func (this *IndexMgt) CreateEmptyIndex(indexname string) error {
 
+	this.indexMapLocker.Lock()
+	defer this.indexMapLocker.Unlock()
 	if _, ok := this.indexers[indexname]; ok {
 		this.Logger.Error("[ERROR] index[%v] Exist", indexname)
 		return nil
@@ -71,6 +75,8 @@ func (this *IndexMgt) CreateEmptyIndex(indexname string) error {
 
 func (this *IndexMgt) CreateIndex(indexname string, fields []utils.SimpleFieldInfo) error {
 
+	this.indexMapLocker.Lock()
+	defer this.indexMapLocker.Unlock()
 	if _, ok := this.indexers[indexname]; ok {
 		this.Logger.Error("[ERROR] index[%v] Exist", indexname)
 		return nil
@@ -87,6 +93,8 @@ func (this *IndexMgt) CreateIndex(indexname string, fields []utils.SimpleFieldIn
 
 func (this *IndexMgt) AddField(indexname string, field utils.SimpleFieldInfo) error {
 
+	this.indexMapLocker.RLock()
+	defer this.indexMapLocker.RUnlock()
 	if _, ok := this.indexers[indexname]; !ok {
 		this.Logger.Error("[ERROR] index[%v] not found", indexname)
 		return fmt.Errorf("[ERROR] index[%v] not found", indexname)
@@ -104,7 +112,8 @@ func (this *IndexMgt) storeStruct() error {
 }
 
 func (this *IndexMgt) updateDocument(indexname string, document map[string]string) (string, error) {
-
+	this.indexMapLocker.RLock()
+	defer this.indexMapLocker.RUnlock()
 	if _, ok := this.indexers[indexname]; !ok {
 		this.Logger.Error("[ERROR] index[%v] not found", indexname)
 		return "", fmt.Errorf("[ERROR] index[%v] not found", indexname)
@@ -114,7 +123,8 @@ func (this *IndexMgt) updateDocument(indexname string, document map[string]strin
 }
 
 func (this *IndexMgt) sync(indexname string) error {
-
+	this.indexMapLocker.RLock()
+	defer this.indexMapLocker.RUnlock()
 	if _, ok := this.indexers[indexname]; !ok {
 		this.Logger.Error("[ERROR] index[%v] not found", indexname)
 		return fmt.Errorf("[ERROR] index[%v] not found", indexname)
@@ -124,7 +134,8 @@ func (this *IndexMgt) sync(indexname string) error {
 }
 
 func (this *IndexMgt) mergeIndex(indexname string) error {
-
+	this.indexMapLocker.RLock()
+	defer this.indexMapLocker.RUnlock()
 	if _, ok := this.indexers[indexname]; !ok {
 		this.Logger.Error("[ERROR] index[%v] not found", indexname)
 		return fmt.Errorf("[ERROR] index[%v] not found", indexname)
@@ -133,11 +144,12 @@ func (this *IndexMgt) mergeIndex(indexname string) error {
 	return this.indexers[indexname].MergeSegments()
 }
 
-
 func (this *IndexMgt) searchDocIds(indexname string,
 	querys []utils.FSSearchQuery,
 	filters []utils.FSSearchFilted) ([]utils.DocIdNode, bool) {
 
+	this.indexMapLocker.RLock()
+	defer this.indexMapLocker.RUnlock()
 	if _, ok := this.indexers[indexname]; !ok {
 		this.Logger.Error("[ERROR] index[%v] not found", indexname)
 		return nil, false //fmt.Errorf("[ERROR] index[%v] not found", indexname)
@@ -148,10 +160,14 @@ func (this *IndexMgt) searchDocIds(indexname string,
 }
 
 func (this *IndexMgt) GetIndex(indexname string) *fi.Index {
+	this.indexMapLocker.RLock()
+	defer this.indexMapLocker.RUnlock()
 	if _, ok := this.indexers[indexname]; !ok {
 		this.Logger.Error("[ERROR] index[%v] not found", indexname)
 		return nil //fmt.Errorf("[ERROR] index[%v] not found", indexname)
 	}
 
-	return this.indexers[indexname]
+	index := this.indexers[indexname]
+
+	return index
 }

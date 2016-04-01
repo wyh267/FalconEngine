@@ -29,9 +29,8 @@ type FieldInfo struct {
 
 // Segment description:段结构
 type Segment struct {
-	StartDocId uint32 `json:"startdocid"`
-	MaxDocId   uint32 `json:"maxdocid"`
-	//SegmentNumber uint32                         `json:"segmentnumber"`
+	StartDocId  uint32                           `json:"startdocid"`
+	MaxDocId    uint32                           `json:"maxdocid"`
 	SegmentName string                           `json:"segmentname"`
 	FieldInfos  map[string]utils.SimpleFieldInfo `json:"fields"`
 	fields      map[string]*FSField
@@ -149,9 +148,6 @@ func (this *Segment) AddField(sfield utils.SimpleFieldInfo) error {
 	indexer := newEmptyField(sfield.FieldName, this.MaxDocId, sfield.FieldType, this.dict, this.Logger)
 	this.FieldInfos[sfield.FieldName] = sfield
 	this.fields[sfield.FieldName] = indexer
-	//if err := this.storeStruct(); err != nil {
-	//	return err
-	//}
 	this.Logger.Info("[INFO] Segment --> AddField :: Success ")
 	return nil
 }
@@ -174,11 +170,7 @@ func (this *Segment) DeleteField(fieldname string) error {
 	this.fields[fieldname].destroy()
 	delete(this.FieldInfos, fieldname)
 	delete(this.fields, fieldname)
-	//if err := this.storeStruct(); err != nil {
-	//	return err
-	//}
 	this.Logger.Info("[INFO] Segment --> DeleteField[%v] :: Success ", fieldname)
-	// this.Fields[field.FieldName].Indexer=idf
 	return nil
 }
 
@@ -268,7 +260,6 @@ func (this *Segment) Serialization() error {
 		this.Logger.Error("[ERROR] mmap error : %v \n", err)
 	}
 	this.idxMmap.SetFileEnd(0)
-	//this.Logger.Info("[INFO] Read Invert File : %v.idx ", this.SegmentName)
 
 	this.pflMmap, err = utils.NewMmap(fmt.Sprintf("%v.pfl", this.SegmentName), utils.MODE_APPEND)
 	if err != nil {
@@ -281,7 +272,6 @@ func (this *Segment) Serialization() error {
 		this.Logger.Error("[ERROR] mmap error : %v \n", err)
 	}
 	this.dtlMmap.SetFileEnd(0)
-	//this.Logger.Info("[INFO] Read Invert File : %v.pfl", this.SegmentName)
 
 	for name := range this.fields {
 		this.fields[name].setMmap(this.idxMmap, this.pflMmap, this.dtlMmap)
@@ -495,8 +485,8 @@ func (this *Segment) GetValueWithFields(docid uint32, fields []string) (map[stri
 }
 
 func (this *Segment) FilterDocId(filteds []utils.FSSearchFilted,
-                                bitmap *utils.Bitmap,
-                                docid utils.DocIdNode) bool {
+	bitmap *utils.Bitmap,
+	docid utils.DocIdNode) bool {
 	for _, filter := range filteds {
 		if _, hasField := this.fields[filter.FieldName]; hasField {
 			if bitmap.GetBit(uint64(docid.Docid)) == 1 {
@@ -523,7 +513,6 @@ func (this *Segment) SearchDocIds(query utils.FSSearchQuery,
 	//query查询
 
 	docids, match := this.fields[query.FieldName].query(query.Value)
-	// this.Logger.Info("[INFO] key[%v] len:%v",query.Value,len(docids))
 	if !match {
 		return indocids, false
 	}

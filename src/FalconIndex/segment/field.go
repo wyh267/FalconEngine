@@ -1,5 +1,5 @@
 /*****************************************************************************
- *  file name : Field.go
+ *  file name : field.go
  *  author : Wu Yinghao
  *  email  : wyh817@gmail.com
  *
@@ -122,8 +122,10 @@ func (this *FSField) updateDocument(docid uint32, contentstr string) error {
 		this.Logger.Error("[ERROR] FSField --> UpdateDocument :: Wrong docid %v", docid)
 		return errors.New("[ERROR] Wrong docid")
 	}
-	if this.fieldType == utils.IDX_TYPE_NUMBER {
-		if err := this.pfl.updateDocument(docid, contentstr); err != nil {
+	if this.fieldType == utils.IDX_TYPE_NUMBER ||
+       this.fieldType == utils.IDX_TYPE_DATE || 
+       this.fieldType == utils.IDX_ONLYSTORE {
+		if err := this.pfl.updateDocument(docid-this.startDocId, contentstr); err != nil {
 			this.Logger.Error("[ERROR] FSField --> UpdateDocument :: Add Document Error %v", err)
 			return err
 		}
@@ -261,14 +263,7 @@ func (this *FSField) mergeField(fields []*FSField, segmentname string, btree *tr
 		pfls := make([]*profile, 0)
 
 		for _, fd := range fields {
-			//if fd == nil {
-			//    this.Logger.Info("[INFO] fake profile docLen %v",docLen)
-			//    fakepfl:=newEmptyFakeProfile(this.fieldType,0,this.fieldName,0,docLen,this.Logger)
-			//     pfls = append(pfls,fakepfl)
-			//}else{
 			pfls = append(pfls, fd.pfl)
-			//}
-
 		}
 		this.pflOffset, this.pflLen, err = this.pfl.mergeProfiles(pfls, segmentname)
 		if err != nil {
