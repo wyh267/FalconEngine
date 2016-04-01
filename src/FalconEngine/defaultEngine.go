@@ -38,8 +38,8 @@ const (
 
 type DefaultResult struct {
 	TotalCount int64                     `json:"totalCount"`
-	PageSize   int64                     `json:"pageSize"`
-	PageNum    int64                     `json:"pageNumber"`
+	From       int64                     `json:"from"`
+	To         int64                     `json:"to"`
 	Status     string                    `json:"status"`
 	CostTime   string                    `json:"costTime"`
 	Gater      map[string]map[string]int `json:"Gaters"`
@@ -73,97 +73,103 @@ func (this *DefaultEngine) Search(method string, parms map[string]string, body [
 		return "", errors.New(eProcessoParms)
 	}
 
-	//this.Logger.Info("[INFO] parms %v", parms)
-
+	//获取索引
 	indexer := this.idxManager.GetIndex(indexname)
 	if indexer == nil {
 		return "", errors.New(eDefaultEngineNotFound)
 	}
 
-	if !hasshow {
-		shows = indexer.GetFields()
-	} else {
-		shows = strings.Split(show, ",")
-	}
-    
-    searchquerys := make([]utils.FSSearchCrossFieldsQuery, 0)
-    if hasquery{
-        terms := utils.GSegmenter.Segment(query, false)
-        for _, term := range terms {
-            var queryst utils.FSSearchCrossFieldsQuery
-            queryst.FieldNames = []string{"title","nickname"}
-            queryst.Value = term
-            searchquerys = append(searchquerys, queryst)
-        }
-    }
-
-	
-
-	nps, ok1 := strconv.ParseInt(ps, 0, 0)
-	npg, ok2 := strconv.ParseInt(pg, 0, 0)
-	if ok1 != nil || ok2 != nil {
-		nps = 10
-		npg = 1
-	}
-
-	if nps <= 0 {
-		nps = 10
-	}
-
-	if npg <= 0 {
-		npg = 1
-	}
-
+	// 建立过滤条件
 	searchfilters := this.parseFilted(parms, indexer)
 
+	//首先在主字段进行检索
+	mainsearchquerys := make([]utils.FSSearchQuery, 0)
+	if hasquery {
+		terms := utils.GSegmenter.Segment(query, false)
+		for _, term := range terms {
+			var queryst utils.FSSearchQuery
+			queryst.FieldName = "title"
+			queryst.Value = term
+			mainsearchquerys = append(mainsearchquerys, queryst)
+		}
+	}
 
-	docids, found := indexer.SearchDocIdsCrossFields(searchquerys, searchfilters)
+	//进行主字段搜索过滤
+	docids, mainFound := indexer.SearchDocIds(mainsearchquerys, searchfilters)
+	searchquerys := make([]utils.FSSearchCrossFieldsQuery, 0)
+	if len(docids) < 10 {
+        this.Logger.Info("[INFO] SearchDocIdsCrossFields %v",len(docids))
+		//TODO : 跨字段搜索
+		if hasquery {
+			terms := utils.GSegmenter.Segment(query, false)
+			for _, term := range terms {
+				var queryst utils.FSSearchCrossFieldsQuery
+				queryst.FieldNames = []string{"title", "nickname", "content"}
+				queryst.Value = term
+				searchquerys = append(searchquerys, utils.FSSearchCrossFieldsQuery{FieldNames: []string{"title", "nickname", "content"}, Value: term})
+			}
+		}
 
-	if !found {
-		return eDefaultEngineNotFound, nil
+		//进行搜索过滤
+		crossDocids, crossFound := indexer.SearchDocIdsCrossFields(searchquerys, searchfilters)
+		if crossFound {
+			docids = append(docids, crossDocids...)
+			utils.GiveDocIDsChan <- crossDocids
+		} else if !crossFound && !mainFound {
+            utils.GiveDocIDsChan <- crossDocids
+            utils.GiveDocIDsChan <- docids
+			return eDefaultEngineNotFound, nil
+
+		}
+
 	}
 
 	lens := int64(len(docids))
 
-	start := nps * (npg - 1)
-	end := nps * npg
-
-	if start >= lens {
-		return eDefaultEngineNotFound, nil
-	}
-
-	if end >= lens {
-		end = lens
-	}
-
-	if !(hassort && sortfield == "false") {
+	//进行排序
+	if !(hassort && sortfield == "false") && len(searchquerys) > 0 {
 		sort.Sort(utils.DocWeightSort(docids))
 	}
 
 	var defaultResult DefaultResult
-
-	defaultResult.Result = make([]map[string]string, 0)
-	for _, docid := range docids[start:end] {
-		val, ok := indexer.GetDocumentWithFields(docid.Docid, shows)
-		if ok {
-			defaultResult.Result = append(defaultResult.Result, val)
-		}
-	}
-
-	
-	
-	defaultResult.PageNum = npg
-	defaultResult.PageSize = nps
-	defaultResult.Status = "OK"
-	defaultResult.TotalCount = lens
+	// 进行汇总
 	if hasgater {
 		gaters := strings.Split(gater, ",")
 		defaultResult.Gater = indexer.GatherFields(docids, gaters)
 	}
 
+	// 进行展示
+	if !hasshow {
+		shows = indexer.GetFields()
+	} else {
+		shows = strings.Split(show, ",")
+	}
+	start, end, pageerr := this.calcStartEnd(ps, pg, lens)
+	if pageerr != nil {
+		return eDefaultEngineNotFound, nil
+	}
+	defaultResult.Result = make([]map[string]string, 0)
+	for _, docid := range docids[start:end] {
+		val, ok := indexer.GetDocumentWithFields(docid.Docid, shows)
+		if ok {
+			val["_id"] = fmt.Sprintf("%d", docid.Docid)
+			val["_weight"] = fmt.Sprintf("%d", docid.Weight)
+			defaultResult.Result = append(defaultResult.Result, val)
+		}
+	}
+
+	// 释放docids
 	utils.GiveDocIDsChan <- docids
-    endTime := time.Now()
-    defaultResult.CostTime = fmt.Sprintf("%v", endTime.Sub(startTime))
+
+	//填写元信息
+	defaultResult.From = start + 1
+	defaultResult.To = end
+	defaultResult.Status = "OK"
+	defaultResult.TotalCount = lens
+	endTime := time.Now()
+	defaultResult.CostTime = fmt.Sprintf("%v", endTime.Sub(startTime))
+
+	//生成json结构
 	r, err := json.Marshal(defaultResult)
 	if err != nil {
 		return eDefaultEngineNotFound, err
@@ -408,4 +414,37 @@ func (this *DefaultEngine) parseFilted(parms map[string]string, indexer *fi.Inde
 
 	return searchfilters
 
+}
+
+func (this *DefaultEngine) calcStartEnd(ps, pg string, doclen int64) (int64, int64, error) {
+
+	nps, ok1 := strconv.ParseInt(ps, 0, 0)
+	npg, ok2 := strconv.ParseInt(pg, 0, 0)
+	if ok1 != nil || ok2 != nil {
+		nps = 10
+		npg = 1
+	}
+
+	if nps <= 0 {
+		nps = 10
+	}
+
+	if npg <= 0 {
+		npg = 1
+	}
+
+	lens := doclen
+
+	start := nps * (npg - 1)
+	end := nps * npg
+
+	if start >= lens {
+		return 0, 0, fmt.Errorf("out page")
+	}
+
+	if end >= lens {
+		end = lens
+	}
+
+	return start, end, nil
 }
