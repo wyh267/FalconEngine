@@ -60,6 +60,7 @@ func (this *DefaultEngine) Search(method string, parms map[string]string, body [
 
 	//this.Logger.Info("[INFO] DefaultEngine Search >>>>>>>>")
 	var shows []string
+    crossSort:=false
 	startTime := time.Now()
 	indexname, hasindex := parms["index"]
 	query, hasquery := parms["q"]
@@ -78,7 +79,7 @@ func (this *DefaultEngine) Search(method string, parms map[string]string, body [
 	if indexer == nil {
 		return "", errors.New(eDefaultEngineNotFound)
 	}
-
+    
 	// 建立过滤条件
 	searchfilters := this.parseFilted(parms, indexer)
 
@@ -98,7 +99,7 @@ func (this *DefaultEngine) Search(method string, parms map[string]string, body [
 	docids, mainFound := indexer.SearchDocIds(mainsearchquerys, searchfilters)
 	searchquerys := make([]utils.FSSearchCrossFieldsQuery, 0)
 	if len(docids) < 10 {
-        this.Logger.Info("[INFO] SearchDocIdsCrossFields %v",len(docids))
+        //this.Logger.Info("[INFO] SearchDocIdsCrossFields %v",len(docids))
 		//TODO : 跨字段搜索
 		if hasquery {
 			terms := utils.GSegmenter.Segment(query, false)
@@ -113,6 +114,11 @@ func (this *DefaultEngine) Search(method string, parms map[string]string, body [
 		//进行搜索过滤
 		crossDocids, crossFound := indexer.SearchDocIdsCrossFields(searchquerys, searchfilters)
 		if crossFound {
+            if !(hassort && sortfield == "false") && len(searchquerys) > 0 {
+		        sort.Sort(utils.DocWeightSort(docids))
+                sort.Sort(utils.DocWeightSort(crossDocids))
+                crossSort=true
+	        }
 			docids = append(docids, crossDocids...)
 			utils.GiveDocIDsChan <- crossDocids
 		} else if !crossFound && !mainFound {
@@ -127,7 +133,7 @@ func (this *DefaultEngine) Search(method string, parms map[string]string, body [
 	lens := int64(len(docids))
 
 	//进行排序
-	if !(hassort && sortfield == "false") && len(searchquerys) > 0 {
+	if !(hassort && sortfield == "false") && len(mainsearchquerys) > 0 && !crossSort{
 		sort.Sort(utils.DocWeightSort(docids))
 	}
 
@@ -152,8 +158,8 @@ func (this *DefaultEngine) Search(method string, parms map[string]string, body [
 	for _, docid := range docids[start:end] {
 		val, ok := indexer.GetDocumentWithFields(docid.Docid, shows)
 		if ok {
-			val["_id"] = fmt.Sprintf("%d", docid.Docid)
-			val["_weight"] = fmt.Sprintf("%d", docid.Weight)
+			//val["_id"] = fmt.Sprintf("%d", docid.Docid)
+			//val["_weight"] = fmt.Sprintf("%d", docid.Weight)
 			defaultResult.Result = append(defaultResult.Result, val)
 		}
 	}

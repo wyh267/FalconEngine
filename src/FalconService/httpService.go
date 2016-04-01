@@ -84,6 +84,9 @@ func (this *HttpService) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	header.Add("charset", "UTF-8")
 	header.Add("Access-Control-Allow-Origin", "*")
 	requestUrl := r.RequestURI
+    if requestUrl == "/favicon.ico"{
+        return
+    }
 	result := make(map[string]interface{})
 	result["_errorcode"] = 0
 	parms, err := this.parseArgs(r)
