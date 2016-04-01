@@ -488,13 +488,155 @@ func (this *Index) GetDocument(docid uint32) (map[string]string, bool) {
 	return nil, false
 }
 
+// SearchDocIdsCrossFields function description : 跨字段检索
+// params :
+// return :
+func (this *Index) SearchDocIdsCrossFields(querys []utils.FSSearchCrossFieldsQuery,
+	filteds []utils.FSSearchFilted) ([]utils.DocIdNode, bool) {
+
+	var ok bool
+	var crossMatch bool
+	var crossFlag bool
+    docids := <-utils.GetDocIDsChan
+	docidNode := utils.DocIdNode{Docid: 0}
+    if len(querys) == 0 && len(filteds)==0{
+        for docidnum := uint32(0); docidnum < this.segments[len(this.segments)-1].MaxDocId; docidnum++ {
+            docidNode.Docid = docidnum
+            docids = append(docids, docidNode)
+        }
+        return docids,true
+    }
+    
+	if len(querys) == 0 && len(filteds)>0{
+		for docidnum := uint32(0); docidnum < this.segments[len(this.segments)-1].MaxDocId; docidnum++ {
+			docidNode.Docid = docidnum
+			for _, segment := range this.segments {
+
+				if docidnum >= segment.StartDocId && docidnum < segment.MaxDocId {
+					if segment.FilterDocId(filteds, this.bitmap, docidNode) {
+						docids = append(docids, docidNode)
+					}
+				}
+			}
+		}
+        if len(docids)>0{
+            return docids,true
+        }
+        utils.GiveDocIDsChan <- docids
+        return nil,false
+	}
+    
+    
+    
+	if len(querys) >= 1 {
+		for _, segment := range this.segments {
+			crossFlag = false
+			mergeDocids := <-utils.GetDocIDsChan //make([]utils.DocIdNode,0)
+			for _, fieldname := range querys[0].FieldNames {
+				subMergeDocids := <-utils.GetDocIDsChan
+				subMergeDocids, crossMatch = segment.SearchDocIds(utils.FSSearchQuery{FieldName: fieldname, Value: querys[0].Value},
+					filteds, this.bitmap, subMergeDocids)
+
+				if crossMatch {
+					crossFlag = true
+					mergeDocids, _ = utils.Merge(mergeDocids, subMergeDocids)
+				}
+				utils.GiveDocIDsChan <- subMergeDocids
+			}
+			if !crossFlag {
+				utils.GiveDocIDsChan <- docids
+				utils.GiveDocIDsChan <- mergeDocids
+				return nil, false
+			}
+			docids = append(docids, mergeDocids...)
+			utils.GiveDocIDsChan <- mergeDocids
+		}
+		docids = utils.ComputeWeight(docids, len(docids), this.MaxDocId)
+	}
+	if len(querys) == 1 {
+		if len(docids) > 0 {
+			return docids, true
+		}
+		utils.GiveDocIDsChan <- docids
+		return nil, false
+	}
+
+	for _, query := range querys[1:] {
+		fielddocids := <-utils.GetDocIDsChan
+		for _, segment := range this.segments {
+
+			mergeDocids := <-utils.GetDocIDsChan //make([]utils.DocIdNode,0)
+			for _, fieldname := range query.FieldNames {
+				crossFlag = false
+				subdocids := <-utils.GetDocIDsChan
+				subdocids, crossMatch = segment.SearchDocIds(utils.FSSearchQuery{FieldName: fieldname, Value: query.Value},
+					filteds, this.bitmap, subdocids)
+				if crossMatch {
+					crossFlag = true
+					mergeDocids, _ = utils.Merge(mergeDocids, subdocids)
+				}
+				utils.GiveDocIDsChan <- subdocids
+			}
+			if !crossFlag {
+				utils.GiveDocIDsChan <- docids
+				utils.GiveDocIDsChan <- mergeDocids
+				utils.GiveDocIDsChan <- fielddocids
+				return nil, false
+			}
+			fielddocids = append(fielddocids, mergeDocids...)
+			utils.GiveDocIDsChan <- mergeDocids
+		}
+
+		//this.Logger.Info("[INFO] key[%v] doclens:%v",query.Value,len(subdocids))
+		docids, ok = utils.InteractionWithStartAndDf(docids, fielddocids, 0, len(fielddocids), this.MaxDocId)
+		utils.GiveDocIDsChan <- fielddocids
+		if !ok {
+			utils.GiveDocIDsChan <- docids
+			return nil, false
+		}
+
+	}
+
+	return docids, true
+
+}
+
 // SearchDocIds function description : 标准查询接口
 // params : 查询结构体，过滤结构体
 // return :
 func (this *Index) SearchDocIds(querys []utils.FSSearchQuery, filteds []utils.FSSearchFilted) ([]utils.DocIdNode, bool) {
 
 	var ok bool
-	docids := <-utils.GetDocIDsChan
+    docids := <-utils.GetDocIDsChan
+	docidNode := utils.DocIdNode{Docid: 0}
+    if len(querys) == 0 && len(filteds)==0{
+        for docidnum := uint32(0); docidnum < this.segments[len(this.segments)-1].MaxDocId; docidnum++ {
+            docidNode.Docid = docidnum
+            docids = append(docids, docidNode)
+        }
+        return docids,true
+    }
+    
+	
+	if len(querys) == 0 {
+		for docidnum := uint32(0); docidnum < this.segments[len(this.segments)-1].MaxDocId; docidnum++ {
+			docidNode.Docid = docidnum
+			for _, segment := range this.segments {
+
+				if docidnum >= segment.StartDocId && docidnum < segment.MaxDocId {
+					if segment.FilterDocId(filteds, this.bitmap, docidNode) {
+						docids = append(docids, docidNode)
+					}
+				}
+			}
+		}
+        if len(docids)>0{
+            return docids,true
+        }
+        utils.GiveDocIDsChan <- docids
+        return nil,false
+	}
+
 	if len(querys) >= 1 {
 		for _, segment := range this.segments {
 			docids, _ = segment.SearchDocIds(querys[0], filteds, this.bitmap, docids)
@@ -505,7 +647,11 @@ func (this *Index) SearchDocIds(querys []utils.FSSearchQuery, filteds []utils.FS
 
 	if len(querys) == 1 {
 		//sort.Sort(utils.DocWeightSort(docids))
-		return docids, true
+		if len(docids) > 0 {
+			return docids, true
+		}
+		utils.GiveDocIDsChan <- docids
+		return nil, false
 	}
 
 	for _, query := range querys[1:] {
@@ -529,13 +675,12 @@ func (this *Index) SearchDocIds(querys []utils.FSSearchQuery, filteds []utils.FS
 
 }
 
-
 // GatherFields function description : 汇总字段，根据字段名称和字段的值进行汇总统计【性能堪忧】TODO
 // params : docid列表，需要汇总的字段
 // return :
 func (this *Index) GatherFieldsByStruct(docids []utils.DocIdNode, gater utils.FSSearchGather) map[string]map[string]int {
-    
-    return this.GatherFields(docids,gater.FieldNames)
+
+	return this.GatherFields(docids, gater.FieldNames)
 }
 
 // GatherFields function description : 汇总字段，根据字段名称和字段的值进行汇总统计【性能堪忧】TODO
@@ -566,13 +711,12 @@ func (this *Index) GatherFields(docids []utils.DocIdNode, gaters []string) map[s
 	return gaterMap
 }
 
+func (this *Index) GetFieldType(fieldname string) (uint64, bool) {
 
-func (this *Index) GetFieldType(fieldname string) (uint64,bool) {
-    
-    if _,ok:=this.Fields[fieldname];!ok{
-        return 0,false
-    }
-    
-    return this.Fields[fieldname].FieldType,true
-    
+	if _, ok := this.Fields[fieldname]; !ok {
+		return 0, false
+	}
+
+	return this.Fields[fieldname].FieldType, true
+
 }

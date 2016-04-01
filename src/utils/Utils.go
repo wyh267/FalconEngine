@@ -222,7 +222,7 @@ func Merge(a []DocIdNode, b []DocIdNode) ([]DocIdNode, bool) {
 
 	for ia < lena && ib < lenb {
 
-		if a[ia] == b[ib] {
+		if a[ia].Docid == b[ib].Docid {
 			//c = append(c, a[ia])
 			c[lenc] = a[ia]
 			lenc++
