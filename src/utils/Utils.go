@@ -197,6 +197,7 @@ type Engine interface {
 	Search(method string, parms map[string]string, body []byte) (string, error)
 	CreateIndex(method string, parms map[string]string, body []byte) error
 	UpdateDocument(method string, parms map[string]string, body []byte) (string, error)
+    DeleteDocument(method string, parms map[string]string, body []byte) (string, error)
 	LoadData(method string, parms map[string]string, body []byte) (string, error)
 }
 

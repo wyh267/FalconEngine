@@ -32,6 +32,7 @@ const (
 	eProcessoUpdateProcessorBusy string = "处理进程繁忙，请稍候提交"
 	eProcessoQueryError          string = "查询条件有问题，请检查查询条件"
 	eDefaultEngineNotFound       string = `{"status":"NotFound"}`
+    eDefaultEngineDeleteOk       string = `eDefaultEngineDeleteOk`
 	eDefaultEngineLoadOk         string = `{"status":"OK"}`
 	eDefaultEngineLoadFail       string = `{"status":"Fail"}`
 )
@@ -233,6 +234,13 @@ func (this *DefaultEngine) UpdateDocument(method string, parms map[string]string
 	}
 
 	return this.idxManager.updateDocument(indexname, document)
+}
+
+
+func (this *DefaultEngine) DeleteDocument(method string, parms map[string]string, body []byte) (string, error) {
+    
+    
+    return eDefaultEngineDeleteOk,nil
 }
 
 func (this *DefaultEngine) LoadData(method string, parms map[string]string, body []byte) (string, error) {
