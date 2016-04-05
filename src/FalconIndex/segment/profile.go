@@ -370,7 +370,21 @@ func (this *profile) updateDocument(docidpos uint32, content interface{}) error 
                 value = 0xFFFFFFFF
             }
         }else if this.fieldType == utils.IDX_ONLYSTORE {
+            
             //TODO 存储
+            contentstr:=fmt.Sprintf("%v",content)
+            if this.isMomery == true {
+                this.pflString[docidpos] = contentstr
+            }else{
+                
+                offset := this.pflOffset + int64(docidpos*8)
+                dtloffset := this.pflMmap.ReadInt64(offset)
+	            lens := len(contentstr)
+                this.dtlMmap.WriteInt64(offset,int64(lens))
+	            return this.dtlMmap.WriteBytes(dtloffset+8, []byte(contentstr))
+            }
+            
+            
         }
 	case  "int", "int8", "int16", "int32", "int64", "uint", "uint8", "uint16", "uint32", "uint64":
 		var ok error
