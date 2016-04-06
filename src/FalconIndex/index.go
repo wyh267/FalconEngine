@@ -333,14 +333,13 @@ func (this *Index) UpdateDocument(content map[string]string) error {
 	//无主键的表直接添加
 	_, hasPrimary := content[this.PrimaryKey]
 	if this.PrimaryKey == utils.DEFAULT_PRIMARY_KEY && !hasPrimary {
-		uuid, _ := utils.NewV4()
-		//uuid := fmt.Sprintf("%v",buuid)
-		//this.Logger.Info("[INFO] UUID :: %v",uuid.String())
-		if err := this.primary.Set(utils.DEFAULT_PRIMARY_KEY, uuid.String(), uint64(docid)); err != nil {
-			this.MaxDocId--
-			return err
-		}
-		content[this.PrimaryKey]=uuid.String()
+        // delete主键生成
+		/////uuid, _ := utils.NewV4()
+		////if err := this.primary.Set(utils.DEFAULT_PRIMARY_KEY, uuid.String(), uint64(docid)); err != nil {
+		////	this.MaxDocId--
+		////	return err
+		////}
+		////content[this.PrimaryKey]=uuid.String()
 		return this.memorySegment.AddDocument(docid, content)
 	}
 

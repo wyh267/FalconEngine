@@ -92,7 +92,7 @@ func (this *DefaultEngine) Search(method string, parms map[string]string, body [
 		terms := utils.GSegmenter.Segment(query, false)
 		for _, term := range terms {
 			var queryst utils.FSSearchQuery
-			queryst.FieldName = "title"
+			queryst.FieldName = "content"
 			queryst.Value = term
 			mainsearchquerys = append(mainsearchquerys, queryst)
 		}
@@ -108,9 +108,9 @@ func (this *DefaultEngine) Search(method string, parms map[string]string, body [
 			terms := utils.GSegmenter.Segment(query, false)
 			for _, term := range terms {
 				var queryst utils.FSSearchCrossFieldsQuery
-				queryst.FieldNames = []string{"title", "nickname", "content"}
+				queryst.FieldNames = []string{"name", "content"}
 				queryst.Value = term
-				searchquerys = append(searchquerys, utils.FSSearchCrossFieldsQuery{FieldNames: []string{"title", "nickname", "content"}, Value: term})
+				searchquerys = append(searchquerys, utils.FSSearchCrossFieldsQuery{FieldNames: []string{"name", "content"}, Value: term})
 			}
 		}
          
