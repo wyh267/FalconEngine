@@ -153,10 +153,18 @@ func main() {
 			continue
 		}
 		terms,_ := sg.Segment(split[3], false)
-		if len(terms) < 4 {
+		if len(terms) < 10 {
 			continue
 		}
-		idx := rand.Intn(3)
+		idx := rand.Intn(9)
+        i:=0
+        for len(terms[idx]) < 4 {
+            idx = rand.Intn(9)
+            i++
+            if i==20 {
+                break
+            }
+        }
 		fmt.Printf("http://10.254.33.2:9990/v1/_search?index=weibo&q=%v&ps=10&pg=1&show=name,level,datetime,content\n", terms[idx])
 	}
 
