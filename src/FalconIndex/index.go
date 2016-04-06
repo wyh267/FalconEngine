@@ -272,6 +272,32 @@ func (this *Index) storeStruct() error {
 
 }
 
+
+
+func (this *Index) DeleteDocumentByDocId(docid uint32) error {
+    
+    if docid<this.MaxDocId {
+        this.bitmap.SetBit(uint64(docid),1)
+        this.Logger.Info("[INFO] Delete %v",docid)
+        return nil
+    }
+    
+    return fmt.Errorf("docid[%v] overflow..",docid)
+    
+}
+
+
+func (this *Index) DeleteDocument(primarykey string) error {
+    
+    ok,docid:=this.primary.Search(this.PrimaryKey,primarykey)
+    if ok {
+        return this.DeleteDocumentByDocId(uint32(docid))
+    }
+    
+    return fmt.Errorf("Key[%v] not found",primarykey)
+}
+
+
 // UpdateDocument function description : 更新文档，新增文档
 // params :
 // return :
@@ -580,8 +606,11 @@ func (this *Index) SearchDocIdsCrossFields(querys []utils.FSSearchCrossFieldsQue
     //没有任何条件，返回所有结果集
 	if len(querys) == 0 && len(filteds) == 0 {
 		for docidnum := uint32(0); docidnum < this.segments[len(this.segments)-1].MaxDocId; docidnum++ {
-			docidNode.Docid = docidnum
-			docids = append(docids, docidNode)
+            if this.bitmap.GetBit(uint64(docidnum)) == 0 {
+                docidNode.Docid = docidnum
+			    docids = append(docids, docidNode)
+            }
+			
 		}
 		return docids, true
 	}
@@ -689,14 +718,16 @@ func (this *Index) SearchDocIdsCrossFields(querys []utils.FSSearchCrossFieldsQue
 // params : 查询结构体，过滤结构体
 // return :
 func (this *Index) SearchDocIds(querys []utils.FSSearchQuery, filteds []utils.FSSearchFilted) ([]utils.DocIdNode, bool) {
-
+    //this.Logger.Info("[INFO] filteds %v",filteds)
 	var ok bool
 	docids := <-utils.GetDocIDsChan
 	docidNode := utils.DocIdNode{Docid: 0}
 	if len(querys) == 0 && len(filteds) == 0 {
 		for docidnum := uint32(0); docidnum < this.segments[len(this.segments)-1].MaxDocId; docidnum++ {
-			docidNode.Docid = docidnum
-			docids = append(docids, docidNode)
+			if this.bitmap.GetBit(uint64(docidnum)) == 0 {
+                docidNode.Docid = docidnum
+			    docids = append(docids, docidNode)
+            }
 		}
 		return docids, true
 	}

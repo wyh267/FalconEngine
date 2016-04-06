@@ -101,7 +101,7 @@ func (this *DefaultEngine) Search(method string, parms map[string]string, body [
 	//进行主字段搜索过滤
 	docids, mainFound := indexer.SearchDocIds(mainsearchquerys, searchfilters)
 	searchquerys := make([]utils.FSSearchCrossFieldsQuery, 0)
-	if len(docids) < 10 {
+	if len(docids) < 10 && len(mainsearchquerys)>0{
        
 		//TODO : 跨字段搜索
 		if hasquery {
@@ -226,18 +226,46 @@ func (this *DefaultEngine) AddField(indexname string, field utils.SimpleFieldInf
 func (this *DefaultEngine) UpdateDocument(method string, parms map[string]string, body []byte) (string, error) {
 	indexname, hasindex := parms["index"]
 
-	if !hasindex || method != "POST" {
+	if !hasindex {
 		return "", errors.New(eProcessoParms)
 	}
+    indexer:=this.idxManager.GetIndex(indexname)
+    switch method {
+    case "POST":
+        document := make(map[string]string)
+        err := json.Unmarshal(body, &document)
+        if err != nil {
+            this.Logger.Error("[ERROR] Parse JSON Fail : %v ", err)
+            return "", errors.New(eProcessoJsonParse)
+        }
 
-	document := make(map[string]string)
-	err := json.Unmarshal(body, &document)
-	if err != nil {
-		this.Logger.Error("[ERROR] Parse JSON Fail : %v ", err)
-		return "", errors.New(eProcessoJsonParse)
-	}
+	    return this.idxManager.updateDocument(indexname, document)
+    case "DELETE":
+        if pk,haspk:=parms["_pk"];haspk{
+            err:=indexer.DeleteDocument(pk)
+            if err!=nil{
+                return "",err
+            }
+            return eDefaultEngineLoadOk,nil
+        }
+        
+        if docidstr,hasdocid:=parms["_docid"];hasdocid{
+            docid,converr := strconv.ParseInt(docidstr,0,0)
+            if converr!= nil {
+                return "",converr
+            }
+            err:=indexer.DeleteDocumentByDocId(uint32(docid))
+            if err!=nil{
+                return "",err
+            }
+            return eDefaultEngineLoadOk,nil
+        }
+        
+    default:
+        return "", errors.New(eProcessoParms)
+    }
 
-	return this.idxManager.updateDocument(indexname, document)
+	return "", errors.New(eProcessoParms)
 }
 
 

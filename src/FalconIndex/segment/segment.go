@@ -521,7 +521,8 @@ func (this *Segment) SearchDocIds(query utils.FSSearchQuery,
 
 	//bitmap去掉数据
 	index := start
-	if filteds == nil && bitmap != nil {
+	if (len(filteds) == 0 || filteds == nil ) && bitmap != nil {
+        
 		for _, docid := range indocids[start:] {
 			//去掉bitmap删除的
 			if bitmap.GetBit(uint64(docid.Docid)) == 0 {
