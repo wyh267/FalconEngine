@@ -34,7 +34,7 @@ var GSegmenter *Segmenter
 *
 ******************************************************************************/
 func NewSegmenter(dic_name string) *Segmenter {
-    /*
+    /*    
 	var seg sego.Segmenter
 	this := &Segmenter{dictionary:dic_name, segmenter:seg}
 	this.segmenter.LoadDictionary(dic_name)
@@ -47,6 +47,7 @@ func NewSegmenter(dic_name string) *Segmenter {
 		return nil
 	}
 	return this
+
 }
 
 func NewMyFSSegmenter(dic_name string) *Segmenter {
@@ -61,16 +62,21 @@ func NewMyFSSegmenter(dic_name string) *Segmenter {
 
 func (this *Segmenter) Segment(content string, search_mode bool) []string {
 
+      /*  
 	text := []byte(content)
 	segments := this.segmenter.Segment(text)
 	res := sego.SegmentsToSlice(segments, search_mode)
 	//fmt.Println("SEGMENT::: ",res)
 	return res
+    */
+    terms,_ := this.fssegmenter.Segment(content, search_mode)
+    return terms
+
 }
 
 func (this *Segmenter) SegmentWithTf(content string, search_mode bool) ([]TermInfo, int) {
 
-/*
+
 	terms := this.Segment(content, search_mode)
 	termmap := make(map[string]TermInfo)
 	for _, term := range terms {
@@ -89,7 +95,8 @@ func (this *Segmenter) SegmentWithTf(content string, search_mode bool) ([]TermIn
 	}
 	//fmt.Printf("[TREMSSSSS::::%v] ",resterms)
 	return resterms, len(terms)
-*/
+
+/*
     terms,_ := this.fssegmenter.Segment(content, search_mode)
 	termmap := make(map[string]TermInfo)
 	for _, term := range terms {
@@ -108,6 +115,7 @@ func (this *Segmenter) SegmentWithTf(content string, search_mode bool) ([]TermIn
 	}
 	//fmt.Printf("[TREMSSSSS::::%v] ",resterms)
 	return resterms, len(terms)
+*/
 }
 
 

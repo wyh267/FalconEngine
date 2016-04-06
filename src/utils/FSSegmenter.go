@@ -138,7 +138,7 @@ func (this *FSSegmenter) Segment(contentstr string, searchmode bool) ([]string, 
 
 	}
 
-	//this.Logger.Info("[INFO] Content: %v  Terms :: %v",contentstr, terms)
+	//fmt.Printf("[INFO]  Terms :: %v\n", terms)
 
 	return terms, 0
 

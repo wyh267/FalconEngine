@@ -76,6 +76,7 @@ func (this *invert) addDocument(docid uint32, content interface{}) error {
 	case utils.IDX_TYPE_STRING_SEG: //分词模式
 		terminfos, termcount := utils.GSegmenter.SegmentWithTf(contentstr, true)
 		for _, terminfo := range terminfos {
+            //this.Logger.Info("[INFO] TermInfo %v",terminfo.Term)
 			docidNode := utils.DocIdNode{Docid: docid, Weight: uint32((float64(terminfo.Tf) / float64(termcount)) * 10000)}
 			if _, inTmp := this.tempHashTable[terminfo.Term]; !inTmp {
 				var docidNodes []utils.DocIdNode
@@ -113,6 +114,8 @@ func (this *invert) addDocument(docid uint32, content interface{}) error {
 // params :
 // return : error 正确返回Nil，否则返回错误类型
 func (this *invert) serialization(fullsegmentname string, btdb *tree.BTreedb) error {
+    
+    this.Logger.Info("[INFO] this.fieldName %v",this.fieldName)
 
 	//打开倒排文件
 	idxFileName := fmt.Sprintf("%v.idx", fullsegmentname)
@@ -139,7 +142,11 @@ func (this *invert) serialization(fullsegmentname string, btdb *tree.BTreedb) er
 			return err
 		}
 		idxFd.Write(buffer.Bytes())
-		this.btree.Set(this.fieldName, key, uint64(totalOffset))
+        //this.Logger.Info("[INFO] key %v",key)
+		err:=this.btree.Set(this.fieldName, key, uint64(totalOffset))
+        if err!=nil {
+            this.Logger.Error("[ERROR]  Insert To B+Tree Fail ... %v",err)
+        }
 		totalOffset = totalOffset + 8 + lens*utils.DOCNODE_SIZE
 
 	}
@@ -166,10 +173,12 @@ func (this *invert) queryTerm(keystr string) ([]utils.DocIdNode, bool) {
 
 		ok, offset := this.btree.Search(this.fieldName, keystr)
 		if !ok {
+            //this.Logger.Info("[INFO] no key %v",keystr)
 			return nil, false
 		}
 		lens := this.idxMmap.ReadInt64(int64(offset))
 		res := this.idxMmap.ReadDocIdsArry(uint64(offset+8), uint64(lens))
+        //this.Logger.Info("[INFO] res %v",res)
 		return res, true
 
 	}

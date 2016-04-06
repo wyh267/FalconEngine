@@ -86,6 +86,8 @@ func (this *DefaultEngine) Search(method string, parms map[string]string, body [
 
 	//首先在主字段进行检索
 	mainsearchquerys := make([]utils.FSSearchQuery, 0)
+    
+    //this.Logger.Info("[INFO] Terms %v",terms)
 	if hasquery {
 		terms := utils.GSegmenter.Segment(query, false)
 		for _, term := range terms {
@@ -100,7 +102,7 @@ func (this *DefaultEngine) Search(method string, parms map[string]string, body [
 	docids, mainFound := indexer.SearchDocIds(mainsearchquerys, searchfilters)
 	searchquerys := make([]utils.FSSearchCrossFieldsQuery, 0)
 	if len(docids) < 10 {
-        //this.Logger.Info("[INFO] SearchDocIdsCrossFields %v",len(docids))
+       
 		//TODO : 跨字段搜索
 		if hasquery {
 			terms := utils.GSegmenter.Segment(query, false)
@@ -111,10 +113,12 @@ func (this *DefaultEngine) Search(method string, parms map[string]string, body [
 				searchquerys = append(searchquerys, utils.FSSearchCrossFieldsQuery{FieldNames: []string{"title", "nickname", "content"}, Value: term})
 			}
 		}
-
+         
 		//进行搜索过滤
 		crossDocids, crossFound := indexer.SearchDocIdsCrossFields(searchquerys, searchfilters)
+       // this.Logger.Info("[INFO] SearchDocIdsCrossFields %v found:%v docidslen:%v",searchquerys,crossFound,crossDocids)
 		if crossFound {
+            
             if !(hassort && sortfield == "false") && len(searchquerys) > 0 {
 		        sort.Sort(utils.DocWeightSort(docids))
                 sort.Sort(utils.DocWeightSort(crossDocids))
