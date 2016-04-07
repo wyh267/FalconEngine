@@ -1,7 +1,7 @@
 package utils
 
 import (
-	"container/list"
+	//"container/list"
 	"math"
 	"os"
 	"time"
@@ -501,9 +501,38 @@ func DocIdsMaker() (get, give chan []DocIdNode) {
 	get = make(chan []DocIdNode)
 	give = make(chan []DocIdNode)
 	go func() {
-		q := new(list.List)
-
+		//q := new(list.List)
+        q := make([][]DocIdNode,0)
 		for {
+            
+            if len(q) == 0 {
+                q=append(q,makeDocIdSlice())
+            }
+            e:=q[0]
+            timeout := time.NewTimer(time.Second)
+            select {
+			case b := <-give:
+				timeout.Stop()
+				//fmt.Printf("Recive Buffer...\n")
+				//b=b[:MAX_DOCID_LEN]
+                q=append(q,b)
+				//q.PushFront(queued{when: time.Now(), slice: b})
+
+			case get <- e:
+				timeout.Stop()
+                q=q[1:]
+				//fmt.Printf("Sent Buffer...\n")
+				//q.Remove(e)
+
+			case <-timeout.C:
+                for i:=len(q)/2;i<len(q);i++{
+                    q[i]=nil
+                }
+                q=q[len(q)/2:]
+				
+
+			}
+            /*
 			if q.Len() == 0 {
 				q.PushFront(queued{when: time.Now(), slice: makeDocIdSlice()})
 			}
@@ -535,6 +564,7 @@ func DocIdsMaker() (get, give chan []DocIdNode) {
 				}
 
 			}
+            */
 		}
 
 	}()
