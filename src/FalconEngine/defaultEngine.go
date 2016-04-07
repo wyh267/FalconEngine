@@ -136,10 +136,19 @@ func (this *DefaultEngine) Search(method string, parms map[string]string, body [
 	}
 
 	lens := int64(len(docids))
-
+    
+    start, end, pageerr := this.calcStartEnd(ps, pg, lens)
+	if pageerr != nil {
+		return eDefaultEngineNotFound, nil
+	}
+    //heap.Init(&(docids[:end][0]))
 	//进行排序
 	if !(hassort && sortfield == "false") && len(mainsearchquerys) > 0 && !crossSort{
-		sort.Sort(utils.DocWeightSort(docids))
+		//for _,docid:=range docids[end:]{
+        //    heap.Push()
+        //}
+        
+        sort.Sort(utils.DocWeightSort(docids[:end]))
 	}
 
 	var defaultResult DefaultResult
@@ -155,10 +164,7 @@ func (this *DefaultEngine) Search(method string, parms map[string]string, body [
 	} else {
 		shows = strings.Split(show, ",")
 	}
-	start, end, pageerr := this.calcStartEnd(ps, pg, lens)
-	if pageerr != nil {
-		return eDefaultEngineNotFound, nil
-	}
+	
 	defaultResult.Result = make([]map[string]string, 0)
 	for _, docid := range docids[start:end] {
 		val, ok := indexer.GetDocumentWithFields(docid.Docid, shows)

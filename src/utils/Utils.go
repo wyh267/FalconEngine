@@ -43,6 +43,29 @@ func (a DocWeightSort) Less(i, j int) bool {
 	return a[i].Weight > a[j].Weight
 }
 
+//DocWeightHeap 按weight堆排序
+type DocWeightHeap []DocIdNode
+
+func (h DocWeightHeap) Len() int           { return len(h) }
+func (h DocWeightHeap) Less(i, j int) bool { return h[i].Weight < h[j].Weight }
+func (h DocWeightHeap) Swap(i, j int)      { h[i], h[j] = h[j], h[i] }
+
+func (h *DocWeightHeap) Push(x interface{}) {
+	// Push and Pop use pointer receivers because they modify the slice's length,
+	// not just its contents.
+	*h = append(*h, x.(DocIdNode))
+}
+
+func (h *DocWeightHeap) Pop() interface{} {
+	old := *h
+	n := len(old)
+	//x:=old[0]
+	//*h = old[1:n]
+	x := old[n-1]
+	*h = old[0 : n-1]
+	return x
+}
+
 const DOCNODE_SIZE int = 8 //12
 
 // BASE_PREFIX_SEGMENT 段起始计数
@@ -197,7 +220,7 @@ type Engine interface {
 	Search(method string, parms map[string]string, body []byte) (string, error)
 	CreateIndex(method string, parms map[string]string, body []byte) error
 	UpdateDocument(method string, parms map[string]string, body []byte) (string, error)
-    DeleteDocument(method string, parms map[string]string, body []byte) (string, error)
+	DeleteDocument(method string, parms map[string]string, body []byte) (string, error)
 	LoadData(method string, parms map[string]string, body []byte) (string, error)
 }
 
