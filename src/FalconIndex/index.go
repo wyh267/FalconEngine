@@ -600,7 +600,7 @@ func (this *Index) SearchDocIdsCrossFields(querys []utils.FSSearchCrossFieldsQue
 	var ok bool
 	var crossMatch bool
 	var crossFlag bool
-	docids := <-utils.GetDocIDsChan
+	docids := make([]utils.DocIdNode,0)//<-utils.GetDocIDsChan
 	docidNode := utils.DocIdNode{Docid: 0}
     //没有任何条件，返回所有结果集
 	if len(querys) == 0 && len(filteds) == 0 {
@@ -629,7 +629,7 @@ func (this *Index) SearchDocIdsCrossFields(querys []utils.FSSearchCrossFieldsQue
 		if len(docids) > 0 {
 			return docids, true
 		}
-		utils.GiveDocIDsChan <- docids
+		// Delete free utils.GiveDocIDsChan <- docids
 		return nil, false
 	}
 
@@ -637,9 +637,9 @@ func (this *Index) SearchDocIdsCrossFields(querys []utils.FSSearchCrossFieldsQue
         //this.Logger.Info("[INFO] querys %v",querys)
 		for _, segment := range this.segments {
 			crossFlag = false
-			mergeDocids := <-utils.GetDocIDsChan //make([]utils.DocIdNode,0)
+			mergeDocids := make([]utils.DocIdNode,0)//<-utils.GetDocIDsChan 
 			for _, fieldname := range querys[0].FieldNames {
-				subMergeDocids := <-utils.GetDocIDsChan
+				subMergeDocids := make([]utils.DocIdNode,0)//<-utils.GetDocIDsChan
 				subMergeDocids, crossMatch = segment.SearchDocIds(utils.FSSearchQuery{FieldName: fieldname, Value: querys[0].Value},
 					filteds, this.bitmap, subMergeDocids)
                 //this.Logger.Info("[INFO]crossMatch: %v fieldname:%v Value:%v subMergeDocids %v ",crossMatch,fieldname,querys[0].Value,subMergeDocids)
@@ -647,16 +647,14 @@ func (this *Index) SearchDocIdsCrossFields(querys []utils.FSSearchCrossFieldsQue
 					crossFlag = true
 					mergeDocids, _ = utils.Merge(mergeDocids, subMergeDocids)
 				}
-				utils.GiveDocIDsChan <- subMergeDocids
+				// Delete free utils.GiveDocIDsChan <- subMergeDocids
 			}
 			if !crossFlag {
-				//utils.GiveDocIDsChan <- docids
-				utils.GiveDocIDsChan <- mergeDocids
-				//return nil, false
+				// Delete free utils.GiveDocIDsChan <- mergeDocids
                 continue
 			}
 			docids = append(docids, mergeDocids...)
-			utils.GiveDocIDsChan <- mergeDocids
+			// Delete free utils.GiveDocIDsChan <- mergeDocids
 		}
 		docids = utils.ComputeWeight(docids, len(docids), this.MaxDocId)
 	}
@@ -665,18 +663,18 @@ func (this *Index) SearchDocIdsCrossFields(querys []utils.FSSearchCrossFieldsQue
 		if len(docids) > 0 {
 			return docids, true
 		}
-		utils.GiveDocIDsChan <- docids
+		// Delete free utils.GiveDocIDsChan <- docids
 		return nil, false
 	}
 
 	for _, query := range querys[1:] {
-		fielddocids := <-utils.GetDocIDsChan
+		fielddocids := make([]utils.DocIdNode,0)//<-utils.GetDocIDsChan
 		for _, segment := range this.segments {
 
-			mergeDocids := <-utils.GetDocIDsChan //make([]utils.DocIdNode,0)
+			mergeDocids := make([]utils.DocIdNode,0)//<-utils.GetDocIDsChan 
 			for _, fieldname := range query.FieldNames {
 				crossFlag = false
-				subdocids := <-utils.GetDocIDsChan
+				subdocids := make([]utils.DocIdNode,0)//<-utils.GetDocIDsChan
 				subdocids, crossMatch = segment.SearchDocIds(utils.FSSearchQuery{FieldName: fieldname, Value: query.Value},
 					filteds, this.bitmap, subdocids)
                 //this.Logger.Info("[INFO]crossMatch: %v fieldname:%v Value:%v subMergeDocids %v ",crossMatch,fieldname,query.Value,subdocids)
@@ -685,24 +683,22 @@ func (this *Index) SearchDocIdsCrossFields(querys []utils.FSSearchCrossFieldsQue
 					crossFlag = true
 					mergeDocids, _ = utils.Merge(mergeDocids, subdocids)
 				}
-				utils.GiveDocIDsChan <- subdocids
+				// Delete free utils.GiveDocIDsChan <- subdocids
 			}
 			if !crossFlag {
-				//utils.GiveDocIDsChan <- docids
-				utils.GiveDocIDsChan <- mergeDocids
-				utils.GiveDocIDsChan <- fielddocids
-				//return nil, false
+				// Delete free utils.GiveDocIDsChan <- mergeDocids
+				// Delete free utils.GiveDocIDsChan <- fielddocids
                 continue
 			}
 			fielddocids = append(fielddocids, mergeDocids...)
-			utils.GiveDocIDsChan <- mergeDocids
+			// Delete free utils.GiveDocIDsChan <- mergeDocids
 		}
 
 		//this.Logger.Info("[INFO] key[%v] doclens:%v",query.Value,len(subdocids))
 		docids, ok = utils.InteractionWithStartAndDf(docids, fielddocids, 0, len(fielddocids), this.MaxDocId)
-		utils.GiveDocIDsChan <- fielddocids
+		// Delete free utils.GiveDocIDsChan <- fielddocids
 		if !ok {
-			utils.GiveDocIDsChan <- docids
+			// Delete free utils.GiveDocIDsChan <- docids
 			return nil, false
 		}
 
@@ -719,7 +715,7 @@ func (this *Index) SearchDocIdsCrossFields(querys []utils.FSSearchCrossFieldsQue
 func (this *Index) SearchDocIds(querys []utils.FSSearchQuery, filteds []utils.FSSearchFilted) ([]utils.DocIdNode, bool) {
     //this.Logger.Info("[INFO] filteds %v",filteds)
 	var ok bool
-	docids := <-utils.GetDocIDsChan
+	docids := make([]utils.DocIdNode,0)//<-utils.GetDocIDsChan
 	docidNode := utils.DocIdNode{Docid: 0}
 	if len(querys) == 0 && len(filteds) == 0 {
 		for docidnum := uint32(0); docidnum < this.segments[len(this.segments)-1].MaxDocId; docidnum++ {
@@ -746,7 +742,7 @@ func (this *Index) SearchDocIds(querys []utils.FSSearchQuery, filteds []utils.FS
 		if len(docids) > 0 {
 			return docids, true
 		}
-		utils.GiveDocIDsChan <- docids
+		// Delete free utils.GiveDocIDsChan <- docids
 		return nil, false
 	}
 
@@ -761,21 +757,21 @@ func (this *Index) SearchDocIds(querys []utils.FSSearchQuery, filteds []utils.FS
 		if len(docids) > 0 {
 			return docids, true
 		}
-		utils.GiveDocIDsChan <- docids
+		// Delete free utils.GiveDocIDsChan <- docids
 		return nil, false
 	}
 
 	for _, query := range querys[1:] {
 
-		subdocids := <-utils.GetDocIDsChan
+		subdocids := make([]utils.DocIdNode,0)//<-utils.GetDocIDsChan
 		for _, segment := range this.segments {
 			subdocids, _ = segment.SearchDocIds(query, filteds, this.bitmap, subdocids)
 		}
 
 		docids, ok = utils.InteractionWithStartAndDf(docids, subdocids, 0, len(subdocids), this.MaxDocId)
-		utils.GiveDocIDsChan <- subdocids
+		// Delete free utils.GiveDocIDsChan <- subdocids
 		if !ok {
-			utils.GiveDocIDsChan <- docids
+			// Delete free utils.GiveDocIDsChan <- docids
 			return nil, false
 		}
 

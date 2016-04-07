@@ -125,10 +125,10 @@ func (this *DefaultEngine) Search(method string, parms map[string]string, body [
                 crossSort=true
 	        }
 			docids = append(docids, crossDocids...)
-			utils.GiveDocIDsChan <- crossDocids
+			// Delete free utils.GiveDocIDsChan <- crossDocids
 		} else if !crossFound && !mainFound {
-            utils.GiveDocIDsChan <- crossDocids
-            utils.GiveDocIDsChan <- docids
+            // Delete free utils.GiveDocIDsChan <- crossDocids
+            // Delete free utils.GiveDocIDsChan <- docids
 			return eDefaultEngineNotFound, nil
 
 		}
@@ -176,7 +176,7 @@ func (this *DefaultEngine) Search(method string, parms map[string]string, body [
 	}
 
 	// 释放docids
-	utils.GiveDocIDsChan <- docids
+	// Delete free utils.GiveDocIDsChan <- docids
 
 	//填写元信息
 	defaultResult.From = start + 1
