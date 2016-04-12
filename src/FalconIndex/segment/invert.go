@@ -125,7 +125,7 @@ func (this *invert) serialization(fullsegmentname string, btdb *tree.BTreedb) er
 	}
 	defer idxFd.Close()
 	fi, _ := idxFd.Stat()
-	totalOffset := int(fi.Size())
+	totalOffset := fi.Size()
 
 	this.btree = btdb
 
@@ -147,7 +147,7 @@ func (this *invert) serialization(fullsegmentname string, btdb *tree.BTreedb) er
         if err!=nil {
             this.Logger.Error("[ERROR]  Insert To B+Tree Fail ... %v",err)
         }
-		totalOffset = totalOffset + 8 + lens*utils.DOCNODE_SIZE
+		totalOffset = totalOffset + 8 + int64(lens*utils.DOCNODE_SIZE)
 
 	}
 	this.tempHashTable = nil

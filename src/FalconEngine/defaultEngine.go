@@ -32,7 +32,7 @@ const (
 	eProcessoUpdateProcessorBusy string = "处理进程繁忙，请稍候提交"
 	eProcessoQueryError          string = "查询条件有问题，请检查查询条件"
 	eDefaultEngineNotFound       string = `{"status":"NotFound"}`
-    eDefaultEngineDeleteOk       string = `eDefaultEngineDeleteOk`
+	eDefaultEngineDeleteOk       string = `eDefaultEngineDeleteOk`
 	eDefaultEngineLoadOk         string = `{"status":"OK"}`
 	eDefaultEngineLoadFail       string = `{"status":"Fail"}`
 )
@@ -61,7 +61,6 @@ func (this *DefaultEngine) Search(method string, parms map[string]string, body [
 
 	//this.Logger.Info("[INFO] DefaultEngine Search >>>>>>>>")
 	var shows []string
-    crossSort:=false
 	startTime := time.Now()
 	indexname, hasindex := parms["index"]
 	query, hasquery := parms["q"]
@@ -80,77 +79,74 @@ func (this *DefaultEngine) Search(method string, parms map[string]string, body [
 	if indexer == nil {
 		return "", errors.New(eDefaultEngineNotFound)
 	}
-    
+
 	// 建立过滤条件
 	searchfilters := this.parseFilted(parms, indexer)
-
-	//首先在主字段进行检索
-	mainsearchquerys := make([]utils.FSSearchQuery, 0)
-    
-    //this.Logger.Info("[INFO] Terms %v",terms)
-	if hasquery {
-		terms := utils.GSegmenter.Segment(query, false)
-		for _, term := range terms {
-			var queryst utils.FSSearchQuery
-			queryst.FieldName = "content"
-			queryst.Value = term
-			mainsearchquerys = append(mainsearchquerys, queryst)
+	docids := make([]utils.DocIdNode, 0)
+	//如果没有query，直接进行过滤操作
+	if !hasquery {
+		var fliterFound bool
+		docids, fliterFound = indexer.SearchDocIds(nil, searchfilters)
+		if !fliterFound {
+			return eDefaultEngineNotFound, nil
 		}
-	}
+	} else {
 
-	//进行主字段搜索过滤
-	docids, mainFound := indexer.SearchDocIds(mainsearchquerys, searchfilters)
-	searchquerys := make([]utils.FSSearchCrossFieldsQuery, 0)
-	if len(docids) < 10 && len(mainsearchquerys)>0{
-       
-		//TODO : 跨字段搜索
-		if hasquery {
+		//首先按照字段优先级进行字段内搜索
+		terms := utils.GSegmenter.Segment(query, false)
+		innFieldsFlag := false
+		for _, fieldname := range []string{"name", "content"} {
+			mainsearchquerys := make([]utils.FSSearchQuery, 0)
+			for _, term := range terms {
+				var queryst utils.FSSearchQuery
+				queryst.FieldName = fieldname
+				queryst.Value = term
+				mainsearchquerys = append(mainsearchquerys, queryst)
+			}
+			innFieldsdocids, _ := indexer.SearchDocIds(mainsearchquerys, searchfilters)
+			if !(hassort && sortfield == "false") && len(innFieldsdocids) > 0 {
+				sort.Sort(utils.DocWeightSort(innFieldsdocids))
+			}
+			docids = append(docids, innFieldsdocids...)
+			if len(docids) > 10 {
+				innFieldsFlag = true
+				break
+			}
+		}
+		//结果集不够，进行跨字段搜索
+		if !innFieldsFlag {
 			terms := utils.GSegmenter.Segment(query, false)
+			searchquerys := make([]utils.FSSearchCrossFieldsQuery, 0)
 			for _, term := range terms {
 				var queryst utils.FSSearchCrossFieldsQuery
 				queryst.FieldNames = []string{"name", "content"}
 				queryst.Value = term
 				searchquerys = append(searchquerys, utils.FSSearchCrossFieldsQuery{FieldNames: []string{"name", "content"}, Value: term})
 			}
-		}
-         
-		//进行搜索过滤
-		crossDocids, crossFound := indexer.SearchDocIdsCrossFields(searchquerys, searchfilters)
-       // this.Logger.Info("[INFO] SearchDocIdsCrossFields %v found:%v docidslen:%v",searchquerys,crossFound,crossDocids)
-		if crossFound {
-            
-            if !(hassort && sortfield == "false") && len(searchquerys) > 0 {
-		        sort.Sort(utils.DocWeightSort(docids))
-                sort.Sort(utils.DocWeightSort(crossDocids))
-                crossSort=true
-	        }
-			docids = append(docids, crossDocids...)
-			// Delete free utils.GiveDocIDsChan <- crossDocids
-		} else if !crossFound && !mainFound {
-            // Delete free utils.GiveDocIDsChan <- crossDocids
-            // Delete free utils.GiveDocIDsChan <- docids
-			return eDefaultEngineNotFound, nil
-
+			//进行搜索过滤
+			crossDocids, crossFound := indexer.SearchDocIdsCrossFields(searchquerys, searchfilters)
+			if crossFound {
+				if !(hassort && sortfield == "false") && len(searchquerys) > 0 {
+					sort.Sort(utils.DocWeightSort(crossDocids))
+				}
+				docids = append(docids, crossDocids...)
+			}
 		}
 
 	}
 
 	lens := int64(len(docids))
-    
-    start, end, pageerr := this.calcStartEnd(ps, pg, lens)
+    if lens == 0 {
+        return eDefaultEngineNotFound,nil
+    }
+
+
+    //计算起始和终止位置
+	start, end, pageerr := this.calcStartEnd(ps, pg, lens)
 	if pageerr != nil {
 		return eDefaultEngineNotFound, nil
 	}
-    //heap.Init(&(docids[:end][0]))
-	//进行排序
-	if !(hassort && sortfield == "false") && len(mainsearchquerys) > 0 && !crossSort{
-		//for _,docid:=range docids[end:]{
-        //    heap.Push()
-        //}
-        
-        sort.Sort(utils.DocWeightSort(docids[:end]))
-	}
-
+	
 	var defaultResult DefaultResult
 	// 进行汇总
 	if hasgater {
@@ -164,7 +160,7 @@ func (this *DefaultEngine) Search(method string, parms map[string]string, body [
 	} else {
 		shows = strings.Split(show, ",")
 	}
-	
+
 	defaultResult.Result = make([]map[string]string, 0)
 	for _, docid := range docids[start:end] {
 		val, ok := indexer.GetDocumentWithFields(docid.Docid, shows)
@@ -235,50 +231,48 @@ func (this *DefaultEngine) UpdateDocument(method string, parms map[string]string
 	if !hasindex {
 		return "", errors.New(eProcessoParms)
 	}
-    indexer:=this.idxManager.GetIndex(indexname)
-    switch method {
-    case "POST":
-        document := make(map[string]string)
-        err := json.Unmarshal(body, &document)
-        if err != nil {
-            this.Logger.Error("[ERROR] Parse JSON Fail : %v ", err)
-            return "", errors.New(eProcessoJsonParse)
-        }
+	indexer := this.idxManager.GetIndex(indexname)
+	switch method {
+	case "POST":
+		document := make(map[string]string)
+		err := json.Unmarshal(body, &document)
+		if err != nil {
+			this.Logger.Error("[ERROR] Parse JSON Fail : %v ", err)
+			return "", errors.New(eProcessoJsonParse)
+		}
 
-	    return this.idxManager.updateDocument(indexname, document)
-    case "DELETE":
-        if pk,haspk:=parms["_pk"];haspk{
-            err:=indexer.DeleteDocument(pk)
-            if err!=nil{
-                return "",err
-            }
-            return eDefaultEngineLoadOk,nil
-        }
-        
-        if docidstr,hasdocid:=parms["_docid"];hasdocid{
-            docid,converr := strconv.ParseInt(docidstr,0,0)
-            if converr!= nil {
-                return "",converr
-            }
-            err:=indexer.DeleteDocumentByDocId(uint32(docid))
-            if err!=nil{
-                return "",err
-            }
-            return eDefaultEngineLoadOk,nil
-        }
-        
-    default:
-        return "", errors.New(eProcessoParms)
-    }
+		return this.idxManager.updateDocument(indexname, document)
+	case "DELETE":
+		if pk, haspk := parms["_pk"]; haspk {
+			err := indexer.DeleteDocument(pk)
+			if err != nil {
+				return "", err
+			}
+			return eDefaultEngineLoadOk, nil
+		}
+
+		if docidstr, hasdocid := parms["_docid"]; hasdocid {
+			docid, converr := strconv.ParseInt(docidstr, 0, 0)
+			if converr != nil {
+				return "", converr
+			}
+			err := indexer.DeleteDocumentByDocId(uint32(docid))
+			if err != nil {
+				return "", err
+			}
+			return eDefaultEngineLoadOk, nil
+		}
+
+	default:
+		return "", errors.New(eProcessoParms)
+	}
 
 	return "", errors.New(eProcessoParms)
 }
 
-
 func (this *DefaultEngine) DeleteDocument(method string, parms map[string]string, body []byte) (string, error) {
-    
-    
-    return eDefaultEngineDeleteOk,nil
+
+	return eDefaultEngineDeleteOk, nil
 }
 
 func (this *DefaultEngine) LoadData(method string, parms map[string]string, body []byte) (string, error) {
