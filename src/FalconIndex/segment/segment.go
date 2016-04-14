@@ -511,8 +511,9 @@ func (this *Segment) SearchDocIds(query utils.FSSearchQuery,
 
 	start := len(indocids)
 	//query查询
-
-	docids, match := this.fields[query.FieldName].query(query.Value)
+    docids, match := this.fields[query.FieldName].query(query.Value)
+    //this.Logger.Info("[INFO]match : %v  SearchDocIds query.FieldName] %v query.Value : %v",match,query.FieldName,query.Value)
+	
 	if !match {
 		return indocids, false
 	}

@@ -144,15 +144,17 @@ func (this *HttpService) ServeHTTP(w http.ResponseWriter, r *http.Request) {
             }
             //result["_status"]= "sucess"
             io.WriteString(w,res)
+            return
        case URL_LOADDATA:
-            res,err:=this.engine.LoadData(r.Method,parms,body)
+            _,err:=this.engine.LoadData(r.Method,parms,body)
             if err!=nil{
                 result["_errorcode"] = -1
                 result["_errormessage"] = err.Error()
                 goto END
             }
-            //result["_status"]= "sucess"
-            io.WriteString(w,res)
+            result["_status"]= "sucess"
+            //io.WriteString(w,res)
+            goto END
             
     }
 

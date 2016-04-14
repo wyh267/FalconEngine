@@ -89,6 +89,7 @@ func NewIndexWithLocalFile(name, pathname string, logger *utils.Log4FE) *Index {
 	if err != nil {
 		return this
 	}
+    
 	/* delete by wuyinghao,去掉字典支持
 	dictfilename := fmt.Sprintf("%v%v_dict.dic", this.Pathname, this.Name)
 	if utils.Exist(dictfilename) {
@@ -747,7 +748,9 @@ func (this *Index) SearchDocIds(querys []utils.FSSearchQuery, filteds []utils.FS
 	}
 
 	if len(querys) >= 1 {
+        
 		for _, segment := range this.segments {
+            //this.Logger.Info("[INFO] SearchDocIds querys[0] %v",querys[0])
 			docids, _ = segment.SearchDocIds(querys[0], filteds, this.bitmap, docids)
 		}
 		docids = utils.ComputeWeight(docids, len(docids), this.MaxDocId)
