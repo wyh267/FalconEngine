@@ -59,7 +59,7 @@ type DBLoadInfo struct {
 	Mapping        []Dbfield `json:"mapping"`
 	StartTime      string    `json:"starttime"`
 	UpdateSql      string    `json:"updatesql"`
-    UpdateField    string    `json:"updatefield"`
+	UpdateField    string    `json:"updatefield"`
 	UpdateInterval int       `json:"interval"`
 	SyncInterval   int       `json:"syncinterval"`
 	MergeInterval  int       `json:"mergeinterval"`
@@ -342,7 +342,7 @@ func (this *DefaultEngine) LoadData(method string, parms map[string]string, body
 			return eDefaultEngineLoadFail, errors.New(eProcessoJsonParse)
 		}
 		indexer := this.idxManager.GetIndex(indexname)
-        curr_time := time.Now().Add(-10*time.Minute).Format("2006-01-02 15:04:05")
+		curr_time := time.Now().Add(-10 * time.Minute).Format("2006-01-02 15:04:05")
 		if indexer == nil {
 			var fieldinfos []utils.SimpleFieldInfo
 			db2idx := make(map[string]string)
@@ -411,7 +411,7 @@ func (this *DefaultEngine) LoadData(method string, parms map[string]string, body
 			}
 
 			//启动增量数据 TODO
-            go this.incUpdate(indexname,curr_time,dbinfo)
+			go this.incUpdate(indexname, curr_time, dbinfo)
 			return eDefaultEngineLoadOk, nil
 		}
 
@@ -590,6 +590,8 @@ func (this *DefaultEngine) parseFilted(parms map[string]string, indexer *fi.Inde
 						End:   endtimestmp})
 				}
 			}
+
+
 		}
 
 	}
@@ -631,25 +633,24 @@ func (this *DefaultEngine) calcStartEnd(ps, pg string, doclen int64) (int64, int
 	return start, end, nil
 }
 
-func (this *DefaultEngine) incUpdate(indexname string,starttime string, dbinfo DBLoadInfo) {
-    
-    db2idx := make(map[string]string)
-    var fieldinfos []utils.SimpleFieldInfo
-    for _, finfo := range dbinfo.Mapping {
-        fieldinfos = append(fieldinfos, utils.SimpleFieldInfo{FieldName: finfo.IdxField, FieldType: finfo.FieldType})
-        db2idx[finfo.DbField] = finfo.IdxField
-    }
-    indexer := this.idxManager.GetIndex(indexname)
-    if indexer == nil {
-			return
-    }
-    synccount := 0
-    curr_time := starttime
-    updateSql := fmt.Sprintf(dbinfo.UpdateSql,curr_time)
-    
+func (this *DefaultEngine) incUpdate(indexname string, starttime string, dbinfo DBLoadInfo) {
+
+	db2idx := make(map[string]string)
+	var fieldinfos []utils.SimpleFieldInfo
+	for _, finfo := range dbinfo.Mapping {
+		fieldinfos = append(fieldinfos, utils.SimpleFieldInfo{FieldName: finfo.IdxField, FieldType: finfo.FieldType})
+		db2idx[finfo.DbField] = finfo.IdxField
+	}
+	indexer := this.idxManager.GetIndex(indexname)
+	if indexer == nil {
+		return
+	}
+	curr_time := starttime
+	updateSql := fmt.Sprintf(dbinfo.UpdateSql, curr_time)
+
 	for {
-        this.Logger.Info("[INFO] IncUpdate Running ... %v", updateSql)
-        
+		this.Logger.Info("[INFO] IncUpdate Running ... %v", updateSql)
+
 		rows, err := this.mysql.QueryFormat(updateSql)
 		if err != nil {
 			this.Logger.Error("[ERROR] DB err %v", err.Error())
@@ -657,14 +658,12 @@ func (this *DefaultEngine) incUpdate(indexname string,starttime string, dbinfo D
 		}
 		defer rows.Close()
 
-		//读取全量数据
 		cols, _ := rows.Columns()
 		rawResult := make([][]byte, len(cols))
 		dest := make([]interface{}, len(cols))
 		for i, _ := range rawResult {
 			dest[i] = &rawResult[i]
 		}
-        //curr_time = time.Now().Add(-10*time.Minute).Format("2006-01-02 15:04:05")
 		for rows.Next() {
 			if err := rows.Scan(dest...); err != nil {
 				return
@@ -678,34 +677,28 @@ func (this *DefaultEngine) incUpdate(indexname string,starttime string, dbinfo D
 					if _, ok := db2idx[cols[idx]]; ok {
 						document[cols[idx]] = string(raw)
 					}
-                    if cols[idx] == dbinfo.UpdateField {
-                         curr_time = string(raw)
-                    }
+					if cols[idx] == dbinfo.UpdateField {
+						curr_time = string(raw)
+					}
 				}
 			}
-
-			//this.Logger.Info("[INFO] document %v",document)
 			if _, err := this.idxManager.updateDocument(indexname, document); err != nil {
-				return 
+				return
 			}
 
 		}
 
-		synccount++
-        time.Sleep(time.Second)
-        if synccount == dbinfo.SyncInterval {
-            synccount=0
-            indexer.SyncMemorySegment()
-            
-            if dbinfo.IsMerge {
-			    indexer.MergeSegments()
-		    }
-        }
-        
-        //curr_time = time.Now().Add(-10*time.Second).Format("2006-01-02 15:04:05") //new_values[incField]
-        updateSql = fmt.Sprintf(dbinfo.UpdateSql,curr_time)
+		indexer.SyncMemorySegment()
+		if dbinfo.IsMerge {
+			indexer.MergeSegments()
+		}
 
-		
+		for count := 0; count < dbinfo.SyncInterval; count++ {
+			time.Sleep(time.Second)
+		}
+
+		//curr_time = time.Now().Add(-10*time.Second).Format("2006-01-02 15:04:05") //new_values[incField]
+		updateSql = fmt.Sprintf(dbinfo.UpdateSql, curr_time)
 
 	}
 
