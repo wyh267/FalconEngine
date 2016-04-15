@@ -246,32 +246,32 @@
 ```json
 
 {
-    totalCount: 405,
-    from: 1,
-    to: 10,
-    status: "OK",
-    costTime: "3.743808ms",
-    Gaters: {
-          level: {
-          付费会员: 11,
-          普通用户: 67,
-          蓝V: 84,
-          达人: 14,
-          黄V: 229
+    "totalCount": 405,          //结果集数量
+    "from": 1,                  //此次返回的起始位置
+    "to": 10,                   //此次返回的结束位置
+    "status": "OK",             //状态
+    "costTime": "3.743808ms",   //查询时间
+            "Gaters": {         //汇总信息
+          "level": {            //level字段汇总
+          "付费会员": 11,        //付费会员 有 11 条数据，下同
+          "普通用户": 67,
+          "蓝V": 84,
+          "达人": 14,
+          "黄V": 229
           }
 	},
-dataDetail: [
+"dataDetail": [                 //详情
         {
-        content: "可以回雅礼试试",
-        datetime: "2015-11-12 20:26:27",
-        level: "普通用户",
-        name: "拐栋六R"
+        "content": "可以回雅礼试试",
+        "datetime": "2015-11-12 20:26:27",
+        "level": "普通用户",
+        "name": "拐栋六R"
         },
         {
-        content: "雅礼中学开始报名了",
-        datetime: "2015-11-12 18:58:03",
-        level: "蓝V",
-        name: "爱尔威智能科技"
+        "content": "雅礼中学开始报名了",
+        "datetime": "2015-11-12 18:58:03",
+        "level": "蓝V",
+        "name": "爱尔威智能科技"
         }
   ......
 }
