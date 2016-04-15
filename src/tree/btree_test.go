@@ -88,7 +88,7 @@ func TestLoadTree(t *testing.T) {
 	ok, value = db.Search("test", "hello")
 	fmt.Printf("found hello : %v value : %v \n===================\n", ok, value)
 	start := time.Now()
-	for i := 0; i < 20; i++ {
+	for i := 0; i < 100000; i++ {
 		//fmt.Printf("%04d\n", i)
 		db.Set("test", fmt.Sprintf("%08d", rand.Intn(20000000)), uint64(i))
 	}
@@ -99,16 +99,16 @@ func TestLoadTree(t *testing.T) {
 	start = time.Now()
 	// bt.Display()
 
-	for i := 10; i >= 0; i-- {
+	for i := 100000; i >= 0; i-- {
 		ii := fmt.Sprintf("%08d", rand.Intn(2000))
 		ok, value = db.Search("test", ii)
 		if !ok {
-			fmt.Printf("notfound : %v value : %v \n===================\n", ii, value)
+			//fmt.Printf("notfound : %v value : %v \n===================\n", ii, value)
 		}
 
 	}
 	fmt.Printf("query b+tree over cost %v\n===================\n", time.Now().Sub(start))
-
+/*
 	found, ranges := db.Range("test", "", "09999900")
 
 	if found {
@@ -123,9 +123,9 @@ func TestLoadTree(t *testing.T) {
 		fmt.Printf("key:%v value:%v index:%v pagenum:%v ok:%v\n", key, value1, idx, pgnum, ok)
 
 	}
-
+*/
 }
-
+/*
 func TestMergeTree(t *testing.T) {
 	//start := time.Now()
 	db := NewBTDB("bp.tree")
@@ -172,3 +172,4 @@ func TestMergeTree(t *testing.T) {
 	}
 
 }
+*/

@@ -495,6 +495,9 @@ func (this *Index) MergeSegments() error {
 	var startIdx int = -1
 	this.idxSegmentMutex.Lock()
 	defer this.idxSegmentMutex.Unlock()
+    if len(this.segments) <= 1 {
+        return nil
+    }
 	for idx := range this.segments {
 		if this.segments[idx].MaxDocId-this.segments[idx].StartDocId < 1000000 {
 			startIdx = idx

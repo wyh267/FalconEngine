@@ -61,16 +61,19 @@
     - 一部分是引擎部分，在`FalconEngine`文件夹中，此文件夹中已经实现了一个默认引擎，自己的引擎需要实现`utils.go`下面的引擎方法
     - 一部分是网络部分，在`FalconService`文件夹中，此文件夹已经实现了一个默认的HTTP服务
 引擎接口：
-    ```
-        // Engine 引擎接口，自己实现的引擎必须实现以下接口
-        type Engine interface {
-            Search(method string, parms map[string]string, body []byte) (string, error)
-            CreateIndex(method string, parms map[string]string, body []byte) error
-            UpdateDocument(method string, parms map[string]string, body []byte) (string, error)
-            DeleteDocument(method string, parms map[string]string, body []byte) (string, error)
-            LoadData(method string, parms map[string]string, body []byte) (string, error)
-        }
-    ```
+
+
+```
+    // Engine 引擎接口，自己实现的引擎必须实现以下接口
+    type Engine interface {
+        Search(method string, parms map[string]string, body []byte) (string, error)
+        CreateIndex(method string, parms map[string]string, body []byte) error
+        UpdateDocument(method string, parms map[string]string, body []byte) (string, error)
+        DeleteDocument(method string, parms map[string]string, body []byte) (string, error)
+        LoadData(method string, parms map[string]string, body []byte) (string, error)
+    }
+```
+
 默认引擎使用方法
 
 ### 新建索引

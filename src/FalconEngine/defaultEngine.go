@@ -41,7 +41,7 @@ type Dbfield struct {
 	DbField   string `json:"field_db"`
 	IdxField  string `json:"field_index"`
 	FieldType uint64 `json:"field_type"`
-    //FieldPriority uint64 `json:"field_priority"`
+	//FieldPriority uint64 `json:"field_priority"`
 }
 
 type DBLoadInfo struct {
@@ -54,15 +54,16 @@ type DBLoadInfo struct {
 	Dbname         string    `json:"dbname"`
 	IndexName      string    `json:"indexname"`
 	TableName      string    `json:"tablename"`
-    SyncCount      int       `json:"synccount"`
-    IsMerge        bool        `json:"ismerge"`
+	SyncCount      int       `json:"synccount"`
+	IsMerge        bool      `json:"ismerge"`
 	Mapping        []Dbfield `json:"mapping"`
-	UpdateField    string    `json:"updatefield"`
+	StartTime      string    `json:"starttime"`
 	UpdateSql      string    `json:"updatesql"`
+    UpdateField    string    `json:"updatefield"`
 	UpdateInterval int       `json:"interval"`
 	SyncInterval   int       `json:"syncinterval"`
 	MergeInterval  int       `json:"mergeinterval"`
-    FieldPriority  []string  `json:"field_priority"`
+	FieldPriority  []string  `json:"field_priority"`
 }
 
 type DefaultResult struct {
@@ -76,14 +77,14 @@ type DefaultResult struct {
 }
 
 type DefaultEngine struct {
-	idxManager *IndexMgt
-	mysql      *utils.MysqlDBAdaptor
-    idxFieldProiority map[string][]string 
-	Logger     *utils.Log4FE `json:"-"`
+	idxManager        *IndexMgt
+	mysql             *utils.MysqlDBAdaptor
+	idxFieldProiority map[string][]string
+	Logger            *utils.Log4FE `json:"-"`
 }
 
 func NewDefaultEngine(logger *utils.Log4FE) *DefaultEngine {
-	this := &DefaultEngine{Logger: logger, idxManager: newIndexMgt(logger), mysql: nil,idxFieldProiority:nil}
+	this := &DefaultEngine{Logger: logger, idxManager: newIndexMgt(logger), mysql: nil, idxFieldProiority: nil}
 	return this
 }
 
@@ -121,25 +122,25 @@ func (this *DefaultEngine) Search(method string, parms map[string]string, body [
 			return eDefaultEngineNotFound, nil
 		}
 	} else {
-        var searchFields []string
-        if _,haspro := this.idxFieldProiority[indexname];haspro {
-            searchFields = this.idxFieldProiority[indexname]
-        }else{
-            idxfields := indexer.GetFields()
-            for _,field := range idxfields{
-                if fty,ok:=indexer.GetFieldType(field);ok{
-                    if fty == utils.IDX_TYPE_STRING_SEG {
-                        searchFields=append(searchFields,field)
-                    }
-                }
-            }
-           
-        }
+		var searchFields []string
+		if _, haspro := this.idxFieldProiority[indexname]; haspro {
+			searchFields = this.idxFieldProiority[indexname]
+		} else {
+			idxfields := indexer.GetFields()
+			for _, field := range idxfields {
+				if fty, ok := indexer.GetFieldType(field); ok {
+					if fty == utils.IDX_TYPE_STRING_SEG {
+						searchFields = append(searchFields, field)
+					}
+				}
+			}
+
+		}
 		//首先按照字段优先级进行字段内搜索
 		terms := utils.GSegmenter.Segment(query, false)
-        //this.Logger.Info("[INFO] terms :  %v",terms)
+		//this.Logger.Info("[INFO] terms :  %v",terms)
 		innFieldsFlag := false
-		for _, fieldname := range searchFields{//[]string{"title"/*, "content"*/} {
+		for _, fieldname := range searchFields { //[]string{"title"/*, "content"*/} {
 			mainsearchquerys := make([]utils.FSSearchQuery, 0)
 			for _, term := range terms {
 				var queryst utils.FSSearchQuery
@@ -148,7 +149,7 @@ func (this *DefaultEngine) Search(method string, parms map[string]string, body [
 				mainsearchquerys = append(mainsearchquerys, queryst)
 			}
 			innFieldsdocids, _ := indexer.SearchDocIds(mainsearchquerys, searchfilters)
-            //this.Logger.Info("[INFO] innFieldsdocids %v",mainsearchquerys)
+			//this.Logger.Info("[INFO] innFieldsdocids %v",mainsearchquerys)
 			if !(hassort && sortfield == "false") && len(innFieldsdocids) > 0 {
 				sort.Sort(utils.DocWeightSort(innFieldsdocids))
 			}
@@ -164,9 +165,9 @@ func (this *DefaultEngine) Search(method string, parms map[string]string, body [
 			searchquerys := make([]utils.FSSearchCrossFieldsQuery, 0)
 			for _, term := range terms {
 				var queryst utils.FSSearchCrossFieldsQuery
-				queryst.FieldNames = searchFields//[]string{"title"/*, "content"*/}//{"name", "content"}
+				queryst.FieldNames = searchFields //[]string{"title"/*, "content"*/}//{"name", "content"}
 				queryst.Value = term
-				searchquerys = append(searchquerys, utils.FSSearchCrossFieldsQuery{FieldNames: []string{"title"/*, "content"*/}/*{"name", "content"}*/, Value: term})
+				searchquerys = append(searchquerys, utils.FSSearchCrossFieldsQuery{FieldNames: []string{"title" /*, "content"*/} /*{"name", "content"}*/, Value: term})
 			}
 			//进行搜索过滤
 			crossDocids, crossFound := indexer.SearchDocIdsCrossFields(searchquerys, searchfilters)
@@ -333,14 +334,15 @@ func (this *DefaultEngine) LoadData(method string, parms map[string]string, body
 		dbinfo.CharSet = "utf8"
 		dbinfo.SyncInterval = 10
 		dbinfo.MergeInterval = 60
-        dbinfo.SyncCount=10000
-        dbinfo.IsMerge = true
+		dbinfo.SyncCount = 10000
+		dbinfo.IsMerge = true
 		err := json.Unmarshal(body, &dbinfo)
 		if err != nil {
 			this.Logger.Error("[ERROR] Parse JSON Fail : %v ", err)
 			return eDefaultEngineLoadFail, errors.New(eProcessoJsonParse)
 		}
 		indexer := this.idxManager.GetIndex(indexname)
+        curr_time := time.Now().Add(-10*time.Minute).Format("2006-01-02 15:04:05")
 		if indexer == nil {
 			var fieldinfos []utils.SimpleFieldInfo
 			db2idx := make(map[string]string)
@@ -348,7 +350,7 @@ func (this *DefaultEngine) LoadData(method string, parms map[string]string, body
 				fieldinfos = append(fieldinfos, utils.SimpleFieldInfo{FieldName: finfo.IdxField, FieldType: finfo.FieldType})
 				db2idx[finfo.DbField] = finfo.IdxField
 			}
-            this.Logger.Info("[INFO] fieldinfos %v",fieldinfos)
+			this.Logger.Info("[INFO] fieldinfos %v", fieldinfos)
 			if err := this.idxManager.CreateIndex(indexname, fieldinfos); err != nil {
 				return "", err
 			}
@@ -368,56 +370,52 @@ func (this *DefaultEngine) LoadData(method string, parms map[string]string, body
 
 			//读取全量数据
 			cols, _ := rows.Columns()
-            rawResult := make([][]byte, len(cols))
-            //result := make([]string, len(cols))
+			rawResult := make([][]byte, len(cols))
 
-            dest := make([]interface{}, len(cols)) // A temporary interface{} slice
-            for i, _ := range rawResult {
-                dest[i] = &rawResult[i] // Put pointers to each string in the interface slice
-            }
-            count := 1
-			for rows.Next() { //循环，让游标往下推
-				if err := rows.Scan(dest...); err != nil { //query.Scan查询出来的不定长值放到scans[i] = &values[i],也就是每行都放在values里
+			dest := make([]interface{}, len(cols))
+			for i, _ := range rawResult {
+				dest[i] = &rawResult[i]
+			}
+			count := 1
+			for rows.Next() {
+				if err := rows.Scan(dest...); err != nil {
 					return "", err
 				}
-                document := make(map[string]string)
-                
-                for idx, raw := range rawResult {
-                    if raw == nil {
-                        continue
-                    } else {
-                        if _,ok:=db2idx[cols[idx]];ok{
-                            document[cols[idx]] = string(raw)
-                        }
-                    }
-                }
-                
-                
-                //this.Logger.Info("[INFO] document %v",document)
-                if _,err := this.idxManager.updateDocument(indexname,document);err!=nil{
-                    return "",err
-                }
-				
-                if count%dbinfo.SyncCount == 0 {
-                    this.idxManager.sync(indexname)
-                }
-                count++
+				document := make(map[string]string)
+
+				for idx, raw := range rawResult {
+					if raw == nil {
+						continue
+					} else {
+						if _, ok := db2idx[cols[idx]]; ok {
+							document[cols[idx]] = string(raw)
+						}
+					}
+				}
+
+				//this.Logger.Info("[INFO] document %v",document)
+				if _, err := this.idxManager.updateDocument(indexname, document); err != nil {
+					return "", err
+				}
+
+				if count%dbinfo.SyncCount == 0 {
+					this.idxManager.sync(indexname)
+				}
+				count++
 			}
-            
-            this.idxManager.sync(indexname)
-            
-            if dbinfo.IsMerge {
-                this.idxManager.mergeIndex(indexname)
-            }
-            
-            
-            //启动增量数据 TODO
-            return eDefaultEngineLoadOk, nil
+
+			this.idxManager.sync(indexname)
+
+			if dbinfo.IsMerge {
+				this.idxManager.mergeIndex(indexname)
+			}
+
+			//启动增量数据 TODO
+            go this.incUpdate(indexname,curr_time,dbinfo)
+			return eDefaultEngineLoadOk, nil
 		}
-        
-        
-         
-        return eDefaultEngineLoadOk, nil
+
+		return eDefaultEngineLoadOk, nil
 
 	}
 
@@ -631,4 +629,84 @@ func (this *DefaultEngine) calcStartEnd(ps, pg string, doclen int64) (int64, int
 	}
 
 	return start, end, nil
+}
+
+func (this *DefaultEngine) incUpdate(indexname string,starttime string, dbinfo DBLoadInfo) {
+    
+    db2idx := make(map[string]string)
+    var fieldinfos []utils.SimpleFieldInfo
+    for _, finfo := range dbinfo.Mapping {
+        fieldinfos = append(fieldinfos, utils.SimpleFieldInfo{FieldName: finfo.IdxField, FieldType: finfo.FieldType})
+        db2idx[finfo.DbField] = finfo.IdxField
+    }
+    indexer := this.idxManager.GetIndex(indexname)
+    if indexer == nil {
+			return
+    }
+    synccount := 0
+    curr_time := starttime
+    updateSql := fmt.Sprintf(dbinfo.UpdateSql,curr_time)
+    
+	for {
+        this.Logger.Info("[INFO] IncUpdate Running ... %v", updateSql)
+        
+		rows, err := this.mysql.QueryFormat(updateSql)
+		if err != nil {
+			this.Logger.Error("[ERROR] DB err %v", err.Error())
+			return
+		}
+		defer rows.Close()
+
+		//读取全量数据
+		cols, _ := rows.Columns()
+		rawResult := make([][]byte, len(cols))
+		dest := make([]interface{}, len(cols))
+		for i, _ := range rawResult {
+			dest[i] = &rawResult[i]
+		}
+        //curr_time = time.Now().Add(-10*time.Minute).Format("2006-01-02 15:04:05")
+		for rows.Next() {
+			if err := rows.Scan(dest...); err != nil {
+				return
+			}
+			document := make(map[string]string)
+
+			for idx, raw := range rawResult {
+				if raw == nil {
+					continue
+				} else {
+					if _, ok := db2idx[cols[idx]]; ok {
+						document[cols[idx]] = string(raw)
+					}
+                    if cols[idx] == dbinfo.UpdateField {
+                         curr_time = string(raw)
+                    }
+				}
+			}
+
+			//this.Logger.Info("[INFO] document %v",document)
+			if _, err := this.idxManager.updateDocument(indexname, document); err != nil {
+				return 
+			}
+
+		}
+
+		synccount++
+        time.Sleep(time.Second)
+        if synccount == dbinfo.SyncInterval {
+            synccount=0
+            indexer.SyncMemorySegment()
+            
+            if dbinfo.IsMerge {
+			    indexer.MergeSegments()
+		    }
+        }
+        
+        //curr_time = time.Now().Add(-10*time.Second).Format("2006-01-02 15:04:05") //new_values[incField]
+        updateSql = fmt.Sprintf(dbinfo.UpdateSql,curr_time)
+
+		
+
+	}
+
 }
