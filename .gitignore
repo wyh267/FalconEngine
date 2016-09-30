@@ -3,7 +3,7 @@
 *github.com*
 *bin/
 *pkg/
-*index/
+index/
 *data/
 *.log*
 *.json*
