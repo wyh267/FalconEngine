@@ -90,7 +90,7 @@ func NewSegmentWithLocalFile(segmentname string,dict *tree.BTreedb, logger *util
 	btdbname := fmt.Sprintf("%v.bt", segmentname)
 	if utils.Exist(btdbname) {
 		this.Logger.Info("[INFO] Load B+Tree File : %v", btdbname)
-		this.btdb = tree.NewBTDB(btdbname)
+		this.btdb = tree.NewBTDB(btdbname,logger)
 	}
 
 	this.idxMmap, err = utils.NewMmap(fmt.Sprintf("%v.idx", segmentname), utils.MODE_APPEND)
@@ -242,7 +242,7 @@ func (this *Segment) Serialization() error {
 
 	btdbname := fmt.Sprintf("%v.bt", this.SegmentName)
 	if this.btdb == nil {
-		this.btdb = tree.NewBTDB(btdbname)
+		this.btdb = tree.NewBTDB(btdbname,this.Logger)
 	}
 
 	for name, field := range this.FieldInfos {
@@ -683,7 +683,7 @@ func (this *Segment) MergeSegments(sgs []*Segment) error {
 	this.Logger.Info("[INFO] Segment >>>>> MergeSegments [%v]", this.SegmentName)
 	btdbname := fmt.Sprintf("%v.bt", this.SegmentName)
 	if this.btdb == nil {
-		this.btdb = tree.NewBTDB(btdbname)
+		this.btdb = tree.NewBTDB(btdbname,this.Logger)
 	}
 
 	for name, field := range this.FieldInfos {

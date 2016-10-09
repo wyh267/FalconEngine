@@ -17,9 +17,11 @@ import (
 	"os"
 	"reflect"
 	"sort"
+	"strconv"
 	//"strconv"
 	"syscall"
 	"unsafe"
+	"utils"
 )
 
 const (
@@ -330,24 +332,21 @@ func (p *page) getElement(index int) *element {
 	return &((*[0xFFFF]element)(unsafe.Pointer(&p.elementsptr)))[index]
 }
 
+func (p *page) getfristkv(bt *btree) (string, uint32, uint32, int, bool) {
 
-func (p *page)getfristkv(bt *btree) (string,uint32,uint32,int,bool) {
-    
-    if p.pgtype == tinterior {
-        child := bt.getpage(uint32(p.getElement(0).value))
-        return child.getfristkv(bt)
-    }
-    
-    if p.pgtype == tleaf && p.count>0{
-        res:=p.getElement(0)
-        return res.key(),uint32(res.value),uint32(p.curid),0,true
-    }
-    
-    return "",0,0,0,false
-    
+	if p.pgtype == tinterior {
+		child := bt.getpage(uint32(p.getElement(0).value))
+		return child.getfristkv(bt)
+	}
+
+	if p.pgtype == tleaf && p.count > 0 {
+		res := p.getElement(0)
+		return res.key(), uint32(res.value), uint32(p.curid), 0, true
+	}
+
+	return "", 0, 0, 0, false
+
 }
-
-
 
 // btree function description : b+树
 type btree struct {
@@ -507,44 +506,38 @@ func (bt *btree) Range(start, end string) (bool, []uint64) {
 
 }
 
+func (bt *btree) GetFristKV() (string, uint32, uint32, int, bool) {
 
+	if bt.rootpgid == 0 {
+		return "", 0, 0, 0, false
+	}
 
-func (bt *btree) GetFristKV() (string,uint32,uint32,int,bool) {
- 
-    if bt.rootpgid == 0 {
-        return "",0,0,0,false
-    }
-    
-    node := bt.db.getpage(bt.rootpgid)
-    return node.getfristkv(bt)
-    
- 
+	node := bt.db.getpage(bt.rootpgid)
+	return node.getfristkv(bt)
+
 }
 
+func (bt *btree) GetNextKV(pagenum uint32, index int) (string, uint32, uint32, int, bool) {
+	if bt.rootpgid == 0 {
+		return "", 0, 0, 0, false
+	}
 
+	node := bt.db.getpage(pagenum)
+	if uint32(index+1) < node.count {
+		ele := node.getElement(index + 1)
+		return ele.key(), uint32(ele.value), node.curid, index + 1, true
+	}
+	if node.nextid == 0 {
+		return "", 0, 0, 0, false
+	}
+	next := bt.db.getpage(node.nextid)
+	if next.count > 0 {
+		ele := node.getElement(0)
+		return ele.key(), uint32(ele.value), next.curid, 0, true
+	}
+	return "", 0, 0, 0, false
 
-func (bt *btree) GetNextKV(pagenum uint32,index int) (string,uint32,uint32,int,bool) {
-    if bt.rootpgid == 0 {
-        return "",0,0,0,false
-    }
-    
-    node := bt.db.getpage(pagenum)
-    if uint32(index+1) < node.count {
-        ele:=node.getElement(index+1)
-        return ele.key(),uint32(ele.value),node.curid,index+1,true
-    }
-    if node.nextid == 0 {
-        return "",0,0,0,false
-    }
-    next := bt.db.getpage(node.nextid)
-    if next.count>0{
-        ele:=node.getElement(0)
-        return ele.key(),uint32(ele.value),next.curid,0,true
-    }
-    return "",0,0,0,false
-  
 }
-
 
 func (bt *btree) Display() {
 	bt.root.display(bt)
@@ -600,6 +593,8 @@ type BTreedb struct {
 	//maxpgid   uint32
 	fd   *os.File
 	meta *metaInfo
+
+	dbHelper *utils.BoltHelper
 }
 
 func exist(filename string) bool {
@@ -607,85 +602,98 @@ func exist(filename string) bool {
 	return err == nil || os.IsExist(err)
 }
 
-func NewBTDB(dbname string) *BTreedb {
+func NewBTDB(dbname string, logger *utils.Log4FE) *BTreedb {
 
-	//fmt.Printf("headoffset : %v \n", pageheadOffset)
-	//fmt.Printf("elementSize: %v \n", elementSize)
-	//fmt.Printf("pageheaadlen: %v \n", pageheaadlen)
-	//fmt.Printf("btdbname : %v \n", dbname)
-	file_create_mode := os.O_RDWR | os.O_CREATE | os.O_TRUNC
-	this := &BTreedb{filename: dbname, btmap: make(map[string]*btree)}
+	this := &BTreedb{filename: dbname, btmap: nil, dbHelper: nil}
+	this.dbHelper = utils.NewBoltHelper(dbname, 0, logger)
 
-	if exist(dbname) {
-		file_create_mode = os.O_RDWR
-	} else {
-		file_create_mode = os.O_RDWR | os.O_CREATE | os.O_TRUNC
-	}
+	return this
 
-	f, err := os.OpenFile(dbname, file_create_mode, 0664)
-	if err != nil {
-		return nil
-	}
+	/*
 
-	fi, _ := f.Stat()
-	filelen := fi.Size()
-	//fmt.Printf("filelen : %v, %v \n", filelen, pagesize*2)
-	if filelen < pagesize*2 {
-		syscall.Ftruncate(int(f.Fd()), pagesize*2)
-		filelen = pagesize * 2
+		//fmt.Printf("headoffset : %v \n", pageheadOffset)
+		//fmt.Printf("elementSize: %v \n", elementSize)
+		//fmt.Printf("pageheaadlen: %v \n", pageheaadlen)
+		//fmt.Printf("btdbname : %v \n", dbname)
+		file_create_mode := os.O_RDWR | os.O_CREATE | os.O_TRUNC
+		this := &BTreedb{filename: dbname, btmap: make(map[string]*btree)}
+
+		if exist(dbname) {
+			file_create_mode = os.O_RDWR
+		} else {
+			file_create_mode = os.O_RDWR | os.O_CREATE | os.O_TRUNC
+		}
+
+		f, err := os.OpenFile(dbname, file_create_mode, 0664)
+		if err != nil {
+			return nil
+		}
+
+		fi, _ := f.Stat()
+		filelen := fi.Size()
+		//fmt.Printf("filelen : %v, %v \n", filelen, pagesize*2)
+		if filelen < pagesize*2 {
+			syscall.Ftruncate(int(f.Fd()), pagesize*2)
+			filelen = pagesize * 2
+			this.fd = f
+			//var addr = unsafe.Pointer(&this.mmapbytes[0])
+			this.mmapbytes, err = syscall.Mmap(int(f.Fd()), 0, int(filelen), syscall.PROT_READ|syscall.PROT_WRITE, syscall.MAP_SHARED)
+			//ptr, err := C.mmap(addr, C.size_t(filelen), C.PROT_READ|C.PROT_WRITE, C.MAP_SHARED, C.int(f.Fd()), 0)
+
+			if err != nil {
+				fmt.Printf("MAPPING ERROR  %v \n", err)
+				return nil
+			}
+			//this.mmapbytes = ([]byte)(unsafe.Pointer(ptr))
+			this.meta = (*metaInfo)(unsafe.Pointer(&this.mmapbytes[0]))
+			this.meta.magic = magicnum
+			this.meta.maxpgid = 1
+			this.meta.btnum = 0
+			return this
+		}
 		this.fd = f
-		//var addr = unsafe.Pointer(&this.mmapbytes[0])
 		this.mmapbytes, err = syscall.Mmap(int(f.Fd()), 0, int(filelen), syscall.PROT_READ|syscall.PROT_WRITE, syscall.MAP_SHARED)
-		//ptr, err := C.mmap(addr, C.size_t(filelen), C.PROT_READ|C.PROT_WRITE, C.MAP_SHARED, C.int(f.Fd()), 0)
-
 		if err != nil {
 			fmt.Printf("MAPPING ERROR  %v \n", err)
 			return nil
 		}
-		//this.mmapbytes = ([]byte)(unsafe.Pointer(ptr))
 		this.meta = (*metaInfo)(unsafe.Pointer(&this.mmapbytes[0]))
-		this.meta.magic = magicnum
-		this.meta.maxpgid = 1
-		this.meta.btnum = 0
+		if this.meta.magic != magicnum {
+			fmt.Printf("FILE TYPE ERROR \n")
+			return nil
+		}
+
+		for i := uint32(0); i < this.meta.btnum; i++ {
+			btname := this.meta.btinfos[i].key()
+			root := this.getpage(this.meta.btinfos[i].rootpgid)
+			this.btmap[btname] = loadbtree(btname, root, this)
+		}
+
 		return this
-	}
-	this.fd = f
-	this.mmapbytes, err = syscall.Mmap(int(f.Fd()), 0, int(filelen), syscall.PROT_READ|syscall.PROT_WRITE, syscall.MAP_SHARED)
-	if err != nil {
-		fmt.Printf("MAPPING ERROR  %v \n", err)
-		return nil
-	}
-	this.meta = (*metaInfo)(unsafe.Pointer(&this.mmapbytes[0]))
-	if this.meta.magic != magicnum {
-		fmt.Printf("FILE TYPE ERROR \n")
-		return nil
-	}
-
-	for i := uint32(0); i < this.meta.btnum; i++ {
-		btname := this.meta.btinfos[i].key()
-		root := this.getpage(this.meta.btinfos[i].rootpgid)
-		this.btmap[btname] = loadbtree(btname, root, this)
-	}
-
-	return this
+	*/
 }
 
 func (db *BTreedb) AddBTree(name string) error {
 
-	if _, ok := db.btmap[name]; ok {
-		fmt.Printf("ERROR:::%v\n", db.filename)
+	_, err := db.dbHelper.CreateTable(name)
+	return err
+
+	/*
+		if _, ok := db.btmap[name]; ok {
+			fmt.Printf("ERROR:::%v\n", db.filename)
+			return nil
+		}
+		//fmt.Printf("FILE:::%v\n", db.filename)
+		bt := newbtree(name, db)
+		if bt == nil {
+			fmt.Printf("create error:::%v\n", name)
+			return errors.New("create error")
+		}
+		db.btmap[name] = bt
+		db.meta.addbt(name, bt.root.curid)
+		db.Sync()
 		return nil
-	}
-	//fmt.Printf("FILE:::%v\n", db.filename)
-	bt := newbtree(name, db)
-	if bt == nil {
-		fmt.Printf("create error:::%v\n", name)
-		return errors.New("create error")
-	}
-	db.btmap[name] = bt
-	db.meta.addbt(name, bt.root.curid)
-	db.Sync()
-	return nil
+	*/
 }
 
 func (db *BTreedb) header() *reflect.SliceHeader {
@@ -693,48 +701,69 @@ func (db *BTreedb) header() *reflect.SliceHeader {
 }
 
 func (db *BTreedb) Sync() error {
-	dh := db.header()
-	_, _, err := syscall.Syscall(syscall.SYS_MSYNC, dh.Data, uintptr(dh.Len), syscall.MS_SYNC)
-	if err != 0 {
-		fmt.Printf("Sync Error ")
-		return errors.New("Sync Error")
-	}
+
+	/*
+		dh := db.header()
+		_, _, err := syscall.Syscall(syscall.SYS_MSYNC, dh.Data, uintptr(dh.Len), syscall.MS_SYNC)
+		if err != 0 {
+			fmt.Printf("Sync Error ")
+			return errors.New("Sync Error")
+		}
+	*/
 	return nil
 }
 
 func (db *BTreedb) Set(btname, key string, value uint64) error {
 
-	if _, ok := db.btmap[btname]; !ok {
-		return errors.New("has one")
-	}
+	return db.dbHelper.Update(btname, key, fmt.Sprintf("%v", value))
 
-	return db.btmap[btname].Set(key, value)
+	/*
+		if _, ok := db.btmap[btname]; !ok {
+			return errors.New("has one")
+		}
+
+		return db.btmap[btname].Set(key, value)
+	*/
 
 }
 
+func (db *BTreedb) IncValue(btname, key string) error {
+	/*
+		    if _, ok := db.btmap[btname]; !ok {
+				return errors.New("has one")
+			}
 
+		    found,value:= db.btmap[btname].Search(key)
+		    if found {
+		        return db.btmap[btname].Set(key,value+1)
+		    }
+		        return db.btmap[btname].Set(key,1)
+	*/
+	return nil
 
-func (db *BTreedb) IncValue(btname,key string) error {
-    if _, ok := db.btmap[btname]; !ok {
-		return errors.New("has one")
-	}
-    
-    found,value:= db.btmap[btname].Search(key)
-    if found {
-        return db.btmap[btname].Set(key,value+1)
-    }
-        return db.btmap[btname].Set(key,1)
-   
 }
-
-
 
 func (db *BTreedb) Search(btname, key string) (bool, uint64) {
-	if _, ok := db.btmap[btname]; !ok {
+
+	vstr, err := db.dbHelper.Get(btname, key)
+	if err != nil {
 		return false, 0
 	}
 
-	return db.btmap[btname].Search(key)
+	u, e := strconv.ParseUint(vstr, 10, 64)
+	if e != nil {
+		return false, 0
+	}
+
+	return true, u
+
+	/*
+		if _, ok := db.btmap[btname]; !ok {
+			return false, 0
+		}
+
+		return db.btmap[btname].Search(key)
+	*/
 
 }
 
@@ -753,35 +782,33 @@ func (db *BTreedb) Range(btname, start, end string) (bool, []uint64) {
 
 }
 
-
-
-func (db *BTreedb) GetFristKV(btname string) (string,uint32,uint32,int,bool) {
-    if _, ok := db.btmap[btname]; !ok {
-		return "",0,0,0,false
+func (db *BTreedb) GetFristKV(btname string) (string, uint32, uint32, int, bool) {
+	if _, ok := db.btmap[btname]; !ok {
+		return "", 0, 0, 0, false
 	}
-    
-    return db.btmap[btname].GetFristKV()
-    
+
+	return db.btmap[btname].GetFristKV()
+
 }
 
-
-func (db *BTreedb) GetNextKV(btname string,pagenum uint32,index int) (string,uint32,uint32,int,bool) {
-    if _, ok := db.btmap[btname]; !ok {
-		return "",0,0,0,false
+func (db *BTreedb) GetNextKV(btname string, pagenum uint32, index int) (string, uint32, uint32, int, bool) {
+	if _, ok := db.btmap[btname]; !ok {
+		return "", 0, 0, 0, false
 	}
-    
-    return db.btmap[btname].GetNextKV(pagenum,index)
-    
+
+	return db.btmap[btname].GetNextKV(pagenum, index)
+
 }
-
-
-
 
 func (db *BTreedb) Close() error {
 
-	syscall.Munmap(db.mmapbytes)
-	db.fd.Close()
 	return nil
+
+	/*
+		syscall.Munmap(db.mmapbytes)
+		db.fd.Close()
+		return nil
+	*/
 }
 
 func (bt *BTreedb) newpage( /*parent, pre *page*/ parentid, preid uint32, pagetype uint8) (*page, *page, *page) {

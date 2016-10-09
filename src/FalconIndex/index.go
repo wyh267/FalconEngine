@@ -53,7 +53,7 @@ func NewEmptyIndex(name, pathname string, logger *utils.Log4FE) *Index {
 	this.bitmap = utils.NewBitmap(bitmapname)
 
 	dictfilename := fmt.Sprintf("%v%v_dict.dic", this.Pathname, this.Name)
-	this.dict = tree.NewBTDB(dictfilename)
+	this.dict = tree.NewBTDB(dictfilename,logger)
 
 	return this
 }
@@ -79,7 +79,7 @@ func NewIndexWithLocalFile(name, pathname string, logger *utils.Log4FE) *Index {
     dictfilename := fmt.Sprintf("%v%v_dict.dic", this.Pathname, this.Name)
 	if utils.Exist(dictfilename) {
         this.Logger.Info("[INFO] Load dictfilename %v",dictfilename)
-		this.dict = tree.NewBTDB(dictfilename)
+		this.dict = tree.NewBTDB(dictfilename,logger)
 	}
 
 	for _, segmentname := range this.SegmentNames {
@@ -109,7 +109,7 @@ func NewIndexWithLocalFile(name, pathname string, logger *utils.Log4FE) *Index {
 
 	if this.PrimaryKey != "" {
 		primaryname := fmt.Sprintf("%v%v_primary.pk", this.Pathname, this.Name)
-		this.primary = tree.NewBTDB(primaryname)
+		this.primary = tree.NewBTDB(primaryname,logger)
 	}
 
 	
@@ -133,7 +133,7 @@ func (this *Index) AddField(field utils.SimpleFieldInfo) error {
 	if field.FieldType == utils.IDX_TYPE_PK {
 		this.PrimaryKey = field.FieldName
 		primaryname := fmt.Sprintf("%v%v_primary.pk", this.Pathname, this.Name)
-		this.primary = tree.NewBTDB(primaryname)
+		this.primary = tree.NewBTDB(primaryname,logger)
 		this.primary.AddBTree(field.FieldName)
 	} else {
 		this.idxSegmentMutex.Lock()
