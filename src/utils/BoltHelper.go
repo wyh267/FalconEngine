@@ -222,6 +222,12 @@ func (this *BoltHelper) GetValue(tablename, key string) ([]byte, error) {
 
 
 
+func (this *BoltHelper) CloseDB() error {
+	
+	return this.db.Close()
+}
+
+
 
 
 func (this *BoltHelper) DisplayTable(tablename string) error {

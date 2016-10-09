@@ -802,7 +802,7 @@ func (db *BTreedb) GetNextKV(btname string, pagenum uint32, index int) (string, 
 
 func (db *BTreedb) Close() error {
 
-	return nil
+	return db.dbHelper.CloseDB()
 
 	/*
 		syscall.Munmap(db.mmapbytes)
