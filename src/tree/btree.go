@@ -716,7 +716,7 @@ func (db *BTreedb) Sync() error {
 
 func (db *BTreedb) Set(btname, key string, value uint64) error {
 	
-	db.logger.Info("btname : %v  key : %v  value : %v ",btname,key,value)
+	//db.logger.Info("btname : %v  key : %v  value : %v ",btname,key,value)
 	return db.dbHelper.Update(btname, key, fmt.Sprintf("%v", value))
 
 	/*
@@ -747,17 +747,17 @@ func (db *BTreedb) IncValue(btname, key string) error {
 
 func (db *BTreedb) Search(btname, key string) (bool, uint64) {
 	
-	db.logger.Info("Search btname : %v  key : %v  ",btname,key)
+	//db.logger.Info("Search btname : %v  key : %v  ",btname,key)
 	vstr, err := db.dbHelper.Get(btname, key)
 	if err != nil {
 		return false, 0
 	}
-	db.logger.Info("Search btname : %v  key : %v value str : %v ",btname,key,vstr)
+	//db.logger.Info("Search btname : %v  key : %v value str : %v ",btname,key,vstr)
 	u, e := strconv.ParseUint(vstr, 10, 64)
 	if e != nil {
 		return false, 0
 	}
-	db.logger.Info("Search btname : %v  key : %v value  : %v ",btname,key,u)
+	//db.logger.Info("Search btname : %v  key : %v value  : %v ",btname,key,u)
 	return true, u
 
 	/*

@@ -235,7 +235,7 @@ func (this *DefaultEngine) LoadData(method string, parms map[string]string, body
 	}
 
 	if loadstruct.SyncCount <= 0 {
-		loadstruct.SyncCount = 10000
+		loadstruct.SyncCount = 1000
 	}
 
 	for scanner.Scan() {
