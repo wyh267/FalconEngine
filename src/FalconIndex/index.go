@@ -133,7 +133,7 @@ func (this *Index) AddField(field utils.SimpleFieldInfo) error {
 	if field.FieldType == utils.IDX_TYPE_PK {
 		this.PrimaryKey = field.FieldName
 		primaryname := fmt.Sprintf("%v%v_primary.pk", this.Pathname, this.Name)
-		this.primary = tree.NewBTDB(primaryname,logger)
+		this.primary = tree.NewBTDB(primaryname,this.Logger)
 		this.primary.AddBTree(field.FieldName)
 	} else {
 		this.idxSegmentMutex.Lock()
