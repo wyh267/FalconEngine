@@ -596,7 +596,7 @@ type BTreedb struct {
 	meta *metaInfo
 
 	dbHelper *utils.BoltHelper
-	buckets   map[string]*bolt.Bucket
+	buckets   map[string]*bolt.Tx
 	logger   *utils.Log4FE
 }
 
@@ -607,7 +607,7 @@ func exist(filename string) bool {
 
 func NewBTDB(dbname string, logger *utils.Log4FE) *BTreedb {
 
-	this := &BTreedb{filename: dbname, btmap: nil, dbHelper: nil,logger:logger,buckets:make(map[string]*bolt.Bucket)}
+	this := &BTreedb{filename: dbname, btmap: nil, dbHelper: nil,logger:logger,buckets:make(map[string]*bolt.Tx)}
 	this.dbHelper = utils.NewBoltHelper(dbname, 0, logger)
 
 	return this
@@ -678,8 +678,8 @@ func NewBTDB(dbname string, logger *utils.Log4FE) *BTreedb {
 
 func (db *BTreedb) AddBTree(name string) error {
 
-	b, err := db.dbHelper.CreateTable(name)
-	db.buckets[name]=b
+	_, err := db.dbHelper.CreateTable(name)
+	//db.buckets[name]=b
 	
 	return err
 
@@ -720,11 +720,17 @@ func (db *BTreedb) Sync() error {
 
 func (db *BTreedb) Set(btname, key string, value uint64) error {
 	
-	if b,ok:=db.buckets[btname];ok{
+	/*
+	if btx,ok:=db.buckets[btname];ok{
+		b:=btx.Bucket([]byte(btname))
+		if b!= nil {
+			return b.Put([]byte(key), []byte(fmt.Sprintf("%v", value)))
+		}
 		
-		err:=b.Put([]byte(key), []byte(fmt.Sprintf("%v", value)))
-		return err
+		return fmt.Errorf("No field[%v]",btname)
 	}
+	
+	btx:=db.dbHelper.BeginTx
 	
 	b,err:=db.dbHelper.GetBucket(btname)
 	if err != nil {
@@ -736,13 +742,14 @@ func (db *BTreedb) Set(btname, key string, value uint64) error {
 	//db.logger.Info("btname : %v  key : %v  value : %v ",btname,key,value)
 	//return fmt.Errorf("No field[%v]",btname)//db.dbHelper.Update(btname, key, fmt.Sprintf("%v", value))
 
-	/*
+	
 		if _, ok := db.btmap[btname]; !ok {
 			return errors.New("has one")
 		}
 
 		return db.btmap[btname].Set(key, value)
-	*/
+		*/
+	return db.dbHelper.Update(btname, key, fmt.Sprintf("%v", value))
 
 }
 
