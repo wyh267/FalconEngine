@@ -21,6 +21,7 @@ import (
 	//"strconv"
 	"syscall"
 	"unsafe"
+	"bolt"
 	"utils"
 )
 
@@ -595,6 +596,7 @@ type BTreedb struct {
 	meta *metaInfo
 
 	dbHelper *utils.BoltHelper
+	buckets   map[string]*bolt.Bucket
 	logger   *utils.Log4FE
 }
 
@@ -605,7 +607,7 @@ func exist(filename string) bool {
 
 func NewBTDB(dbname string, logger *utils.Log4FE) *BTreedb {
 
-	this := &BTreedb{filename: dbname, btmap: nil, dbHelper: nil,logger:logger}
+	this := &BTreedb{filename: dbname, btmap: nil, dbHelper: nil,logger:logger,buckets:make(map[string]*bolt.Bucket)}
 	this.dbHelper = utils.NewBoltHelper(dbname, 0, logger)
 
 	return this
@@ -676,7 +678,9 @@ func NewBTDB(dbname string, logger *utils.Log4FE) *BTreedb {
 
 func (db *BTreedb) AddBTree(name string) error {
 
-	_, err := db.dbHelper.CreateTable(name)
+	b, err := db.dbHelper.CreateTable(name)
+	db.buckets[name]=b
+	
 	return err
 
 	/*
@@ -716,8 +720,21 @@ func (db *BTreedb) Sync() error {
 
 func (db *BTreedb) Set(btname, key string, value uint64) error {
 	
+	if b,ok:=db.buckets[btname];ok{
+		
+		err:=b.Put([]byte(key), []byte(fmt.Sprintf("%v", value)))
+		return err
+	}
+	
+	b,err:=db.dbHelper.GetBucket(btname)
+	if err != nil {
+		return err
+	}
+	
+	return b.Put([]byte(key), []byte(fmt.Sprintf("%v", value)))
+	
 	//db.logger.Info("btname : %v  key : %v  value : %v ",btname,key,value)
-	return db.dbHelper.Update(btname, key, fmt.Sprintf("%v", value))
+	//return fmt.Errorf("No field[%v]",btname)//db.dbHelper.Update(btname, key, fmt.Sprintf("%v", value))
 
 	/*
 		if _, ok := db.btmap[btname]; !ok {

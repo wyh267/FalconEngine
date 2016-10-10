@@ -122,6 +122,30 @@ func (this *BoltHelper) DeleteTable(tablename string) error {
 
 }
 
+func (this *BoltHelper) GetBucket(tablename string) (*bolt.Bucket, error) {
+
+	tx, err := this.db.Begin(true)
+	if err != nil {
+		this.Logger.Error("[ERROR] Create Tx Error %v ", err)
+		return nil, err
+	}
+	defer tx.Rollback()
+
+	b := tx.Bucket([]byte(tablename))
+
+	if b == nil {
+		this.Logger.Error("[ERROR] Tablename[%v] not found", tablename)
+		return nil, fmt.Errorf("Tablename[%v] not found", tablename)
+	}
+
+	if err := tx.Commit(); err != nil {
+		this.Logger.Error("[ERROR] Commit Tx Error %v", err)
+		return nil, err
+	}
+
+	return b, nil
+}
+
 // Update function description : 更新数据
 // params :
 // return :
@@ -139,12 +163,6 @@ func (this *BoltHelper) Update(tablename, key, value string) error {
 
 	return err
 }
-
-
-
-
-
-
 
 func (this *BoltHelper) UpdateObj(tablename, key string, obj interface{}) error {
 
@@ -198,7 +216,6 @@ func (this *BoltHelper) Get(tablename, key string) (string, error) {
 
 }
 
-
 func (this *BoltHelper) GetValue(tablename, key string) ([]byte, error) {
 
 	var value []byte
@@ -220,15 +237,10 @@ func (this *BoltHelper) GetValue(tablename, key string) ([]byte, error) {
 
 }
 
-
-
 func (this *BoltHelper) CloseDB() error {
-	
+
 	return this.db.Close()
 }
-
-
-
 
 func (this *BoltHelper) DisplayTable(tablename string) error {
 
@@ -247,13 +259,12 @@ func (this *BoltHelper) DisplayTable(tablename string) error {
 
 }
 
-func (this *BoltHelper) Traverse(tablename string,tx *bolt.Tx) func() ([]byte, []byte) {
+func (this *BoltHelper) Traverse(tablename string, tx *bolt.Tx) func() ([]byte, []byte) {
 
 	var c *bolt.Cursor
-	
-	b:=tx.Bucket([]byte(tablename))
+
+	b := tx.Bucket([]byte(tablename))
 	c = b.Cursor()
-	
 
 	k, v := c.First()
 	return func() ([]byte, []byte) {
@@ -270,25 +281,19 @@ func (this *BoltHelper) Traverse(tablename string,tx *bolt.Tx) func() ([]byte, [
 
 }
 
-
-
-
-func (this *BoltHelper)BeginTx() (*bolt.Tx,error) {
-	
+func (this *BoltHelper) BeginTx() (*bolt.Tx, error) {
 
 	tx, err := this.db.Begin(true)
 	if err != nil {
 		this.Logger.Error("[ERROR] Create Tx Error %v ", err)
-		return nil,err
+		return nil, err
 	}
-	return tx,nil
+	return tx, nil
 
-	
 }
 
+func (this *BoltHelper) Commit(tx *bolt.Tx) error {
 
-func (this *BoltHelper)Commit(tx *bolt.Tx) error {
-	
 	if err := tx.Commit(); err != nil {
 		this.Logger.Error("[ERROR] Commit Tx Error %v", err)
 		tx.Rollback()
