@@ -828,7 +828,7 @@ func (db *BTreedb) GetFristKV(btname string) (string, uint32, uint32, int, bool)
 		return "", 0, 0, 0, false
 	}
 	//db.logger.Info("Search btname : %v  key : %v value str : %v ",btname,key,vstr)
-	u, e := strconv.ParseUint(vstr, 10, 64)
+	u, e := strconv.ParseUint(vstr, 10, 32)
 	if e != nil {
 		return "", 0, 0, 0, false
 	}
@@ -846,7 +846,7 @@ func (db *BTreedb) GetNextKV(btname,key string /*pagenum uint32, index int*/) (s
 		return "", 0, 0, 0, false
 	}
 	//db.logger.Info("Search btname : %v  key : %v value str : %v ",btname,key,vstr)
-	u, e := strconv.ParseUint(vstr, 10, 64)
+	u, e := strconv.ParseUint(vstr, 10, 32)
 	if e != nil {
 		return "", 0, 0, 0, false
 	}
