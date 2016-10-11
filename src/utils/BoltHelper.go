@@ -164,6 +164,34 @@ func (this *BoltHelper) Update(tablename, key, value string) error {
 	return err
 }
 
+
+
+
+
+func (this *BoltHelper) SetBatch(btname string,btMap map[string]uint64) error {
+	
+	for k,v := range btMap{
+		
+		this.db.Batch(func(tx *bolt.Tx) error {
+		b := tx.Bucket([]byte(tablename))
+		if b == nil {
+			this.Logger.Error("[ERROR] Tablename[%v] not found", tablename)
+			return fmt.Errorf("Tablename[%v] not found", tablename)
+		}
+		err := b.Put([]byte(k), []byte(v))
+		return err
+	})
+		
+	}
+	
+	return nil
+	
+}
+
+
+
+
+
 func (this *BoltHelper) UpdateObj(tablename, key string, obj interface{}) error {
 
 	value, err := json.Marshal(obj)

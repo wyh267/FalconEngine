@@ -748,10 +748,31 @@ func (db *BTreedb) Set(btname, key string, value uint64) error {
 			}
 
 			return db.btmap[btname].Set(key, value)
+			
+			
+			
+			for i := 0; i < n; i++ {
+		go func(i int) {
+			ch <- db.Batch(func(tx *bolt.Tx) error {
+				return tx.Bucket([]byte("widgets")).Put(u64tob(uint64(i)), []byte{})
+			})
+		}(i)
+	}
+			
+			
+			
 	*/
 	return db.dbHelper.Update(btname, key, fmt.Sprintf("%v", value))
 
 }
+
+
+func (db *BTreedb) SetBatch(btname string,btMap map[string]uint64) error {
+	
+	return db.dbHelper.SetBatch(btname, key, btMap)
+	
+}
+
 
 func (db *BTreedb) IncValue(btname, key string) error {
 	/*

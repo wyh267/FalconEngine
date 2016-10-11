@@ -137,6 +137,8 @@ func (this *invert) serialization(fullsegmentname string, btdb *tree.BTreedb) er
 	totalOffset := int(fi.Size())
 
 	this.btree = btdb
+	
+	btMap:=make(map[string]uint64)
 
 	for key, value := range this.tempHashTable {
 		lens := len(value)
@@ -153,12 +155,18 @@ func (this *invert) serialization(fullsegmentname string, btdb *tree.BTreedb) er
 		}
 		idxFd.Write(buffer.Bytes())
 		//this.Logger.Info("[INFO] key :%v totalOffset: %v len:%v value:%v",key,totalOffset,lens,value)
-		this.btree.Set(this.fieldName, key, uint64(totalOffset))
+		
+		btMap[key]=uint64(totalOffset)
+		
+		/////this.btree.Set(this.fieldName, key, uint64(totalOffset))
 		totalOffset = totalOffset + 8 + lens*utils.DOCNODE_SIZE
         
         
 
 	}
+	
+	this.btree.SetBatch(this.fieldName,btMap)
+	
 	this.tempHashTable = nil
 	this.isMomery = false
 	this.Logger.Trace("[TRACE] invert --> Serialization :: Writing to File : [%v.bt] ", fullsegmentname)
