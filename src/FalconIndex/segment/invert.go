@@ -158,14 +158,14 @@ func (this *invert) serialization(fullsegmentname string, btdb *tree.BTreedb) er
 		
 		btMap[key]=uint64(totalOffset)
 		
-		/////this.btree.Set(this.fieldName, key, uint64(totalOffset))
+		this.btree.Set(this.fieldName, key, uint64(totalOffset))
 		totalOffset = totalOffset + 8 + lens*utils.DOCNODE_SIZE
         
         
 
 	}
 	
-	this.btree.SetBatch(this.fieldName,btMap)
+	//this.btree.SetBatch(this.fieldName,btMap)
 	
 	this.tempHashTable = nil
 	this.isMomery = false
