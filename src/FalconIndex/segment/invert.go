@@ -343,7 +343,7 @@ func (this *invert) mergeInvert(ivtlist []*invert,fullsegmentname string, btdb *
             value=append(value,ivts[idx].docids...)
             
            
-            key,_,pgnum,index,ok:=ivts[idx].ivt.GetNextKV(ivts[idx].pgnum,ivts[idx].index)
+            key,_,pgnum,index,ok:=ivts[idx].ivt.GetNextKV(/*ivts[idx].pgnum,ivts[idx].index*/ivts[idx].key)
             if !ok {
                 flag = flag | (1<<uint(idx))
                 //this.Logger.Info("[INFO] FLAG %x RESFLAG %x idx %v meridxs len:%v", flag,resflag,idx,len(meridxs))
@@ -399,12 +399,12 @@ func (this *invert) GetFristKV() (string,uint32,uint32,int,bool) {
 }
 
 
-func (this *invert) GetNextKV(pgnum uint32,idx int) (string,uint32,uint32,int,bool) {
+func (this *invert) GetNextKV(/*pgnum uint32,idx int*/key string) (string,uint32,uint32,int,bool) {
     
     if this.btree==nil {
         return "",0,0,0,false
     }
     
-    return this.btree.GetNextKV(this.fieldName,pgnum,idx)
+    return this.btree.GetNextKV(this.fieldName,/*pgnum,idx*/key)
     
 }
