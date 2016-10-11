@@ -53,7 +53,7 @@ func NewEmptyIndex(name, pathname string, logger *utils.Log4FE) *Index {
 	this.bitmap = utils.NewBitmap(bitmapname)
 
 	dictfilename := fmt.Sprintf("%v%v_dict.dic", this.Pathname, this.Name)
-	this.dict = tree.NewBTDB(dictfilename,logger)
+	this.dict = tree.NewBTDB(dictfilename, logger)
 
 	return this
 }
@@ -76,10 +76,10 @@ func NewIndexWithLocalFile(name, pathname string, logger *utils.Log4FE) *Index {
 		return this
 	}
 
-    dictfilename := fmt.Sprintf("%v%v_dict.dic", this.Pathname, this.Name)
+	dictfilename := fmt.Sprintf("%v%v_dict.dic", this.Pathname, this.Name)
 	if utils.Exist(dictfilename) {
-        this.Logger.Info("[INFO] Load dictfilename %v",dictfilename)
-		this.dict = tree.NewBTDB(dictfilename,logger)
+		this.Logger.Info("[INFO] Load dictfilename %v", dictfilename)
+		this.dict = tree.NewBTDB(dictfilename, logger)
 	}
 
 	for _, segmentname := range this.SegmentNames {
@@ -97,9 +97,7 @@ func NewIndexWithLocalFile(name, pathname string, logger *utils.Log4FE) *Index {
 		}
 
 	}
-    
-    
-    
+
 	this.memorySegment = fis.NewEmptySegmentWithFieldsInfo(segmentname, this.MaxDocId, fields, this.dict, this.Logger)
 	this.PrefixSegment++
 
@@ -109,10 +107,8 @@ func NewIndexWithLocalFile(name, pathname string, logger *utils.Log4FE) *Index {
 
 	if this.PrimaryKey != "" {
 		primaryname := fmt.Sprintf("%v%v_primary.pk", this.Pathname, this.Name)
-		this.primary = tree.NewBTDB(primaryname,logger)
+		this.primary = tree.NewBTDB(primaryname, logger)
 	}
-
-	
 
 	this.Logger.Info("[INFO] Load Index %v success", this.Name)
 	return this
@@ -133,7 +129,7 @@ func (this *Index) AddField(field utils.SimpleFieldInfo) error {
 	if field.FieldType == utils.IDX_TYPE_PK {
 		this.PrimaryKey = field.FieldName
 		primaryname := fmt.Sprintf("%v%v_primary.pk", this.Pathname, this.Name)
-		this.primary = tree.NewBTDB(primaryname,this.Logger)
+		this.primary = tree.NewBTDB(primaryname, this.Logger)
 		this.primary.AddBTree(field.FieldName)
 	} else {
 		this.idxSegmentMutex.Lock()
@@ -432,94 +428,85 @@ func (this *Index) SearchUnitDocIds(querys []utils.FSSearchQuery, filteds []util
 	return nil, false
 }
 
+func (this *Index) SearchDocIds(querys []utils.FSSearchQuery, filteds []utils.FSSearchFilted) ([]utils.DocIdNode, bool) {
 
-func (this *Index)SearchDocIds(querys []utils.FSSearchQuery, filteds []utils.FSSearchFilted) ([]utils.DocIdNode,bool) {
-    
-    var ok bool
-    docids:= <-utils.GetDocIDsChan
-    if len(querys) >= 1 {
-        for _,segment := range this.segments {
-            docids,_ = segment.SearchDocIds(querys[0],filteds, this.bitmap, docids)
-        }
-        //this.Logger.Info("[INFO] key[%v] doclens:%v",querys[0].Value,len(docids))
-        docids = utils.ComputeWeight(docids,len(docids),this.MaxDocId)
-    }
-    
-    if len(querys) == 1 {
-        sort.Sort(utils.DocWeightSort(docids))
-        return docids,true
-    }
-    
-    for _,query := range querys[1:] {
-        
-        subdocids := <-utils.GetDocIDsChan
-        for _,segment := range this.segments {
-            subdocids,_ = segment.SearchDocIds(query,filteds, this.bitmap, subdocids)
-        }
-        
-        //this.Logger.Info("[INFO] key[%v] doclens:%v",query.Value,len(subdocids))
-        docids,ok=utils.InteractionWithStartAndDf(docids,subdocids,0,len(subdocids),this.MaxDocId)
-        utils.GiveDocIDsChan <- subdocids
-        if !ok {
-            utils.GiveDocIDsChan <- docids
-            return nil,false
-        }
-        
-    }
-    
-    sort.Sort(utils.DocWeightSort(docids))
-    return docids,true
-    
-    
+	var ok bool
+	docids := <-utils.GetDocIDsChan
+	if len(querys) >= 1 {
+		for _, segment := range this.segments {
+			docids, _ = segment.SearchDocIds(querys[0], filteds, this.bitmap, docids)
+		}
+		//this.Logger.Info("[INFO] key[%v] doclens:%v",querys[0].Value,len(docids))
+		docids = utils.ComputeWeight(docids, len(docids), this.MaxDocId)
+	}
+
+	if len(querys) == 1 {
+		sort.Sort(utils.DocWeightSort(docids))
+		return docids, true
+	}
+
+	for _, query := range querys[1:] {
+
+		subdocids := <-utils.GetDocIDsChan
+		for _, segment := range this.segments {
+			subdocids, _ = segment.SearchDocIds(query, filteds, this.bitmap, subdocids)
+		}
+
+		//this.Logger.Info("[INFO] key[%v] doclens:%v",query.Value,len(subdocids))
+		docids, ok = utils.InteractionWithStartAndDf(docids, subdocids, 0, len(subdocids), this.MaxDocId)
+		utils.GiveDocIDsChan <- subdocids
+		if !ok {
+			utils.GiveDocIDsChan <- docids
+			return nil, false
+		}
+
+	}
+
+	sort.Sort(utils.DocWeightSort(docids))
+	return docids, true
+
 }
-
-
 
 func (this *Index) SimpleSearch(querys []utils.FSSearchQuery, filteds []utils.FSSearchFilted, ps, pg int) ([]map[string]string, bool) {
 
-    var ok bool
-    docids:= <-utils.GetDocIDsChan
-    if len(querys) >= 1 {
-        for _,segment := range this.segments {
-            docids,_ = segment.SearchDocIds(querys[0],filteds, this.bitmap, docids)
-        }
-        
-        docids = utils.ComputeWeight(docids,len(docids),this.MaxDocId)
-    }
-    
-    if len(querys) == 1 {
-        goto END
-    }
-
-
-    
-    for _,query := range querys[1:] {
-        
-        subdocids := <-utils.GetDocIDsChan
-        for _,segment := range this.segments {
-            subdocids,_ = segment.SearchDocIds(query,filteds, this.bitmap, subdocids)
-        }
-        
-        
-        docids,ok=utils.InteractionWithStartAndDf(docids,subdocids,0,len(subdocids),this.MaxDocId)
-        utils.GiveDocIDsChan <- subdocids
-        if !ok {
-            utils.GiveDocIDsChan <- docids
-            return nil,false
-        }
-        
-    }
-    
-    
-
-/*
-	//docids := make([]utils.DocIdNode, 0)
+	var ok bool
 	docids := <-utils.GetDocIDsChan
-	for _, segment := range this.segments {
-		docids, _ = segment.SearchUnitDocIds(querys, filteds, this.bitmap, docids, this.MaxDocId)
-		//this.Logger.Info("[INFO] segment[%v] docids %v", segment.SegmentName, docids)
+	if len(querys) >= 1 {
+		for _, segment := range this.segments {
+			docids, _ = segment.SearchDocIds(querys[0], filteds, this.bitmap, docids)
+		}
+
+		docids = utils.ComputeWeight(docids, len(docids), this.MaxDocId)
 	}
-*/
+
+	if len(querys) == 1 {
+		goto END
+	}
+
+	for _, query := range querys[1:] {
+
+		subdocids := <-utils.GetDocIDsChan
+		for _, segment := range this.segments {
+			subdocids, _ = segment.SearchDocIds(query, filteds, this.bitmap, subdocids)
+		}
+
+		docids, ok = utils.InteractionWithStartAndDf(docids, subdocids, 0, len(subdocids), this.MaxDocId)
+		utils.GiveDocIDsChan <- subdocids
+		if !ok {
+			utils.GiveDocIDsChan <- docids
+			return nil, false
+		}
+
+	}
+
+	/*
+		//docids := make([]utils.DocIdNode, 0)
+		docids := <-utils.GetDocIDsChan
+		for _, segment := range this.segments {
+			docids, _ = segment.SearchUnitDocIds(querys, filteds, this.bitmap, docids, this.MaxDocId)
+			//this.Logger.Info("[INFO] segment[%v] docids %v", segment.SegmentName, docids)
+		}
+	*/
 
 END:
 	lens := len(docids)

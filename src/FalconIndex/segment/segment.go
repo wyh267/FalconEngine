@@ -586,7 +586,7 @@ func (this *Segment) SearchUnitDocIds(querys []utils.FSSearchQuery, filteds []ut
 
 			if !flag {
 				flag = true
-                if this.FieldInfos[query.FieldName].FieldType == utils.IDX_TYPE_STRING_SEG{
+                /*if this.FieldInfos[query.FieldName].FieldType == utils.IDX_TYPE_STRING_SEG{
                     
                     okdf,df := this.dict.Search(query.FieldName,query.Value)
                     if okdf {
@@ -595,12 +595,12 @@ func (this *Segment) SearchUnitDocIds(querys []utils.FSSearchQuery, filteds []ut
                         indocids = append(indocids, docids...)
                     }
                     
-                }else{
+                }else{*/
                     indocids = append(indocids, docids...)
-                }
+                //}
 				
 			} else {
-                if this.FieldInfos[query.FieldName].FieldType == utils.IDX_TYPE_STRING_SEG{
+                /*if this.FieldInfos[query.FieldName].FieldType == utils.IDX_TYPE_STRING_SEG{
                     okdf,df := this.dict.Search(query.FieldName,query.Value)
                     if okdf {
                         indocids, ok = utils.InteractionWithStartAndDf(indocids, docids, start,int(df),maxdocid)
@@ -613,12 +613,12 @@ func (this *Segment) SearchUnitDocIds(querys []utils.FSSearchQuery, filteds []ut
                             return indocids[:start], false
                         }
                     }
-                }else{
+                }else{*/
                     indocids, ok = utils.InteractionWithStart(indocids, docids, start)
                     if !ok {
                         return indocids[:start], false
                     }
-                }
+                //}
 				
 				
 			}
