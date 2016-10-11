@@ -765,7 +765,21 @@ func (db *BTreedb) IncValue(btname, key string) error {
 		    }
 		        return db.btmap[btname].Set(key,1)
 	*/
-	return nil
+	
+	found,value := db.Search(btname,key)
+	if found {
+		
+		value++
+		
+		
+	}else{
+		value=1
+		
+		
+	}
+	
+	
+	return db.dbHelper.Update(btname, key, fmt.Sprintf("%v", value))
 
 }
 

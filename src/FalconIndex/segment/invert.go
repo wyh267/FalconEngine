@@ -93,9 +93,9 @@ func (this *invert) addDocument(docid uint32, content interface{}) error {
                 this.tempHashTable[terminfo.Term] = append(this.tempHashTable[terminfo.Term], docidNode)
             }
            /// delete by wuyinghao,不用使用字典了
-           /// if err:=this.dict.IncValue(this.fieldName,terminfo.Term);err!=nil{
-           ///     return err
-           /// }
+           if err:=this.dict.IncValue(this.fieldName,terminfo.Term);err!=nil{
+                return err
+            }
         }
         //this.Logger.Info("[INFO] SegmentWithTf <<<<<<<<<<<<<<<<<<<<< ")
 
