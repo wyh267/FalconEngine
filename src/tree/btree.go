@@ -769,7 +769,7 @@ func (db *BTreedb) Set(btname, key string, value uint64) error {
 
 func (db *BTreedb) SetBatch(btname string,btMap map[string]uint64) error {
 	
-	return db.dbHelper.SetBatch(btname, key, btMap)
+	return db.dbHelper.SetBatch(btname, btMap)
 	
 }
 
