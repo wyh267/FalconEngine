@@ -168,7 +168,7 @@ func (this *BoltHelper) Update(tablename, key, value string) error {
 
 
 
-func (this *BoltHelper) SetBatch(btname string,btMap map[string]uint64) error {
+func (this *BoltHelper) SetBatch(tablename string,btMap map[string]uint64) error {
 	
 	for k,v := range btMap{
 		
@@ -178,7 +178,7 @@ func (this *BoltHelper) SetBatch(btname string,btMap map[string]uint64) error {
 			this.Logger.Error("[ERROR] Tablename[%v] not found", tablename)
 			return fmt.Errorf("Tablename[%v] not found", tablename)
 		}
-		err := b.Put([]byte(k), []byte(v))
+		err := b.Put([]byte(k), []byte(fmt.Sprintf("%v",v)))
 		return err
 	})
 		
