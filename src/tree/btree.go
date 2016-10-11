@@ -19,9 +19,9 @@ import (
 	"sort"
 	"strconv"
 	//"strconv"
+	"bolt"
 	"syscall"
 	"unsafe"
-	"bolt"
 	"utils"
 )
 
@@ -509,15 +509,12 @@ func (bt *btree) Range(start, end string) (bool, []uint64) {
 
 func (bt *btree) GetFristKV() (string, uint32, uint32, int, bool) {
 
-	
 	if bt.rootpgid == 0 {
 		return "", 0, 0, 0, false
 	}
 
 	node := bt.db.getpage(bt.rootpgid)
 	return node.getfristkv(bt)
-	
-	
 
 }
 
@@ -599,7 +596,7 @@ type BTreedb struct {
 	meta *metaInfo
 
 	dbHelper *utils.BoltHelper
-	buckets   map[string]*bolt.Tx
+	buckets  map[string]*bolt.Tx
 	logger   *utils.Log4FE
 }
 
@@ -610,7 +607,7 @@ func exist(filename string) bool {
 
 func NewBTDB(dbname string, logger *utils.Log4FE) *BTreedb {
 
-	this := &BTreedb{filename: dbname, btmap: nil, dbHelper: nil,logger:logger,buckets:make(map[string]*bolt.Tx)}
+	this := &BTreedb{filename: dbname, btmap: nil, dbHelper: nil, logger: logger, buckets: make(map[string]*bolt.Tx)}
 	this.dbHelper = utils.NewBoltHelper(dbname, 0, logger)
 
 	return this
@@ -683,7 +680,7 @@ func (db *BTreedb) AddBTree(name string) error {
 
 	_, err := db.dbHelper.CreateTable(name)
 	//db.buckets[name]=b
-	
+
 	return err
 
 	/*
@@ -722,36 +719,36 @@ func (db *BTreedb) Sync() error {
 }
 
 func (db *BTreedb) Set(btname, key string, value uint64) error {
-	
+
 	/*
-	if btx,ok:=db.buckets[btname];ok{
-		b:=btx.Bucket([]byte(btname))
-		if b!= nil {
-			return b.Put([]byte(key), []byte(fmt.Sprintf("%v", value)))
-		}
-		
-		return fmt.Errorf("No field[%v]",btname)
-	}
-	
-	btx:=db.dbHelper.BeginTx
-	
-	b,err:=db.dbHelper.GetBucket(btname)
-	if err != nil {
-		return err
-	}
-	
-	return b.Put([]byte(key), []byte(fmt.Sprintf("%v", value)))
-	
-	//db.logger.Info("btname : %v  key : %v  value : %v ",btname,key,value)
-	//return fmt.Errorf("No field[%v]",btname)//db.dbHelper.Update(btname, key, fmt.Sprintf("%v", value))
+		if btx,ok:=db.buckets[btname];ok{
+			b:=btx.Bucket([]byte(btname))
+			if b!= nil {
+				return b.Put([]byte(key), []byte(fmt.Sprintf("%v", value)))
+			}
 
-	
-		if _, ok := db.btmap[btname]; !ok {
-			return errors.New("has one")
+			return fmt.Errorf("No field[%v]",btname)
 		}
 
-		return db.btmap[btname].Set(key, value)
-		*/
+		btx:=db.dbHelper.BeginTx
+
+		b,err:=db.dbHelper.GetBucket(btname)
+		if err != nil {
+			return err
+		}
+
+		return b.Put([]byte(key), []byte(fmt.Sprintf("%v", value)))
+
+		//db.logger.Info("btname : %v  key : %v  value : %v ",btname,key,value)
+		//return fmt.Errorf("No field[%v]",btname)//db.dbHelper.Update(btname, key, fmt.Sprintf("%v", value))
+
+
+			if _, ok := db.btmap[btname]; !ok {
+				return errors.New("has one")
+			}
+
+			return db.btmap[btname].Set(key, value)
+	*/
 	return db.dbHelper.Update(btname, key, fmt.Sprintf("%v", value))
 
 }
@@ -773,7 +770,7 @@ func (db *BTreedb) IncValue(btname, key string) error {
 }
 
 func (db *BTreedb) Search(btname, key string) (bool, uint64) {
-	
+
 	//db.logger.Info("Search btname : %v  key : %v  ",btname,key)
 	vstr, err := db.dbHelper.Get(btname, key)
 	if err != nil {
@@ -814,52 +811,50 @@ func (db *BTreedb) Range(btname, start, end string) (bool, []uint64) {
 
 func (db *BTreedb) GetFristKV(btname string) (string, uint32, uint32, int, bool) {
 	/*
-	if _, ok := db.btmap[btname]; !ok {
-		return "", 0, 0, 0, false
-	}
+		if _, ok := db.btmap[btname]; !ok {
+			return "", 0, 0, 0, false
+		}
 
-	return db.btmap[btname].GetFristKV()
+		return db.btmap[btname].GetFristKV()
 	*/
-	
-	
+
 	//db.logger.Info("Search btname : %v  key : %v  ",btname,key)
-	key,vstr, err := db.dbHelper.GetFristKV(btname)
+	key, vstr, err := db.dbHelper.GetFristKV(btname)
 	if err != nil {
 		return "", 0, 0, 0, false
 	}
 	//db.logger.Info("Search btname : %v  key : %v value str : %v ",btname,key,vstr)
-	u, e := strconv.ParseUint(vstr, 10, 32)
+	u, e := strconv.ParseUint(vstr, 10, 64)
 	if e != nil {
 		return "", 0, 0, 0, false
 	}
 	//db.logger.Info("Search btname : %v  key : %v value  : %v ",btname,key,u)
-	return key, u,0,0,true
-	
+	return key, uint32(u), 0, 0, true
+
 	//return db.dbHelper.GetFristKV(btname)
-	
+
 }
 
-func (db *BTreedb) GetNextKV(btname,key string /*pagenum uint32, index int*/) (string, uint32, uint32, int, bool) {
-	
-	vkey,vstr, err := db.dbHelper.GetNextKV(btname,key)
+func (db *BTreedb) GetNextKV(btname, key string /*pagenum uint32, index int*/) (string, uint32, uint32, int, bool) {
+
+	vkey, vstr, err := db.dbHelper.GetNextKV(btname, key)
 	if err != nil {
 		return "", 0, 0, 0, false
 	}
 	//db.logger.Info("Search btname : %v  key : %v value str : %v ",btname,key,vstr)
-	u, e := strconv.ParseUint(vstr, 10, 32)
+	u, e := strconv.ParseUint(vstr, 10, 64)
 	if e != nil {
 		return "", 0, 0, 0, false
 	}
 	//db.logger.Info("Search btname : %v  key : %v value  : %v ",btname,key,u)
-	return vkey, u,0,0,true
-	
-	
-	/*
-	if _, ok := db.btmap[btname]; !ok {
-		return "", 0, 0, 0, false
-	}
+	return vkey, uint32(u), 0, 0, true
 
-	return db.btmap[btname].GetNextKV(pagenum, index)
+	/*
+		if _, ok := db.btmap[btname]; !ok {
+			return "", 0, 0, 0, false
+		}
+
+		return db.btmap[btname].GetNextKV(pagenum, index)
 	*/
 }
 

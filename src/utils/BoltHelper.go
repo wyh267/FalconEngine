@@ -195,56 +195,49 @@ func (this *BoltHelper) HasKey(tablename, key string) bool {
 
 }
 
+func (this *BoltHelper) GetNextKV(tablename, key string) (string, string, error) {
 
-
-func (this *BoltHelper) GetNextKV(tablename,key string) (string,string,error) {
-	
 	var value []byte
-	var bkey   []byte
-	this.db.View(func(tx *bolt.Tx) error {
-
-		b := tx.Bucket([]byte(tablename))
-		b.Get([]byte(key))
-		c := b.Cursor()
-		bkey,value = c.Next()
-		//fmt.Printf("value : %v\n", string(value))
-		return nil
-	})
-
-	if value == nil || bkey == nil{
-		//this.Logger.Error("[ERROR] Key %v not found",key)
-		return "", "",fmt.Errorf("Key[%v] Not Found", key)
-	}
-
-	return string(bkey),string(value), nil
-	
-	
-}
-
-
-func (this *BoltHelper) GetFristKV(tablename string) (string, string, error) {
-	
-	var value []byte
-	var key   []byte
+	var bkey []byte
 	this.db.View(func(tx *bolt.Tx) error {
 
 		b := tx.Bucket([]byte(tablename)).Cursor()
-		key,value = b.First()
+		b.Seek([]byte(key))
+		bkey, value = b.Next()
 		//fmt.Printf("value : %v\n", string(value))
+		//fmt.Printf("Key %v Next Key : %v  Value : %v\n", key, string(bkey), string(value))
+		return nil
+	})
+
+	if value == nil || bkey == nil {
+		//this.Logger.Error("[ERROR] Key %v not found",key)
+		return "", "", fmt.Errorf("Key[%v] Not Found", key)
+	}
+
+	return string(bkey), string(value), nil
+
+}
+
+func (this *BoltHelper) GetFristKV(tablename string) (string, string, error) {
+
+	var value []byte
+	var key []byte
+	this.db.View(func(tx *bolt.Tx) error {
+
+		b := tx.Bucket([]byte(tablename)).Cursor()
+		key, value = b.First()
+		//fmt.Printf("First Key : %v  Value : %v\n", string(key), string(value))
 		return nil
 	})
 
 	if value == nil {
 		//this.Logger.Error("[ERROR] Key %v not found",key)
-		return "", "",fmt.Errorf("Key[%v] Not Found", key)
+		return "", "", fmt.Errorf("Key[%v] Not Found", key)
 	}
 
-	return string(key),string(value), nil
-	
-	
-	
-}
+	return string(key), string(value), nil
 
+}
 
 func (this *BoltHelper) Get(tablename, key string) (string, error) {
 
