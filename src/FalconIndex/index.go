@@ -436,7 +436,7 @@ func (this *Index) SearchDocIds(querys []utils.FSSearchQuery, filteds []utils.FS
 		for _, segment := range this.segments {
 			docids, _ = segment.SearchDocIds(querys[0], filteds, this.bitmap, docids)
 		}
-		//this.Logger.Info("[INFO] key[%v] doclens:%v",querys[0].Value,len(docids))
+		this.Logger.Info("[INFO] key[%v] doclens:%v",querys[0].Value,len(docids))
 		docids = utils.ComputeWeight(docids, len(docids), this.MaxDocId)
 	}
 
@@ -452,7 +452,7 @@ func (this *Index) SearchDocIds(querys []utils.FSSearchQuery, filteds []utils.FS
 			subdocids, _ = segment.SearchDocIds(query, filteds, this.bitmap, subdocids)
 		}
 
-		//this.Logger.Info("[INFO] key[%v] doclens:%v",query.Value,len(subdocids))
+		this.Logger.Info("[INFO] key[%v] doclens:%v",query.Value,len(subdocids))
 		docids, ok = utils.InteractionWithStartAndDf(docids, subdocids, 0, len(subdocids), this.MaxDocId)
 		utils.GiveDocIDsChan <- subdocids
 		if !ok {
