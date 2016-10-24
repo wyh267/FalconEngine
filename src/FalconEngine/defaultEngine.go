@@ -123,11 +123,8 @@ func (this *DefaultEngine) Search(method string, parms map[string]string, body [
 	for _, docid := range docids[start:end] {
 		val, ok := indexer.GetDocument(docid.Docid)
 		if ok {
-			if len(val["content"]) > 50 {
-				val["content"]=val["content"][:50]+"..."
-			}
 			for _, term := range terms {
-				val["title"]=strings.Replace(val["title"],term,"[["+term+"]]",-1)
+				val["title"]=strings.Replace(val["title"],term,"\"<font color=\"red\">"+term+"</font>\"",-1)
 			}
 			defaultResult.Result = append(defaultResult.Result, val)
 		}
