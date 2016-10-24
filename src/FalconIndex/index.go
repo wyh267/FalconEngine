@@ -527,6 +527,9 @@ END:
 	for _, docid := range docids[start:end] {
 		val, ok := this.GetDocument(docid.Docid)
 		if ok {
+			if len(val["content"]) > 50 {
+				val["content"]=val["content"][:50]+"..."
+			}
 			res = append(res, val)
 		}
 	}
