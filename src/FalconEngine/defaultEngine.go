@@ -75,7 +75,7 @@ func (this *DefaultEngine) Search(method string, parms map[string]string, body [
 	searchquerys := make([]utils.FSSearchQuery, 0)
 	for _, term := range terms {
 		var queryst utils.FSSearchQuery
-		queryst.FieldName = "content"
+		queryst.FieldName = "title"
 		queryst.Value = term
 		searchquerys = append(searchquerys, queryst)
 	}
