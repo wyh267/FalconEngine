@@ -127,7 +127,7 @@ func (this *DefaultEngine) Search(method string, parms map[string]string, body [
 				val["content"]=val["content"][:50]+"..."
 			}
 			for _, term := range terms {
-				val["title"]=strings.Replace(val["title"],term,"<font color=\"red\">"+val["title"]+"</font>",-1)
+				val["title"]=strings.Replace(val["title"],term,"[["+term+"]]",-1)
 			}
 			defaultResult.Result = append(defaultResult.Result, val)
 		}
