@@ -49,9 +49,10 @@ const SIZE_OF_TRIE_NODE int = 10
 
 // 索引类型说明
 const (
-	IDX_TYPE_STRING      = 1 //字符型索引[全词匹配]
-	IDX_TYPE_STRING_SEG  = 2 //字符型索引[切词匹配，全文索引,hash存储倒排]
-	IDX_TYPE_STRING_LIST = 3 //字符型索引[列表类型，分号切词，直接切分,hash存储倒排]
+	IDX_TYPE_STRING        = 1 //字符型索引[全词匹配]
+	IDX_TYPE_STRING_SEG    = 2 //字符型索引[切词匹配，全文索引,hash存储倒排]
+	IDX_TYPE_STRING_LIST   = 3 //字符型索引[列表类型，分号切词，直接切分,hash存储倒排]
+	IDX_TYPE_STRING_SINGLE = 4 //字符型索引[单字切词]
 
 	IDX_TYPE_NUMBER = 11 //数字型索引，只支持整数，数字型索引只建立正排
 
@@ -211,11 +212,11 @@ type FEResultAutomaticSingle struct {
 }
 
 type FSLoadStruct struct {
-	Split    string   `json:"_split"`
-	Fields   []string `json:"_fields"`
-	Filename string   `json:"_filename"`
-    SyncCount int     `json:"_synccount"`
-    IsMerge   bool    `json:"_ismerge"`
+	Split     string   `json:"_split"`
+	Fields    []string `json:"_fields"`
+	Filename  string   `json:"_filename"`
+	SyncCount int      `json:"_synccount"`
+	IsMerge   bool     `json:"_ismerge"`
 }
 
 type Engine interface {
@@ -291,14 +292,13 @@ func Merge(a []DocIdNode, b []DocIdNode) ([]DocIdNode, bool) {
 }
 
 func ComputeWeight(res []DocIdNode, df int, maxdoc uint32) []DocIdNode {
-    idf:=math.Log10(float64(maxdoc)/float64(df))
-    for ia := 0; ia < len(res); ia++ {
-		res[ia].Weight = uint32(float64(res[ia].Weight) * idf )
+	idf := math.Log10(float64(maxdoc) / float64(df))
+	for ia := 0; ia < len(res); ia++ {
+		res[ia].Weight = uint32(float64(res[ia].Weight) * idf)
 	}
 	return res
-    
-}
 
+}
 
 func ComputeTfIdf(res []DocIdNode, a []DocIdNode, df int, maxdoc uint32) []DocIdNode {
 
@@ -321,13 +321,13 @@ func InteractionWithStartAndDf(a []DocIdNode, b []DocIdNode, start int, df int, 
 	lenc := start
 	ia := start
 	ib := 0
-    idf:=math.Log10(float64(maxdoc)/float64(df))
+	idf := math.Log10(float64(maxdoc) / float64(df))
 	for ia < lena && ib < lenb {
 
 		if a[ia].Docid == b[ib].Docid {
 			a[lenc] = a[ia]
-            //uint32((float64(a[ia].Weight) / 10000 * idf ) * 10000)
-			a[lenc].Weight += uint32(float64(a[ia].Weight) * idf )
+			//uint32((float64(a[ia].Weight) / 10000 * idf ) * 10000)
+			a[lenc].Weight += uint32(float64(a[ia].Weight) * idf)
 			lenc++
 			ia++
 			ib++
@@ -538,8 +538,6 @@ func DocIdsMaker() (get, give chan []DocIdNode) {
 	return
 }
 
-
-
 // IsDateTime function description : 判断是否是日期时间格式
 // params : 字符串
 // return : 是否是日期时间格式
@@ -564,13 +562,12 @@ func IsDateTime(datetime string) (int64, error) {
 
 }
 
+func FormatDateTime(timestamp int64) (string, bool) {
 
-func FormatDateTime(timestamp int64) (string,bool) {
-    
-    if timestamp == 0 {
-        return "",false
-    }
-    tm:=time.Unix(timestamp, 0)
-    return tm.Format("2006-01-02 15:04:05"),true
-    
+	if timestamp == 0 {
+		return "", false
+	}
+	tm := time.Unix(timestamp, 0)
+	return tm.Format("2006-01-02 15:04:05"), true
+
 }

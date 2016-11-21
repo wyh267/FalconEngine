@@ -39,14 +39,14 @@ type invert struct {
 	tempHashTable map[string][]utils.DocIdNode
 	Logger        *utils.Log4FE
 	btree         *tree.BTreedb
-    dict          *tree.BTreedb
+	dict          *tree.BTreedb
 }
 
 // newEmptyInvert function description : 新建空的字符型倒排索引
 // params :
 // return :
-func newEmptyInvert(fieldType uint64, startDocId uint32, fieldname string,dict *tree.BTreedb, logger *utils.Log4FE) *invert {
-	this := &invert{dict:dict,btree: nil, curDocId: startDocId, fieldName: fieldname, fieldType: fieldType, tempHashTable: make(map[string][]utils.DocIdNode), Logger: logger, isMomery: true}
+func newEmptyInvert(fieldType uint64, startDocId uint32, fieldname string, dict *tree.BTreedb, logger *utils.Log4FE) *invert {
+	this := &invert{dict: dict, btree: nil, curDocId: startDocId, fieldName: fieldname, fieldType: fieldType, tempHashTable: make(map[string][]utils.DocIdNode), Logger: logger, isMomery: true}
 	return this
 }
 
@@ -54,9 +54,9 @@ func newEmptyInvert(fieldType uint64, startDocId uint32, fieldname string,dict *
 // params :
 // return :
 func newInvertWithLocalFile(btdb *tree.BTreedb, fieldType uint64, fieldname, fullsegmentname string,
-	idxMmap *utils.Mmap, dict *tree.BTreedb,logger *utils.Log4FE) *invert {
+	idxMmap *utils.Mmap, dict *tree.BTreedb, logger *utils.Log4FE) *invert {
 
-	this := &invert{dict:dict,btree: btdb, fieldType: fieldType, fieldName: fieldname, Logger: logger, isMomery: false, idxMmap: idxMmap}
+	this := &invert{dict: dict, btree: btdb, fieldType: fieldType, fieldName: fieldname, Logger: logger, isMomery: false, idxMmap: idxMmap}
 	return this
 
 }
@@ -79,35 +79,34 @@ func (this *invert) addDocument(docid uint32, content interface{}) error {
 		terms = append(terms, contentstr)
 	case utils.IDX_TYPE_STRING_LIST: //分号切割模式
 		terms = strings.Split(contentstr, ";")
+	case utils.IDX_TYPE_STRING_SINGLE:
 	case utils.IDX_TYPE_STRING_SEG: //分词模式
-		terminfos,termcount := utils.GSegmenter.SegmentWithTf(contentstr, true)
-        //this.Logger.Info("[INFO] SegmentWithTf >>>>>>>>>>>>>>>>>>>>>>>> ")
-        for _, terminfo := range terminfos {
-            //this.Logger.Info("[INFO] terminfo.Term %v",terminfo.Term)
-            docidNode := utils.DocIdNode{Docid:docid,Weight:uint32((float64(terminfo.Tf)/float64(termcount))*10000)}
-            if _, inTmp := this.tempHashTable[terminfo.Term]; !inTmp {
-                var docidNodes []utils.DocIdNode
-                docidNodes = append(docidNodes, docidNode)
-                this.tempHashTable[terminfo.Term] = docidNodes
-            } else {
-                this.tempHashTable[terminfo.Term] = append(this.tempHashTable[terminfo.Term], docidNode)
-            }
-           /// delete by wuyinghao,不用使用字典了
-           //if err:=this.dict.IncValue(this.fieldName,terminfo.Term);err!=nil{
-            //    return err
-            //}
-        }
-        //this.Logger.Info("[INFO] SegmentWithTf <<<<<<<<<<<<<<<<<<<<< ")
+		terminfos, termcount := utils.GSegmenter.SegmentWithTf(contentstr, true)
+		//this.Logger.Info("[INFO] SegmentWithTf >>>>>>>>>>>>>>>>>>>>>>>> ")
+		for _, terminfo := range terminfos {
+			//this.Logger.Info("[INFO] terminfo.Term %v",terminfo.Term)
+			docidNode := utils.DocIdNode{Docid: docid, Weight: uint32((float64(terminfo.Tf) / float64(termcount)) * 10000)}
+			if _, inTmp := this.tempHashTable[terminfo.Term]; !inTmp {
+				var docidNodes []utils.DocIdNode
+				docidNodes = append(docidNodes, docidNode)
+				this.tempHashTable[terminfo.Term] = docidNodes
+			} else {
+				this.tempHashTable[terminfo.Term] = append(this.tempHashTable[terminfo.Term], docidNode)
+			}
+			/// delete by wuyinghao,不用使用字典了
+			//if err:=this.dict.IncValue(this.fieldName,terminfo.Term);err!=nil{
+			//    return err
+			//}
+		}
+		//this.Logger.Info("[INFO] SegmentWithTf <<<<<<<<<<<<<<<<<<<<< ")
 
-        
-        this.curDocId++
-        return nil
-        
-        
+		this.curDocId++
+		return nil
+
 	}
 
 	for _, term := range terms {
-		docidNode := utils.DocIdNode{Docid:docid}
+		docidNode := utils.DocIdNode{Docid: docid}
 		if _, inTmp := this.tempHashTable[term]; !inTmp {
 			var docidNodes []utils.DocIdNode
 			docidNodes = append(docidNodes, docidNode)
@@ -137,8 +136,8 @@ func (this *invert) serialization(fullsegmentname string, btdb *tree.BTreedb) er
 	totalOffset := int(fi.Size())
 
 	this.btree = btdb
-	
-	btMap:=make(map[string]uint64)
+
+	btMap := make(map[string]uint64)
 
 	for key, value := range this.tempHashTable {
 		lens := len(value)
@@ -155,18 +154,16 @@ func (this *invert) serialization(fullsegmentname string, btdb *tree.BTreedb) er
 		}
 		idxFd.Write(buffer.Bytes())
 		//this.Logger.Info("[INFO] key :%v totalOffset: %v len:%v value:%v",key,totalOffset,lens,value)
-		
-		btMap[key]=uint64(totalOffset)
-		
+
+		btMap[key] = uint64(totalOffset)
+
 		this.btree.Set(this.fieldName, key, uint64(totalOffset))
 		totalOffset = totalOffset + 8 + lens*utils.DOCNODE_SIZE
-        
-        
 
 	}
-	
+
 	//this.btree.SetBatch(this.fieldName,btMap)
-	
+
 	this.tempHashTable = nil
 	this.isMomery = false
 	this.Logger.Trace("[TRACE] invert --> Serialization :: Writing to File : [%v.bt] ", fullsegmentname)
@@ -179,15 +176,15 @@ func (this *invert) serialization(fullsegmentname string, btdb *tree.BTreedb) er
 // params : key string 查询的key值
 // return : docid结构体列表  bool 是否找到相应结果
 func (this *invert) queryTerm(keystr string) ([]utils.DocIdNode, bool) {
-    
-    //this.Logger.Info("[INFO] QueryTerm %v",keystr)
+
+	//this.Logger.Info("[INFO] QueryTerm %v",keystr)
 	if this.isMomery == true {
-       // this.Logger.Info("[INFO] ismemory is  %v",this.isMomery)
+		// this.Logger.Info("[INFO] ismemory is  %v",this.isMomery)
 		docids, ok := this.tempHashTable[keystr]
 		if ok {
 			return docids, true
 		}
-        
+
 	} else if this.idxMmap != nil {
 
 		ok, offset := this.btree.Search(this.fieldName, keystr)
@@ -198,7 +195,7 @@ func (this *invert) queryTerm(keystr string) ([]utils.DocIdNode, bool) {
 		lens := this.idxMmap.ReadInt64(int64(offset))
 		//this.Logger.Info("[INFO] found  %v offset %v lens %v",keystr,offset,int(lens))
 		res := this.idxMmap.ReadDocIdsArry(uint64(offset+8), uint64(lens))
-        //this.Logger.Info("[INFO] KEY[%v] RES ::::: %v",keystr,res)
+		//this.Logger.Info("[INFO] KEY[%v] RES ::::: %v",keystr,res)
 		return res, true
 
 	}
@@ -224,6 +221,7 @@ func (this *invert) query(key interface{}) ([]utils.DocIdNode, bool) {
 	switch this.fieldType {
 	case utils.IDX_TYPE_STRING_LIST: //分号切割模式
 		queryterms = strings.Split(keystr, ";")
+	case utils.IDX_TYPE_STRING_SINGLE:
 	case utils.IDX_TYPE_STRING_SEG: //分词模式
 		queryterms = utils.GSegmenter.Segment(keystr, false)
 	default:
@@ -233,11 +231,11 @@ func (this *invert) query(key interface{}) ([]utils.DocIdNode, bool) {
 		return this.queryTerm(queryterms[0])
 	}
 	var fDocids []utils.DocIdNode
-   // var sDocids []utils.DocIdNode
+	// var sDocids []utils.DocIdNode
 	var hasRes bool
 	var match bool
 	fDocids, match = this.queryTerm(queryterms[0])
-    //fDocids=append(fDocids,sDocids...)
+	//fDocids=append(fDocids,sDocids...)
 	if match {
 		for _, term := range queryterms[1:] {
 			subDocids, ok := this.queryTerm(term)
@@ -274,12 +272,9 @@ func (this *invert) setBtree(btdb *tree.BTreedb) {
 	this.btree = btdb
 }
 
+func (this *invert) mergeInvert(ivtlist []*invert, fullsegmentname string, btdb *tree.BTreedb) error {
 
-
-func (this *invert) mergeInvert(ivtlist []*invert,fullsegmentname string, btdb *tree.BTreedb) error {
-    
-    
-    idxFileName := fmt.Sprintf("%v.idx", fullsegmentname)
+	idxFileName := fmt.Sprintf("%v.idx", fullsegmentname)
 	idxFd, err := os.OpenFile(idxFileName, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0644)
 	if err != nil {
 		return err
@@ -288,131 +283,122 @@ func (this *invert) mergeInvert(ivtlist []*invert,fullsegmentname string, btdb *
 	fi, _ := idxFd.Stat()
 	totalOffset := int(fi.Size())
 
-
-	
-
 	this.btree = btdb
-    type ivtmerge struct{
-        ivt   *invert
-        key   string
-        docids []utils.DocIdNode
-        pgnum uint32
-        index int
-    }
-    ivts:=make([]ivtmerge,0)
-    
-    for _,ivt:=range ivtlist {
-        
-        if ivt.btree==nil {
-            continue
-        }
-        
-        key,_,pgnum,index,ok:=ivt.GetFristKV()
-        if !ok {
-            //this.Logger.Info("[INFO] No Frist KV %v",key)
-            continue
-        }
-        
-        docids,_:=ivt.queryTerm(key)
-        //this.Logger.Info("[INFO] Frist DocIDs %v",docids)
-        
-        ivts=append(ivts,ivtmerge{ivt:ivt,key:key,docids:docids,pgnum:pgnum,index:index})
-        
-    }
-    
-    resflag := 0
-    for i:=range ivts{
-        resflag = resflag | (1<<uint(i))
-    }
-    flag := 0 
-    for flag != resflag {
-        maxkey := ""
-        meridxs := make([]int,0)
-        for idx,ivt := range ivts {
-            
-            if (flag>>uint(idx) &0x1)==0 && maxkey < ivt.key {
-                maxkey = ivt.key
-                meridxs = make([]int,0)
-                meridxs = append(meridxs,idx)
-                continue
-            } 
-            
-            if (flag>>uint(idx) &0x1)==0 && maxkey == ivt.key {
-                meridxs = append(meridxs,idx)
-                continue
-            }
-            
-        }
-        
-        value := make([]utils.DocIdNode,0)
-        
-        for _,idx := range meridxs {
-            //this.Logger.Info("[INFO] Key:%v Docids:%v",maxkey,ivts[idx].docids)
-            value=append(value,ivts[idx].docids...)
-            
-           
-            key,_,pgnum,index,ok:=ivts[idx].ivt.GetNextKV(/*ivts[idx].pgnum,ivts[idx].index*/ivts[idx].key)
-            if !ok {
-                flag = flag | (1<<uint(idx))
-                //this.Logger.Info("[INFO] FLAG %x RESFLAG %x idx %v meridxs len:%v", flag,resflag,idx,len(meridxs))
-                continue
-            }
-            //this.Logger.Info("[INFO] pgnum : %v index : %v ok:%v Key:%v Docids:%v",pgnum,index,ok,key,ivts[idx].docids)
-            
-            ivts[idx].key=key
-            ivts[idx].pgnum = pgnum
-            ivts[idx].index = index
-            ivts[idx].docids,ok=ivts[idx].ivt.queryTerm(key)
-            //if !ok {
-            //    this.Logger.Info("[INFO] not found %v",key)
-            //}
-            
-        } 
-        
-        lens:=len(value)
-        lenBufer := make([]byte, 8)
+	type ivtmerge struct {
+		ivt    *invert
+		key    string
+		docids []utils.DocIdNode
+		pgnum  uint32
+		index  int
+	}
+	ivts := make([]ivtmerge, 0)
+
+	for _, ivt := range ivtlist {
+
+		if ivt.btree == nil {
+			continue
+		}
+
+		key, _, pgnum, index, ok := ivt.GetFristKV()
+		if !ok {
+			//this.Logger.Info("[INFO] No Frist KV %v",key)
+			continue
+		}
+
+		docids, _ := ivt.queryTerm(key)
+		//this.Logger.Info("[INFO] Frist DocIDs %v",docids)
+
+		ivts = append(ivts, ivtmerge{ivt: ivt, key: key, docids: docids, pgnum: pgnum, index: index})
+
+	}
+
+	resflag := 0
+	for i := range ivts {
+		resflag = resflag | (1 << uint(i))
+	}
+	flag := 0
+	for flag != resflag {
+		maxkey := ""
+		meridxs := make([]int, 0)
+		for idx, ivt := range ivts {
+
+			if (flag>>uint(idx)&0x1) == 0 && maxkey < ivt.key {
+				maxkey = ivt.key
+				meridxs = make([]int, 0)
+				meridxs = append(meridxs, idx)
+				continue
+			}
+
+			if (flag>>uint(idx)&0x1) == 0 && maxkey == ivt.key {
+				meridxs = append(meridxs, idx)
+				continue
+			}
+
+		}
+
+		value := make([]utils.DocIdNode, 0)
+
+		for _, idx := range meridxs {
+			//this.Logger.Info("[INFO] Key:%v Docids:%v",maxkey,ivts[idx].docids)
+			value = append(value, ivts[idx].docids...)
+
+			key, _, pgnum, index, ok := ivts[idx].ivt.GetNextKV( /*ivts[idx].pgnum,ivts[idx].index*/ ivts[idx].key)
+			if !ok {
+				flag = flag | (1 << uint(idx))
+				//this.Logger.Info("[INFO] FLAG %x RESFLAG %x idx %v meridxs len:%v", flag,resflag,idx,len(meridxs))
+				continue
+			}
+			//this.Logger.Info("[INFO] pgnum : %v index : %v ok:%v Key:%v Docids:%v",pgnum,index,ok,key,ivts[idx].docids)
+
+			ivts[idx].key = key
+			ivts[idx].pgnum = pgnum
+			ivts[idx].index = index
+			ivts[idx].docids, ok = ivts[idx].ivt.queryTerm(key)
+			//if !ok {
+			//    this.Logger.Info("[INFO] not found %v",key)
+			//}
+
+		}
+
+		lens := len(value)
+		lenBufer := make([]byte, 8)
 		binary.LittleEndian.PutUint64(lenBufer, uint64(lens))
-        idxFd.Write(lenBufer)
+		idxFd.Write(lenBufer)
 		buffer := new(bytes.Buffer)
 		err = binary.Write(buffer, binary.LittleEndian, value)
 		if err != nil {
 			this.Logger.Error("[ERROR] invert --> Merge :: Error %v", err)
 			return err
 		}
-        idxFd.Write(buffer.Bytes())
+		idxFd.Write(buffer.Bytes())
 		//this.Logger.Info("[INFO] key :%v totalOffset: %v len:%v value:%v",key,totalOffset,lens,value)
 		this.btree.Set(this.fieldName, maxkey, uint64(totalOffset))
 		totalOffset = totalOffset + 8 + lens*utils.DOCNODE_SIZE
-        
-    }
-    
-    
-    this.tempHashTable = nil
+
+	}
+
+	this.tempHashTable = nil
 	this.isMomery = false
-    
-    
-    return nil
+
+	return nil
 }
 
+func (this *invert) GetFristKV() (string, uint32, uint32, int, bool) {
 
+	if this.btree == nil {
+		return "", 0, 0, 0, false
+	}
+	//this.Logger.Info("[INFO] this.fieldName %v",this.fieldName)
+	return this.btree.GetFristKV(this.fieldName)
 
-func (this *invert) GetFristKV() (string,uint32,uint32,int,bool) {
-    
-    if this.btree==nil {
-        return "",0,0,0,false
-    }
-    //this.Logger.Info("[INFO] this.fieldName %v",this.fieldName)
-    return this.btree.GetFristKV(this.fieldName)
-    
 }
 
+func (this *invert) GetNextKV( /*pgnum uint32,idx int*/ key string) (string, uint32, uint32, int, bool) {
 
-func (this *invert) GetNextKV(/*pgnum uint32,idx int*/key string) (string,uint32,uint32,int,bool) {
-    
-    if this.btree==nil {
-        return "",0,0,0,false
-    }
-    
-    return this.btree.GetNextKV(this.fieldName,/*pgnum,idx*/key)
-    
+	if this.btree == nil {
+		return "", 0, 0, 0, false
+	}
+
+	return this.btree.GetNextKV(this.fieldName /*pgnum,idx*/, key)
+
 }

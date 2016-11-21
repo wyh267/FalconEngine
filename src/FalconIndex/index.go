@@ -123,7 +123,8 @@ func (this *Index) AddField(field utils.SimpleFieldInfo) error {
 	}
 
 	this.Fields[field.FieldName] = field
-	if field.FieldType == utils.IDX_TYPE_STRING_SEG {
+	if field.FieldType == utils.IDX_TYPE_STRING_SEG ||
+		field.FieldType == utils.IDX_TYPE_STRING_SINGLE {
 		this.dict.AddBTree(field.FieldName)
 	}
 	if field.FieldType == utils.IDX_TYPE_PK {
@@ -528,7 +529,7 @@ END:
 		val, ok := this.GetDocument(docid.Docid)
 		if ok {
 			if len(val["content"]) > 50 {
-				val["content"]=val["content"][:50]+"..."
+				val["content"] = val["content"][:50] + "..."
 			}
 			res = append(res, val)
 		}

@@ -54,6 +54,7 @@ func newEmptyField(fieldname string, start uint32, fieldtype uint64, dict *tree.
 	if fieldtype == utils.IDX_TYPE_STRING ||
 		fieldtype == utils.IDX_TYPE_STRING_SEG ||
 		fieldtype == utils.IDX_TYPE_STRING_LIST ||
+		fieldtype == utils.IDX_TYPE_STRING_SINGLE ||
 		fieldtype == utils.GATHER_TYPE {
 		this.ivt = newEmptyInvert(fieldtype, start, fieldname, this.dict, logger)
 	}
@@ -77,6 +78,7 @@ func newFieldWithLocalFile(fieldname, segmentname string, start, max uint32,
 	if fieldtype == utils.IDX_TYPE_STRING ||
 		fieldtype == utils.IDX_TYPE_STRING_SEG ||
 		fieldtype == utils.IDX_TYPE_STRING_LIST ||
+		fieldtype == utils.IDX_TYPE_STRING_SINGLE ||
 		fieldtype == utils.GATHER_TYPE {
 		this.ivt = newInvertWithLocalFile(btree, fieldtype, fieldname, segmentname,
 			idxMmap, this.dict, logger)
