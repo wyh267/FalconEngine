@@ -361,7 +361,27 @@ func (this *profile) filter(pos uint32, filtertype uint64, start, end int64, str
 				}
 			}
 			return false
-
+		case utils.FILT_STR_SUFFIX:
+			if vstr, ok := this.getValue(pos); ok {
+				if strings.HasSuffix(vstr, str) {
+					return true
+				}
+			}
+			return false
+		case utils.FILT_STR_RANGE:
+			if vstr, ok := this.getValue(pos); ok {
+				if strings.Contains(vstr, str) {
+					return true
+				}
+			}
+			return false
+		case utils.FILT_STR_ALL:
+			if vstr, ok := this.getValue(pos); ok {
+				if vstr == str {
+					return true
+				}
+			}
+			return false
 		default:
 			return false
 		}

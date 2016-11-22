@@ -101,6 +101,13 @@ func (this *DefaultEngine) Search(method string, parms map[string]string, body [
 			switch matchtype {
 			case "prefix":
 				searchfilted = append(searchfilted, utils.FSSearchFilted{FieldName: "media_keyword", MatchStr: keyword, Type: utils.FILT_STR_PREFIX})
+			case "suffix":
+				searchfilted = append(searchfilted, utils.FSSearchFilted{FieldName: "media_keyword", MatchStr: keyword, Type: utils.FILT_STR_SUFFIX})
+			case "range":
+				searchfilted = append(searchfilted, utils.FSSearchFilted{FieldName: "media_keyword", MatchStr: keyword, Type: utils.FILT_STR_RANGE})
+			case "all":
+				searchfilted = append(searchfilted, utils.FSSearchFilted{FieldName: "media_keyword", MatchStr: keyword, Type: utils.FILT_STR_ALL})
+
 			default:
 				searchfilted = append(searchfilted, utils.FSSearchFilted{FieldName: "media_keyword", MatchStr: keyword, Type: utils.FILT_STR_PREFIX})
 
@@ -121,6 +128,21 @@ func (this *DefaultEngine) Search(method string, parms map[string]string, body [
 				searchquerys = append(searchquerys, queryst)
 			}
 
+			switch matchtype {
+			case "prefix":
+				searchfilted = append(searchfilted, utils.FSSearchFilted{FieldName: "media_creative_title", MatchStr: creativetitle, Type: utils.FILT_STR_PREFIX})
+			case "suffix":
+				searchfilted = append(searchfilted, utils.FSSearchFilted{FieldName: "media_creative_title", MatchStr: creativetitle, Type: utils.FILT_STR_SUFFIX})
+			case "range":
+				searchfilted = append(searchfilted, utils.FSSearchFilted{FieldName: "media_creative_title", MatchStr: creativetitle, Type: utils.FILT_STR_RANGE})
+			case "all":
+				searchfilted = append(searchfilted, utils.FSSearchFilted{FieldName: "media_creative_title", MatchStr: creativetitle, Type: utils.FILT_STR_ALL})
+
+			default:
+				searchfilted = append(searchfilted, utils.FSSearchFilted{FieldName: "media_creative_title", MatchStr: creativetitle, Type: utils.FILT_STR_PREFIX})
+
+			}
+
 		}
 		if hasdesc1 && hasmatchtype {
 			terms := utils.GSegmenter.SegmentSingle(creativedesc1)
@@ -132,6 +154,21 @@ func (this *DefaultEngine) Search(method string, parms map[string]string, body [
 				queryst.FieldName = "media_creative_description1"
 				queryst.Value = term
 				searchquerys = append(searchquerys, queryst)
+			}
+
+			switch matchtype {
+			case "prefix":
+				searchfilted = append(searchfilted, utils.FSSearchFilted{FieldName: "media_creative_description1", MatchStr: creativedesc1, Type: utils.FILT_STR_PREFIX})
+			case "suffix":
+				searchfilted = append(searchfilted, utils.FSSearchFilted{FieldName: "media_creative_description1", MatchStr: creativedesc1, Type: utils.FILT_STR_SUFFIX})
+			case "range":
+				searchfilted = append(searchfilted, utils.FSSearchFilted{FieldName: "media_creative_description1", MatchStr: creativedesc1, Type: utils.FILT_STR_RANGE})
+			case "all":
+				searchfilted = append(searchfilted, utils.FSSearchFilted{FieldName: "media_creative_description1", MatchStr: creativedesc1, Type: utils.FILT_STR_ALL})
+
+			default:
+				searchfilted = append(searchfilted, utils.FSSearchFilted{FieldName: "media_creative_description1", MatchStr: creativedesc1, Type: utils.FILT_STR_PREFIX})
+
 			}
 		}
 		if hasdesc2 && hasmatchtype {
@@ -145,6 +182,22 @@ func (this *DefaultEngine) Search(method string, parms map[string]string, body [
 				queryst.Value = term
 				searchquerys = append(searchquerys, queryst)
 			}
+
+			switch matchtype {
+			case "prefix":
+				searchfilted = append(searchfilted, utils.FSSearchFilted{FieldName: "media_creative_description2", MatchStr: creativedesc2, Type: utils.FILT_STR_PREFIX})
+			case "suffix":
+				searchfilted = append(searchfilted, utils.FSSearchFilted{FieldName: "media_creative_description2", MatchStr: creativedesc2, Type: utils.FILT_STR_SUFFIX})
+			case "range":
+				searchfilted = append(searchfilted, utils.FSSearchFilted{FieldName: "media_creative_description2", MatchStr: creativedesc2, Type: utils.FILT_STR_RANGE})
+			case "all":
+				searchfilted = append(searchfilted, utils.FSSearchFilted{FieldName: "media_creative_description2", MatchStr: creativedesc2, Type: utils.FILT_STR_ALL})
+
+			default:
+				searchfilted = append(searchfilted, utils.FSSearchFilted{FieldName: "media_creative_description2", MatchStr: creativedesc2, Type: utils.FILT_STR_PREFIX})
+
+			}
+
 		}
 	default:
 		return "indexname错误", nil
