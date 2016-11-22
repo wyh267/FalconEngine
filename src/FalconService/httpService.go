@@ -16,6 +16,7 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
+	"os"
 	"regexp"
 	"strconv"
 	"time"
@@ -29,8 +30,8 @@ const (
 	URL_CONTROL uint64 = 4
 	URL_SHOW    uint64 = 5
 
-	URL_DEBUG_SEARCH uint64 = 100 //调试
-    URL_LOADDATA uint64 = 101 
+	URL_DEBUG_SEARCH  uint64 = 100 //调试
+	URL_LOADDATA      uint64 = 101
 	URL_SEARCH_STATUS uint64 = 301 //查看分群起状态
 )
 
@@ -57,7 +58,7 @@ func (this *HttpService) Start() error {
 		this.Logger.Error("Server start fail: manager is nil")
 		return errors.New("Server start fail: manager is nil")
 	}
-
+	//http.Handle("/html/", http.FileServer(http.Dir("html")))
 	this.Logger.Info("Server starting")
 	addr := fmt.Sprintf(":%d", 9990)
 	err := http.ListenAndServe(addr, this)
@@ -73,7 +74,7 @@ func (this *HttpService) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	var startTime, endTime time.Time
 	var err error
-    var body []byte
+	var body []byte
 	startTime = time.Now()
 	if err != nil {
 		this.Logger.Error(" %v", err)
@@ -100,65 +101,83 @@ func (this *HttpService) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		io.WriteString(w, MakeErrorResult(-1, err.Error()))
 		goto END
 	}
-    
+
 	body, err = ioutil.ReadAll(r.Body)
 	if err != nil && err != io.EOF {
 		result["_errorcode"] = -1
 		result["_errormessage"] = "读取请求数据出错，请重新提交" //err.Error()
 		goto END
 	}
-    
-    switch reqType {
-        case URL_SEARCH:
-            res,err:=this.engine.Search(r.Method, parms, body)
-            if err!=nil{
-                result["_errorcode"] = -1
-                result["_errormessage"] = err.Error()
-                goto END
-            }
-            endTime = time.Now()
-	        this.Logger.Info("[COST:%v] [URL : %v] ", fmt.Sprintf("%v", endTime.Sub(startTime)), r.RequestURI)
-            //this.Logger.Info("[INFO] res %v",res)
-            io.WriteString(w, res)
-            return
-            
-       case URL_CREATE:
-            err:=this.engine.CreateIndex(r.Method, parms, body)
-            if err!=nil{
-                result["_errorcode"] = -1
-                result["_errormessage"] = err.Error()
-                goto END
-            }
-            //result["_status"]= "sucess"
-            io.WriteString(w, "sucess")
-            return
-        case URL_UPDATE:
-            res,err:=this.engine.UpdateDocument(r.Method,parms,body)
-            if err!=nil{
-                result["_errorcode"] = -1
-                result["_errormessage"] = err.Error()
-                goto END
-            }
-            //result["_status"]= "sucess"
-            io.WriteString(w,res)
-       case URL_LOADDATA:
-            res,err:=this.engine.LoadData(r.Method,parms,body)
-            if err!=nil{
-                result["_errorcode"] = -1
-                result["_errormessage"] = err.Error()
-                goto END
-            }
-            //result["_status"]= "sucess"
-            io.WriteString(w,res)
-            
-    }
+
+	switch reqType {
+	case URL_SEARCH:
+		res, err := this.engine.Search(r.Method, parms, body)
+		if err != nil {
+			result["_errorcode"] = -1
+			result["_errormessage"] = err.Error()
+			goto END
+		}
+		endTime = time.Now()
+		this.Logger.Info("[COST:%v] [URL : %v] ", fmt.Sprintf("%v", endTime.Sub(startTime)), r.RequestURI)
+		//this.Logger.Info("[INFO] res %v",res)
+		io.WriteString(w, res)
+		return
+
+	case URL_CREATE:
+		err := this.engine.CreateIndex(r.Method, parms, body)
+		if err != nil {
+			result["_errorcode"] = -1
+			result["_errormessage"] = err.Error()
+			goto END
+		}
+		//result["_status"]= "sucess"
+		io.WriteString(w, "sucess")
+		return
+	case URL_UPDATE:
+		res, err := this.engine.UpdateDocument(r.Method, parms, body)
+		if err != nil {
+			result["_errorcode"] = -1
+			result["_errormessage"] = err.Error()
+			goto END
+		}
+		//result["_status"]= "sucess"
+		io.WriteString(w, res)
+	case URL_LOADDATA:
+		res, err := this.engine.LoadData(r.Method, parms, body)
+		if err != nil {
+			result["_errorcode"] = -1
+			result["_errormessage"] = err.Error()
+			goto END
+		}
+		//result["_status"]= "sucess"
+		io.WriteString(w, res)
+
+	case URL_SHOW:
+		file1, err := os.OpenFile("./html/search.html", os.O_RDWR, os.ModeType)
+		if err != nil {
+			result["_errorcode"] = -1
+			result["_errormessage"] = err.Error()
+			goto END
+		}
+		defer file1.Close()
+		b, err1 := ioutil.ReadAll(file1)
+		if err1 != nil {
+			result["_errorcode"] = -1
+			result["_errormessage"] = err.Error()
+			goto END
+		}
+		header.Add("Content-Type", "text/html")
+		io.WriteString(w, string(b))
+		return
+
+	}
 
 	//this.engine.Search(utils.FSSearchUnit{})
-    
+
 END:
-    if err != nil {
-        this.Logger.Error("[ERROR] %v ",err)
-    }    
+	if err != nil {
+		this.Logger.Error("[ERROR] %v ", err)
+	}
 	result["_method"] = r.Method
 	endTime = time.Now()
 	result["_cost"] = fmt.Sprintf("%v", endTime.Sub(startTime))
@@ -235,14 +254,13 @@ func (this *HttpService) ParseURL(url string) (int, uint64, error) {
 	if resource == "_status" {
 		return version, URL_SEARCH_STATUS, nil
 	}
-    if resource == "_load" {
+	if resource == "_load" {
 		return version, URL_LOADDATA, nil
 	}
 
 	return -1, 0, errors.New("Error")
 
 }
-
 
 func MakeErrorResult(errcode int, errmsg string) string {
 	data := map[string]interface{}{

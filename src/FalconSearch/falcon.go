@@ -52,9 +52,8 @@ func main() {
 	go func() {
 		log.Println(http.ListenAndServe(":6060", nil))
 	}()
-    
-    
-    utils.GetDocIDsChan, utils.GiveDocIDsChan = utils.DocIdsMaker()
+
+	utils.GetDocIDsChan, utils.GiveDocIDsChan = utils.DocIdsMaker()
 
 	//启动全局缓存
 	// utils.Cache,err = cache.NewCache("memory", `{"interval":60}`)
@@ -65,6 +64,7 @@ func main() {
 
 	logger.Info("[INFO] Starting FalconEngine Service.....")
 	http := fs.NewHttpService(engine, logger)
+
 	http.Start()
 
 }
