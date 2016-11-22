@@ -40,24 +40,24 @@ type Segment struct {
 	pflMmap     *utils.Mmap
 	dtlMmap     *utils.Mmap
 	btdb        *tree.BTreedb
-    dict        *tree.BTreedb
+	dict        *tree.BTreedb
 	Logger      *utils.Log4FE `json:"-"`
 }
 
 // NewEmptySegmentWithFieldsInfo function description : 新建一个空的段，可以进行数据添加，包含字段信息
 // params :
 // return :
-func NewEmptySegmentWithFieldsInfo(segmentname string, start uint32, fields []utils.SimpleFieldInfo,dict *tree.BTreedb, logger *utils.Log4FE) *Segment {
+func NewEmptySegmentWithFieldsInfo(segmentname string, start uint32, fields []utils.SimpleFieldInfo, dict *tree.BTreedb, logger *utils.Log4FE) *Segment {
 
 	this := &Segment{btdb: nil, StartDocId: start,
 		MaxDocId: start, SegmentName: segmentname,
-		idxMmap: nil, dtlMmap: nil, pflMmap: nil, fields: make(map[string]*FSField),dict:dict,
+		idxMmap: nil, dtlMmap: nil, pflMmap: nil, fields: make(map[string]*FSField), dict: dict,
 		Logger: logger, isMemory: true, FieldInfos: make(map[string]utils.SimpleFieldInfo)}
 
 	for _, sfield := range fields {
 		field := utils.SimpleFieldInfo{FieldName: sfield.FieldName, FieldType: sfield.FieldType}
 		this.FieldInfos[field.FieldName] = field
-		indexer := newEmptyField(sfield.FieldName, start, sfield.FieldType,dict, logger)
+		indexer := newEmptyField(sfield.FieldName, start, sfield.FieldType, dict, logger)
 		this.fields[field.FieldName] = indexer
 
 	}
@@ -70,11 +70,11 @@ func NewEmptySegmentWithFieldsInfo(segmentname string, start uint32, fields []ut
 // NewSegmentWithLocalFile function description : 从文件重建一个段
 // params :
 // return :
-func NewSegmentWithLocalFile(segmentname string,dict *tree.BTreedb, logger *utils.Log4FE) *Segment {
+func NewSegmentWithLocalFile(segmentname string, dict *tree.BTreedb, logger *utils.Log4FE) *Segment {
 
 	this := &Segment{btdb: nil, StartDocId: 0, MaxDocId: 0, SegmentName: segmentname,
 		idxMmap: nil, dtlMmap: nil, pflMmap: nil, Logger: logger, fields: make(map[string]*FSField),
-		FieldInfos: make(map[string]utils.SimpleFieldInfo), isMemory: false,dict:dict}
+		FieldInfos: make(map[string]utils.SimpleFieldInfo), isMemory: false, dict: dict}
 
 	metaFileName := fmt.Sprintf("%v.meta", segmentname)
 	buffer, err := utils.ReadFromJson(metaFileName)
@@ -90,7 +90,7 @@ func NewSegmentWithLocalFile(segmentname string,dict *tree.BTreedb, logger *util
 	btdbname := fmt.Sprintf("%v.bt", segmentname)
 	if utils.Exist(btdbname) {
 		this.Logger.Info("[INFO] Load B+Tree File : %v", btdbname)
-		this.btdb = tree.NewBTDB(btdbname,logger)
+		this.btdb = tree.NewBTDB(btdbname, logger)
 	}
 
 	this.idxMmap, err = utils.NewMmap(fmt.Sprintf("%v.idx", segmentname), utils.MODE_APPEND)
@@ -116,13 +116,13 @@ func NewSegmentWithLocalFile(segmentname string,dict *tree.BTreedb, logger *util
 
 	for _, field := range this.FieldInfos {
 		if field.PflLen == 0 {
-			indexer := newEmptyField(field.FieldName, this.StartDocId, field.FieldType,dict, logger)
+			indexer := newEmptyField(field.FieldName, this.StartDocId, field.FieldType, dict, logger)
 			this.fields[field.FieldName] = indexer
 			continue
 		}
 		indexer := newFieldWithLocalFile(field.FieldName, segmentname, this.StartDocId,
 			this.MaxDocId, field.FieldType, field.PflOffset, field.PflLen,
-			this.idxMmap, this.pflMmap, this.dtlMmap, false, this.btdb,dict, logger)
+			this.idxMmap, this.pflMmap, this.dtlMmap, false, this.btdb, dict, logger)
 		this.fields[field.FieldName] = indexer
 		//this.Logger.Info("[TRACE] %v", this.FieldInfos[field.FieldName])
 	}
@@ -146,7 +146,7 @@ func (this *Segment) AddField(sfield utils.SimpleFieldInfo) error {
 		return errors.New("memory segment can not add field..")
 	}
 
-	indexer := newEmptyField(sfield.FieldName, this.MaxDocId, sfield.FieldType,this.dict, this.Logger)
+	indexer := newEmptyField(sfield.FieldName, this.MaxDocId, sfield.FieldType, this.dict, this.Logger)
 	this.FieldInfos[sfield.FieldName] = sfield
 	this.fields[sfield.FieldName] = indexer
 	//if err := this.storeStruct(); err != nil {
@@ -242,7 +242,7 @@ func (this *Segment) Serialization() error {
 
 	btdbname := fmt.Sprintf("%v.bt", this.SegmentName)
 	if this.btdb == nil {
-		this.btdb = tree.NewBTDB(btdbname,this.Logger)
+		this.btdb = tree.NewBTDB(btdbname, this.Logger)
 	}
 
 	for name, field := range this.FieldInfos {
@@ -399,7 +399,7 @@ func (this *Segment) Query(fieldname string, key interface{}) ([]utils.DocIdNode
 // Filter function description : 过滤
 // params :
 // return :
-func (this *Segment) Filter(fieldname string, filtertype uint64, start, end int64, docids []utils.DocIdNode) []utils.DocIdNode {
+func (this *Segment) Filter(fieldname string, filtertype uint64, start, end int64, str string, docids []utils.DocIdNode) []utils.DocIdNode {
 
 	if _, hasField := this.fields[fieldname]; !hasField {
 		this.Logger.Warn("[WARN] Field[%v] not found", fieldname)
@@ -421,7 +421,7 @@ func (this *Segment) Filter(fieldname string, filtertype uint64, start, end int6
 
 	for _, docid := range docids {
 
-		if this.fields[fieldname].filter(docid.Docid, filtertype, start, end) {
+		if this.fields[fieldname].filter(docid.Docid, filtertype, start, end, str) {
 			res = append(res, docid)
 		}
 
@@ -494,25 +494,23 @@ func (this *Segment) GetValueWithFields(docid uint32, fields []string) (map[stri
 
 }
 
-
-
 func (this *Segment) SearchDocIds(query utils.FSSearchQuery,
-                                filteds []utils.FSSearchFilted, 
-                                bitmap *utils.Bitmap, 
-                                indocids []utils.DocIdNode) ([]utils.DocIdNode, bool) {
-                                    
-    start:=len(indocids)
-    //query查询
-     
-    docids, match := this.fields[query.FieldName].query(query.Value)
-   // this.Logger.Info("[INFO] key[%v] len:%v",query.Value,len(docids))
-    if !match {
-        return indocids, false
-    }
-    
-    indocids = append(indocids, docids...)
-    
-    //bitmap去掉数据
+	filteds []utils.FSSearchFilted,
+	bitmap *utils.Bitmap,
+	indocids []utils.DocIdNode) ([]utils.DocIdNode, bool) {
+
+	start := len(indocids)
+	//query查询
+
+	docids, match := this.fields[query.FieldName].query(query.Value)
+	// this.Logger.Info("[INFO] key[%v] len:%v",query.Value,len(docids))
+	if !match {
+		return indocids, false
+	}
+
+	indocids = append(indocids, docids...)
+
+	//bitmap去掉数据
 	index := start
 	if filteds == nil && bitmap != nil {
 		for _, docid := range indocids[start:] {
@@ -531,8 +529,8 @@ func (this *Segment) SearchDocIds(query utils.FSSearchQuery,
 		match := true
 		for _, filter := range filteds {
 			if _, hasField := this.fields[filter.FieldName]; hasField {
-				if (bitmap != nil && bitmap.GetBit(uint64(docidinfo.Docid)) == 1) || 
-                (!this.fields[filter.FieldName].filter(docidinfo.Docid, filter.Type, filter.Start, filter.End)) {
+				if (bitmap != nil && bitmap.GetBit(uint64(docidinfo.Docid)) == 1) ||
+					(!this.fields[filter.FieldName].filter(docidinfo.Docid, filter.Type, filter.Start, filter.End, filter.MatchStr)) {
 					match = false
 					break
 				}
@@ -549,22 +547,18 @@ func (this *Segment) SearchDocIds(query utils.FSSearchQuery,
 
 	}
 
-	
 	return indocids[:index], true
 
-
 }
-
-
 
 // SearchUnitDocIds function description : 搜索的基本单元
 // params :
 // return :
-func (this *Segment) SearchUnitDocIds(querys []utils.FSSearchQuery, filteds []utils.FSSearchFilted, bitmap *utils.Bitmap, indocids []utils.DocIdNode,maxdocid uint32) ([]utils.DocIdNode, bool) {
+func (this *Segment) SearchUnitDocIds(querys []utils.FSSearchQuery, filteds []utils.FSSearchFilted, bitmap *utils.Bitmap, indocids []utils.DocIdNode, maxdocid uint32) ([]utils.DocIdNode, bool) {
 
 	start := len(indocids)
 	flag := false
-    var ok bool
+	var ok bool
 
 	if len(querys) == 0 || querys == nil {
 		docids := make([]utils.DocIdNode, 0)
@@ -579,53 +573,52 @@ func (this *Segment) SearchUnitDocIds(querys []utils.FSSearchQuery, filteds []ut
 				return indocids[:start], false
 			}
 			docids, match := this.fields[query.FieldName].query(query.Value)
-          //  this.Logger.Info("[INFO] key[%v] len:%v",query.Value,len(docids))
+			//  this.Logger.Info("[INFO] key[%v] len:%v",query.Value,len(docids))
 			if !match {
 				return indocids[:start], false
 			}
 
 			if !flag {
 				flag = true
-                /*if this.FieldInfos[query.FieldName].FieldType == utils.IDX_TYPE_STRING_SEG{
-                    
-                    okdf,df := this.dict.Search(query.FieldName,query.Value)
-                    if okdf {
-                        indocids = utils.ComputeTfIdf(indocids,docids,int(df),maxdocid)
-                    }else{
-                        indocids = append(indocids, docids...)
-                    }
-                    
-                }else{*/
-                    indocids = append(indocids, docids...)
-                //}
-				
+				/*if this.FieldInfos[query.FieldName].FieldType == utils.IDX_TYPE_STRING_SEG{
+
+				    okdf,df := this.dict.Search(query.FieldName,query.Value)
+				    if okdf {
+				        indocids = utils.ComputeTfIdf(indocids,docids,int(df),maxdocid)
+				    }else{
+				        indocids = append(indocids, docids...)
+				    }
+
+				}else{*/
+				indocids = append(indocids, docids...)
+				//}
+
 			} else {
-                /*if this.FieldInfos[query.FieldName].FieldType == utils.IDX_TYPE_STRING_SEG{
-                    okdf,df := this.dict.Search(query.FieldName,query.Value)
-                    if okdf {
-                        indocids, ok = utils.InteractionWithStartAndDf(indocids, docids, start,int(df),maxdocid)
-                        if !ok {
-                            return indocids[:start], false
-                        }
-                    }else{
-                        indocids, ok = utils.InteractionWithStart(indocids, docids, start)
-                        if !ok {
-                            return indocids[:start], false
-                        }
-                    }
-                }else{*/
-                    indocids, ok = utils.InteractionWithStart(indocids, docids, start)
-                    if !ok {
-                        return indocids[:start], false
-                    }
-                //}
-				
-				
+				/*if this.FieldInfos[query.FieldName].FieldType == utils.IDX_TYPE_STRING_SEG{
+				    okdf,df := this.dict.Search(query.FieldName,query.Value)
+				    if okdf {
+				        indocids, ok = utils.InteractionWithStartAndDf(indocids, docids, start,int(df),maxdocid)
+				        if !ok {
+				            return indocids[:start], false
+				        }
+				    }else{
+				        indocids, ok = utils.InteractionWithStart(indocids, docids, start)
+				        if !ok {
+				            return indocids[:start], false
+				        }
+				    }
+				}else{*/
+				indocids, ok = utils.InteractionWithStart(indocids, docids, start)
+				if !ok {
+					return indocids[:start], false
+				}
+				//}
+
 			}
 		}
 
 	}
-    this.Logger.Info("[INFO] ResLen[%v] ",len(indocids))
+	this.Logger.Info("[INFO] ResLen[%v] ", len(indocids))
 	//bitmap去掉数据
 	index := start
 
@@ -649,8 +642,8 @@ func (this *Segment) SearchUnitDocIds(querys []utils.FSSearchQuery, filteds []ut
 		match := true
 		for _, filter := range filteds {
 			if _, hasField := this.fields[filter.FieldName]; hasField {
-				if (bitmap != nil && bitmap.GetBit(uint64(docidinfo.Docid)) == 1) || 
-                (!this.fields[filter.FieldName].filter(docidinfo.Docid, filter.Type, filter.Start, filter.End)) {
+				if (bitmap != nil && bitmap.GetBit(uint64(docidinfo.Docid)) == 1) ||
+					(!this.fields[filter.FieldName].filter(docidinfo.Docid, filter.Type, filter.Start, filter.End, filter.MatchStr)) {
 					match = false
 					break
 				}
@@ -683,7 +676,7 @@ func (this *Segment) MergeSegments(sgs []*Segment) error {
 	this.Logger.Info("[INFO] Segment >>>>> MergeSegments [%v]", this.SegmentName)
 	btdbname := fmt.Sprintf("%v.bt", this.SegmentName)
 	if this.btdb == nil {
-		this.btdb = tree.NewBTDB(btdbname,this.Logger)
+		this.btdb = tree.NewBTDB(btdbname, this.Logger)
 	}
 
 	for name, field := range this.FieldInfos {
@@ -693,7 +686,7 @@ func (this *Segment) MergeSegments(sgs []*Segment) error {
 			if _, ok := sg.fields[name]; !ok {
 				fakefield := newEmptyFakeField(this.fields[name].fieldName, sg.StartDocId,
 					this.fields[name].fieldType,
-					uint64(sg.MaxDocId-sg.StartDocId), nil,this.Logger)
+					uint64(sg.MaxDocId-sg.StartDocId), nil, this.Logger)
 				fs = append(fs, fakefield)
 				continue
 			}

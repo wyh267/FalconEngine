@@ -16,6 +16,7 @@ import (
 	"os"
 	"reflect"
 	"strconv"
+	"strings"
 	"utils"
 )
 
@@ -317,35 +318,58 @@ func (this *profile) getIntValue(pos uint32) (int64, bool) {
 // Filter function description : 过滤
 // params :
 // return :
-func (this *profile) filter(pos uint32, filtertype uint64, start, end int64) bool {
+func (this *profile) filter(pos uint32, filtertype uint64, start, end int64, str string) bool {
 
 	var value int64
-	if (this.fieldType != utils.IDX_TYPE_NUMBER && this.fieldType != utils.IDX_TYPE_DATE) || this.fake {
+	if /*(this.fieldType != utils.IDX_TYPE_NUMBER && this.fieldType != utils.IDX_TYPE_DATE) ||*/ this.fake {
 		return false
 	}
 
-	if this.isMomery {
-		value = this.pflNumber[pos]
-	} else if this.pflMmap == nil {
-		return false
+	if this.fieldType == utils.IDX_TYPE_NUMBER {
+		if this.isMomery {
+			value = this.pflNumber[pos]
+		} else if this.pflMmap == nil {
+			return false
+		}
+
+		offset := this.pflOffset + int64(pos*8)
+		value = this.pflMmap.ReadInt64(offset)
+
+		switch filtertype {
+		case utils.FILT_EQ:
+
+			return (0xFFFFFFFF&value != 0xFFFFFFFF) && (value == start)
+		case utils.FILT_OVER:
+			return (0xFFFFFFFF&value != 0xFFFFFFFF) && (value >= start)
+		case utils.FILT_LESS:
+			return (0xFFFFFFFF&value != 0xFFFFFFFF) && (value <= start)
+		case utils.FILT_RANGE:
+			return (0xFFFFFFFF&value != 0xFFFFFFFF) && (value >= start && value <= end)
+		default:
+			return false
+		}
 	}
 
-	offset := this.pflOffset + int64(pos*8)
-	value = this.pflMmap.ReadInt64(offset)
+	if this.fieldType == utils.IDX_TYPE_STRING_SINGLE {
 
-	switch filtertype {
-	case utils.FILT_EQ:
+		switch filtertype {
 
-		return (0xFFFFFFFF&value != 0xFFFFFFFF) && (value == start)
-	case utils.FILT_OVER:
-		return (0xFFFFFFFF&value != 0xFFFFFFFF) && (value >= start)
-	case utils.FILT_LESS:
-		return (0xFFFFFFFF&value != 0xFFFFFFFF) && (value <= start)
-	case utils.FILT_RANGE:
-		return (0xFFFFFFFF&value != 0xFFFFFFFF) && (value >= start && value <= end)
-	default:
-		return false
+		case utils.FILT_STR_PREFIX:
+			if vstr, ok := this.getValue(pos); ok {
+				if strings.HasPrefix(vstr, str) {
+					return true
+				}
+			}
+			return false
+
+		default:
+			return false
+		}
+
 	}
+
+	return false
+
 }
 
 // destroy function description : 销毁

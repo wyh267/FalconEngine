@@ -67,9 +67,12 @@ func (this *DefaultEngine) Search(method string, parms map[string]string, body [
 
 	indexname, hasindex := parms["index"]
 	keyword, haskeyword := parms["keyword"]
+
 	creativetitle, hastitle := parms["creativetitle"]
 	creativedesc1, hasdesc1 := parms["creativedesc1"]
 	creativedesc2, hasdesc2 := parms["creativedesc2"]
+
+	matchtype, hasmatchtype := parms["matchtype"]
 
 	ps, hasps := parms["ps"]
 	pg, haspg := parms["pg"]
@@ -83,7 +86,7 @@ func (this *DefaultEngine) Search(method string, parms map[string]string, body [
 
 	switch indexname {
 	case IKeyword:
-		if haskeyword {
+		if haskeyword && hasmatchtype {
 			terms := utils.GSegmenter.SegmentSingle(keyword)
 			if len(terms) == 0 {
 				return eDefaultEngineNotFound, nil
@@ -95,10 +98,18 @@ func (this *DefaultEngine) Search(method string, parms map[string]string, body [
 				queryst.Value = term
 				searchquerys = append(searchquerys, queryst)
 			}
+			switch matchtype {
+			case "prefix":
+				searchfilted = append(searchfilted, utils.FSSearchFilted{FieldName: "media_keyword", MatchStr: keyword, Type: utils.FILT_STR_PREFIX})
+			default:
+				searchfilted = append(searchfilted, utils.FSSearchFilted{FieldName: "media_keyword", MatchStr: keyword, Type: utils.FILT_STR_PREFIX})
+
+			}
+
 		}
 
 	case ICreative:
-		if hastitle {
+		if hastitle && hasmatchtype {
 			terms := utils.GSegmenter.SegmentSingle(creativetitle)
 			if len(terms) == 0 {
 				return eDefaultEngineNotFound, nil
@@ -109,8 +120,9 @@ func (this *DefaultEngine) Search(method string, parms map[string]string, body [
 				queryst.Value = term
 				searchquerys = append(searchquerys, queryst)
 			}
+
 		}
-		if hasdesc1 {
+		if hasdesc1 && hasmatchtype {
 			terms := utils.GSegmenter.SegmentSingle(creativedesc1)
 			if len(terms) == 0 {
 				return eDefaultEngineNotFound, nil
@@ -122,7 +134,7 @@ func (this *DefaultEngine) Search(method string, parms map[string]string, body [
 				searchquerys = append(searchquerys, queryst)
 			}
 		}
-		if hasdesc2 {
+		if hasdesc2 && hasmatchtype {
 			terms := utils.GSegmenter.SegmentSingle(creativedesc2)
 			if len(terms) == 0 {
 				return eDefaultEngineNotFound, nil
@@ -134,6 +146,8 @@ func (this *DefaultEngine) Search(method string, parms map[string]string, body [
 				searchquerys = append(searchquerys, queryst)
 			}
 		}
+	default:
+		return "indexname错误", nil
 
 	}
 
