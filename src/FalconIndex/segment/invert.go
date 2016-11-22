@@ -79,7 +79,25 @@ func (this *invert) addDocument(docid uint32, content interface{}) error {
 		terms = append(terms, contentstr)
 	case utils.IDX_TYPE_STRING_LIST: //分号切割模式
 		terms = strings.Split(contentstr, ";")
-	case utils.IDX_TYPE_STRING_SINGLE:
+	case utils.IDX_TYPE_STRING_SINGLE: //单个词模式
+
+		terminfos, _ := utils.GSegmenter.SegmentWithSingle(contentstr)
+
+		for _, terminfo := range terminfos {
+			docidNode := utils.DocIdNode{Docid: docid, Weight: uint32(terminfo.Tf)}
+			if _, inTmp := this.tempHashTable[terminfo.Term]; !inTmp {
+				var docidNodes []utils.DocIdNode
+				docidNodes = append(docidNodes, docidNode)
+				this.tempHashTable[terminfo.Term] = docidNodes
+			} else {
+				this.tempHashTable[terminfo.Term] = append(this.tempHashTable[terminfo.Term], docidNode)
+			}
+
+		}
+
+		this.curDocId++
+		return nil
+
 	case utils.IDX_TYPE_STRING_SEG: //分词模式
 		terminfos, termcount := utils.GSegmenter.SegmentWithTf(contentstr, true)
 		//this.Logger.Info("[INFO] SegmentWithTf >>>>>>>>>>>>>>>>>>>>>>>> ")
@@ -221,7 +239,8 @@ func (this *invert) query(key interface{}) ([]utils.DocIdNode, bool) {
 	switch this.fieldType {
 	case utils.IDX_TYPE_STRING_LIST: //分号切割模式
 		queryterms = strings.Split(keystr, ";")
-	case utils.IDX_TYPE_STRING_SINGLE:
+	case utils.IDX_TYPE_STRING_SINGLE: //单字模式
+		queryterms = utils.GSegmenter.SegmentSingle(keystr)
 	case utils.IDX_TYPE_STRING_SEG: //分词模式
 		queryterms = utils.GSegmenter.Segment(keystr, false)
 	default:

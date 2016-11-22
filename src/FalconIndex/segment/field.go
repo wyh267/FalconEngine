@@ -199,7 +199,7 @@ func (this *FSField) getValue(docid uint32) (string, bool) {
 func (this *FSField) filter(docid uint32, filtertype uint64, start, end int64) bool {
 
 	if docid >= this.startDocId && docid < this.maxDocId && this.pfl != nil {
-
+		//this.Logger.Info("[INFO] FSField docid %v start %v", docid, start)
 		return this.pfl.filter(docid-this.startDocId, filtertype, start, end)
 	}
 

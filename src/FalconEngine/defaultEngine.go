@@ -17,7 +17,6 @@ import (
 	"os"
 	"reflect"
 	"strconv"
-	"strings"
 	"time"
 	"unsafe"
 	"utils"
@@ -29,6 +28,8 @@ const (
 	eProcessoJsonParse           string = "JSON格式解析错误"
 	eProcessoUpdateProcessorBusy string = "处理进程繁忙，请稍候提交"
 	eProcessoQueryError          string = "查询条件有问题，请检查查询条件"
+	eHasCidError                 string = "CID已经存在"
+	eNoIndexname                 string = "Indexname不存在"
 	eDefaultEngineNotFound       string = `{"status":"NotFound"}`
 	eDefaultEngineLoadOk         string = `{"status":"OK"}`
 	eDefaultEngineLoadFail       string = `{"status":"Fail"}`
@@ -44,40 +45,120 @@ type DefaultResult struct {
 }
 
 type DefaultEngine struct {
-	idxManager *IndexMgt
-	Logger     *utils.Log4FE `json:"-"`
+	idxManagers map[string]*SemSearchMgt
+	Logger      *utils.Log4FE `json:"-"`
 }
 
 func NewDefaultEngine(logger *utils.Log4FE) *DefaultEngine {
-	this := &DefaultEngine{Logger: logger, idxManager: newIndexMgt(logger)}
+	this := &DefaultEngine{Logger: logger, idxManagers: make(map[string]*SemSearchMgt)}
 	return this
 }
 
 func (this *DefaultEngine) Search(method string, parms map[string]string, body []byte) (string, error) {
 
 	//this.Logger.Info("[INFO] DefaultEngine Search >>>>>>>>")
+
 	startTime := time.Now()
+	cid, hascid := parms["cid"]
+	accountid, hasaccountid := parms["account_id"]
+	adgroupid, hasadgroupid := parms["adgroup_id"]
+	campaignid, hascampaignid := parms["campaign_id"]
+	keywordid, haskeywordid := parms["keyword_id"]
+
 	indexname, hasindex := parms["index"]
-	query, hasquery := parms["q"]
+	keyword, haskeyword := parms["keyword"]
+	creativetitle, hastitle := parms["creativetitle"]
+	creativedesc1, hasdesc1 := parms["creativedesc1"]
+	creativedesc2, hasdesc2 := parms["creativedesc2"]
+
 	ps, hasps := parms["ps"]
 	pg, haspg := parms["pg"]
 
-	if !hasindex || !hasquery || !haspg || !hasps {
+	if !hascid || !hasindex || !haspg || !hasps {
 		return "", errors.New(eProcessoParms)
 	}
 
-	terms := utils.GSegmenter.Segment(query, false)
-	if len(terms) == 0 {
-		return eDefaultEngineNotFound, nil
-	}
-	//this.Logger.Info("[INFO] SegmentTerms >>>  %v ",terms)
-
 	searchquerys := make([]utils.FSSearchQuery, 0)
-	for _, term := range terms {
-		var queryst utils.FSSearchQuery
-		queryst.FieldName = "title"
-		queryst.Value = term
-		searchquerys = append(searchquerys, queryst)
+	searchfilted := make([]utils.FSSearchFilted, 0)
+
+	switch indexname {
+	case IKeyword:
+		if haskeyword {
+			terms := utils.GSegmenter.SegmentSingle(keyword)
+			if len(terms) == 0 {
+				return eDefaultEngineNotFound, nil
+			}
+			//this.Logger.Info("[INFO] SegmentTerms >>>  %v ", terms)
+			for _, term := range terms {
+				var queryst utils.FSSearchQuery
+				queryst.FieldName = "media_keyword"
+				queryst.Value = term
+				searchquerys = append(searchquerys, queryst)
+			}
+		}
+
+	case ICreative:
+		if hastitle {
+			terms := utils.GSegmenter.SegmentSingle(creativetitle)
+			if len(terms) == 0 {
+				return eDefaultEngineNotFound, nil
+			}
+			for _, term := range terms {
+				var queryst utils.FSSearchQuery
+				queryst.FieldName = "media_creative_title"
+				queryst.Value = term
+				searchquerys = append(searchquerys, queryst)
+			}
+		}
+		if hasdesc1 {
+			terms := utils.GSegmenter.SegmentSingle(creativedesc1)
+			if len(terms) == 0 {
+				return eDefaultEngineNotFound, nil
+			}
+			for _, term := range terms {
+				var queryst utils.FSSearchQuery
+				queryst.FieldName = "media_creative_description1"
+				queryst.Value = term
+				searchquerys = append(searchquerys, queryst)
+			}
+		}
+		if hasdesc2 {
+			terms := utils.GSegmenter.SegmentSingle(creativedesc2)
+			if len(terms) == 0 {
+				return eDefaultEngineNotFound, nil
+			}
+			for _, term := range terms {
+				var queryst utils.FSSearchQuery
+				queryst.FieldName = "media_creative_description2"
+				queryst.Value = term
+				searchquerys = append(searchquerys, queryst)
+			}
+		}
+
+	}
+
+	if hasaccountid {
+		if accid, err := strconv.ParseInt(accountid, 0, 0); err == nil {
+			searchfilted = append(searchfilted, utils.FSSearchFilted{FieldName: "account_id", Start: accid, Type: utils.FILT_EQ})
+		}
+	}
+
+	if hascampaignid {
+		if campid, err := strconv.ParseInt(campaignid, 0, 0); err == nil {
+			searchfilted = append(searchfilted, utils.FSSearchFilted{FieldName: "media_campaign_id", Start: campid, Type: utils.FILT_EQ})
+		}
+	}
+
+	if hasadgroupid {
+		if adid, err := strconv.ParseInt(adgroupid, 0, 0); err == nil {
+			searchfilted = append(searchfilted, utils.FSSearchFilted{FieldName: "media_adgroup_id", Start: adid, Type: utils.FILT_EQ})
+		}
+	}
+
+	if haskeywordid {
+		if kid, err := strconv.ParseInt(keywordid, 0, 0); err == nil {
+			searchfilted = append(searchfilted, utils.FSSearchFilted{FieldName: "media_keyword_id", Start: kid, Type: utils.FILT_EQ})
+		}
 	}
 
 	nps, ok1 := strconv.ParseInt(ps, 0, 0)
@@ -95,10 +176,20 @@ func (this *DefaultEngine) Search(method string, parms map[string]string, body [
 		npg = 1
 	}
 
-	indexer := this.idxManager.GetIndex(indexname)
+	if _, ok := this.idxManagers[cid]; !ok {
 
+		this.idxManagers[cid] = newSemSearchMgt(cid, this.Logger)
+		if this.idxManagers[cid] == nil {
+			return fmt.Sprintf("Cid[%v] Create Error", cid), nil
+		}
+	}
+
+	indexer := this.idxManagers[cid].GetIndex(indexname)
+	//this.Logger.Info("[INFO] searchquerys %v", searchquerys)
 	//this.queryAnalyse(searchunit)
-	docids, found := indexer.SearchDocIds(searchquerys, nil)
+	//this.Logger.Info("[INFO] searchfilted %v", searchfilted)
+
+	docids, found := indexer.SearchDocIds(searchquerys, searchfilted)
 
 	if !found {
 		return eDefaultEngineNotFound, nil
@@ -123,9 +214,9 @@ func (this *DefaultEngine) Search(method string, parms map[string]string, body [
 	for _, docid := range docids[start:end] {
 		val, ok := indexer.GetDocument(docid.Docid)
 		if ok {
-			for _, term := range terms {
-				val["title"]=strings.Replace(val["title"],term,"[["+term+"]]",-1)
-			}
+			//for _, term := range terms {
+			//	val["title"] = strings.Replace(val["title"], term, "[["+term+"]]", -1)
+			//}
 			defaultResult.Result = append(defaultResult.Result, val)
 		}
 	}
@@ -151,47 +242,29 @@ func (this *DefaultEngine) Search(method string, parms map[string]string, body [
 
 func (this *DefaultEngine) CreateIndex(method string, parms map[string]string, body []byte) error {
 
-	indexname, hasindex := parms["index"]
+	cid, hascid := parms["cid"]
 
-	if !hasindex {
+	if !hascid {
 		return errors.New(eProcessoParms)
 	}
 
-	var indexstruct utils.IndexStrct
-	err := json.Unmarshal(body, &indexstruct)
-	if err != nil {
-		this.Logger.Error("[ERROR]  %v : %v ", eProcessoJsonParse, err)
-		return fmt.Errorf("[ERROR]  %v : %v ", eProcessoJsonParse, err)
+	if _, ok := this.idxManagers[cid]; ok {
+		return errors.New(eHasCidError)
 	}
 
-	return this.idxManager.CreateIndex(indexname, indexstruct.IndexMapping)
+	this.idxManagers[cid] = newSemSearchMgt(cid, this.Logger)
+	if this.idxManagers[cid] == nil {
+		return fmt.Errorf("Cid[%v] Create Error", cid)
+	}
 
-}
-
-func (this *DefaultEngine) CreateEmptyIndex(indexname string) error {
-
-	return this.idxManager.CreateEmptyIndex(indexname)
-
-}
-
-func (this *DefaultEngine) AddField(indexname string, field utils.SimpleFieldInfo) error {
-
-	return this.idxManager.AddField(indexname, field)
-
-}
-
-func (this *DefaultEngine) queryAnalyse(query utils.FSSearchFrontend) utils.FSSearchUnit {
-
-	var unit utils.FSSearchUnit
-
-	return unit
+	return nil
 
 }
 
 func (this *DefaultEngine) UpdateDocument(method string, parms map[string]string, body []byte) (string, error) {
-	indexname, hasindex := parms["index"]
+	cid, hascid := parms["cid"]
 
-	if !hasindex || method != "POST" {
+	if !hascid || method != "POST" {
 		return "", errors.New(eProcessoParms)
 	}
 
@@ -202,16 +275,37 @@ func (this *DefaultEngine) UpdateDocument(method string, parms map[string]string
 		return "", errors.New(eProcessoJsonParse)
 	}
 
-	return this.idxManager.updateDocument(indexname, document)
+	indexname, hasindexname := document["indexname"]
+	if !hasindexname {
+		return "", errors.New(eNoIndexname)
+	}
+
+	if _, ok := this.idxManagers[cid]; !ok {
+		this.idxManagers[cid] = newSemSearchMgt(cid, this.Logger)
+		if this.idxManagers[cid] == nil {
+			return "", fmt.Errorf("Cid[%v] Create Error", cid)
+		}
+	}
+
+	return this.idxManagers[cid].updateDocument(indexname, document)
 }
 
 func (this *DefaultEngine) LoadData(method string, parms map[string]string, body []byte) (string, error) {
 
-	indexname, hasindex := parms["index"]
+	cid, hascid := parms["cid"]
+	var indexname string
+	var hasindexname bool
 
-	if !hasindex || method != "POST" {
+	if !hascid || method != "POST" {
 		return eDefaultEngineLoadFail, errors.New(eProcessoParms)
 	}
+
+	idxCount := make(map[string]int)
+	idxCount["adgroup"] = 0
+	idxCount["account"] = 0
+	idxCount["campaign"] = 0
+	idxCount["keyword"] = 0
+	idxCount["creative"] = 0
 
 	var loadstruct utils.FSLoadStruct
 	err := json.Unmarshal(body, &loadstruct)
@@ -231,7 +325,7 @@ func (this *DefaultEngine) LoadData(method string, parms map[string]string, body
 	defer datafile.Close()
 
 	scanner := bufio.NewScanner(datafile)
-	i := 0
+	//i := 0
 	var isJson bool
 	if loadstruct.Split == "json" {
 		isJson = true
@@ -251,26 +345,25 @@ func (this *DefaultEngine) LoadData(method string, parms map[string]string, body
 			}
 
 		} else {
-			sptext := strings.Split(scanner.Text(), loadstruct.Split)
-			if len(sptext) != len(loadstruct.Fields) {
-				continue
-			}
-			for idx, fname := range loadstruct.Fields {
-				content[fname] = sptext[idx]
-			}
+			return "", errors.New(eProcessoParms)
 		}
 
-		this.idxManager.updateDocument(indexname, content)
+		indexname, hasindexname = content["indexname"]
+		if !hasindexname {
+			return "", errors.New(eNoIndexname)
+		}
 
-		i++
-		if i%loadstruct.SyncCount == 0 {
-			this.idxManager.sync(indexname)
+		this.idxManagers[cid].updateDocument(indexname, content)
+		idxCount[indexname] = idxCount[indexname] + 1
+
+		if idxCount[indexname]%loadstruct.SyncCount == 0 {
+			this.idxManagers[cid].sync(indexname)
 		}
 		//fmt.Println(sptext)
 	}
-	this.idxManager.sync(indexname)
+	this.idxManagers[cid].syncAll()
 	if loadstruct.IsMerge {
-		return eDefaultEngineLoadOk, this.idxManager.mergeIndex(indexname)
+		return eDefaultEngineLoadOk, this.idxManagers[cid].mergeAll()
 	}
 
 	return eDefaultEngineLoadOk, nil

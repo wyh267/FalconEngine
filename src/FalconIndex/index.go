@@ -125,7 +125,7 @@ func (this *Index) AddField(field utils.SimpleFieldInfo) error {
 	this.Fields[field.FieldName] = field
 	if field.FieldType == utils.IDX_TYPE_STRING_SEG ||
 		field.FieldType == utils.IDX_TYPE_STRING_SINGLE {
-		this.dict.AddBTree(field.FieldName)
+		//	this.dict.AddBTree(field.FieldName)
 	}
 	if field.FieldType == utils.IDX_TYPE_PK {
 		this.PrimaryKey = field.FieldName
@@ -437,12 +437,12 @@ func (this *Index) SearchDocIds(querys []utils.FSSearchQuery, filteds []utils.FS
 		for _, segment := range this.segments {
 			docids, _ = segment.SearchDocIds(querys[0], filteds, this.bitmap, docids)
 		}
-		//this.Logger.Info("[INFO] key[%v] doclens:%v",querys[0].Value,len(docids))
-		docids = utils.ComputeWeight(docids, len(docids), this.MaxDocId)
+		//this.Logger.Info("[INFO] key[%v] doclens:%v", querys[0].Value, len(docids))
+		//docids = utils.ComputeWeight(docids, len(docids), this.MaxDocId)
 	}
 
 	if len(querys) == 1 {
-		sort.Sort(utils.DocWeightSort(docids))
+		//sort.Sort(utils.DocWeightSort(docids))
 		return docids, true
 	}
 
@@ -453,7 +453,7 @@ func (this *Index) SearchDocIds(querys []utils.FSSearchQuery, filteds []utils.FS
 			subdocids, _ = segment.SearchDocIds(query, filteds, this.bitmap, subdocids)
 		}
 
-		//this.Logger.Info("[INFO] key[%v] doclens:%v",query.Value,len(subdocids))
+		//this.Logger.Info("[INFO] key[%v] doclens:%v", query.Value, len(subdocids))
 		docids, ok = utils.InteractionWithStartAndDf(docids, subdocids, 0, len(subdocids), this.MaxDocId)
 		utils.GiveDocIDsChan <- subdocids
 		if !ok {
@@ -463,7 +463,7 @@ func (this *Index) SearchDocIds(querys []utils.FSSearchQuery, filteds []utils.FS
 
 	}
 
-	sort.Sort(utils.DocWeightSort(docids))
+	//sort.Sort(utils.DocWeightSort(docids))
 	return docids, true
 
 }

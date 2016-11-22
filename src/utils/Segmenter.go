@@ -48,6 +48,41 @@ func (this *Segmenter) Segment(content string, search_mode bool) []string {
 	return res
 }
 
+func (this *Segmenter) SegmentSingle(content string) []string {
+
+	rstr := []rune(content)
+	res := make([]string, 0)
+	for _, r := range rstr {
+		res = append(res, string(r))
+
+	}
+
+	return res
+}
+
+func (this *Segmenter) SegmentWithSingle(content string) ([]TermInfo, int) {
+	rstr := []rune(content)
+	termmap := make(map[rune]TermInfo)
+	for i, r := range rstr {
+		//if _, ok := termmap[r]; !ok {
+		//	termmap[r] = TermInfo{Term: string(r), Tf: i}
+		//} else {
+		termmap[r] = TermInfo{Term: string(r), Tf: i}
+		//}
+
+	}
+
+	resterms := make([]TermInfo, len(termmap))
+	idx := 0
+	for _, tt := range termmap {
+		resterms[idx] = tt
+		idx++
+	}
+	//fmt.Printf("[TREMSSSSS::::%v] ",resterms)
+	return resterms, len(rstr)
+
+}
+
 func (this *Segmenter) SegmentWithTf(content string, search_mode bool) ([]TermInfo, int) {
 
 	terms := this.Segment(content, search_mode)
