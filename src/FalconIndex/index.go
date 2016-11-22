@@ -433,6 +433,14 @@ func (this *Index) SearchDocIds(querys []utils.FSSearchQuery, filteds []utils.FS
 
 	var ok bool
 	docids := <-utils.GetDocIDsChan
+
+	if len(querys) == 0 {
+		for _, segment := range this.segments {
+			docids, _ = segment.SearchDocIds(utils.FSSearchQuery{}, filteds, this.bitmap, docids)
+		}
+		return docids, true
+	}
+
 	if len(querys) >= 1 {
 		for _, segment := range this.segments {
 			docids, _ = segment.SearchDocIds(querys[0], filteds, this.bitmap, docids)

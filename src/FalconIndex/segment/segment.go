@@ -501,14 +501,21 @@ func (this *Segment) SearchDocIds(query utils.FSSearchQuery,
 
 	start := len(indocids)
 	//query查询
+	if query.Value == "" {
+		docids := make([]utils.DocIdNode, 0)
+		for i := this.StartDocId; i < this.MaxDocId; i++ {
+			docids = append(docids, utils.DocIdNode{Docid: i})
+		}
+		indocids = append(indocids, docids...)
+	} else {
+		docids, match := this.fields[query.FieldName].query(query.Value)
+		// this.Logger.Info("[INFO] key[%v] len:%v",query.Value,len(docids))
+		if !match {
+			return indocids, false
+		}
 
-	docids, match := this.fields[query.FieldName].query(query.Value)
-	// this.Logger.Info("[INFO] key[%v] len:%v",query.Value,len(docids))
-	if !match {
-		return indocids, false
+		indocids = append(indocids, docids...)
 	}
-
-	indocids = append(indocids, docids...)
 
 	//bitmap去掉数据
 	index := start
