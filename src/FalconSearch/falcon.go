@@ -44,6 +44,7 @@ func main() {
 	//初始化分词器
 	logger.Info("[INFO] Loading Segmenter ...")
 	utils.GSegmenter = utils.NewSegmenter("./data/dictionary.txt")
+	utils.GOptions = utils.NewPy(utils.STYLE_NORMAL, utils.NO_SEGMENT)
 
 	//初始化Manager
 	engine := fe.NewDefaultEngine(logger)

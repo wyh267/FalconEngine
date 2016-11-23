@@ -450,7 +450,7 @@ func (this *Index) SearchDocIds(querys []utils.FSSearchQuery, filteds []utils.FS
 	}
 
 	if len(querys) == 1 {
-		//sort.Sort(utils.DocWeightSort(docids))
+		sort.Sort(utils.DocWeightSort(docids))
 		return docids, true
 	}
 
@@ -471,7 +471,8 @@ func (this *Index) SearchDocIds(querys []utils.FSSearchQuery, filteds []utils.FS
 
 	}
 
-	//sort.Sort(utils.DocWeightSort(docids))
+	sort.Sort(utils.DocWeightSort(docids))
+	//this.Logger.Info("[INFO] docids  %v", docids)
 	return docids, true
 
 }

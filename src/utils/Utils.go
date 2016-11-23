@@ -36,9 +36,9 @@ func (a DocWeightSort) Len() int      { return len(a) }
 func (a DocWeightSort) Swap(i, j int) { a[i], a[j] = a[j], a[i] }
 func (a DocWeightSort) Less(i, j int) bool {
 	if a[i] == a[j] {
-		return a[i].Weight > a[j].Weight
+		return a[i].Weight < a[j].Weight
 	}
-	return a[i].Weight > a[j].Weight
+	return a[i].Weight < a[j].Weight
 }
 
 const DOCNODE_SIZE int = 8 //12
