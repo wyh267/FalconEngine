@@ -419,6 +419,27 @@ func (this *DefaultEngine) LoadData(method string, parms map[string]string, body
 		if !hasindexname {
 			return "", errors.New(eNoIndexname)
 		}
+		accid, ok := content["account_id"]
+		if !ok {
+			return "", errors.New("account_id不存在")
+		}
+
+		switch indexname {
+		case IKeyword:
+			if kid, ok := content["media_keyword_id"]; ok {
+				content["_pk"] = fmt.Sprintf("%v.%v", accid, kid)
+			} else {
+				return "", errors.New("media_keyword_id")
+			}
+		case ICreative:
+			if kid, ok := content["media_creative_id"]; ok {
+				content["_pk"] = fmt.Sprintf("%v.%v", accid, kid)
+			} else {
+				return "", errors.New("creative_id不存在")
+			}
+		default:
+
+		}
 
 		this.idxManagers[cid].updateDocument(indexname, content)
 		idxCount[indexname] = idxCount[indexname] + 1
