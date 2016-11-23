@@ -239,7 +239,7 @@ table.gridtable td {
             <form class="content">
                 <h4 style="text-align: left">{{ searchTitle }}</h2>
                 <input  id="cid-text" type="text" placeholder="请输入CID" maxlength="10" v-model="cid">
-                <label> 索引: </label>
+                <label> 选择索引: </label>
                 <select id="index-text" v-model="indexname">
                     <option value ="keyword" selected="selected">关键词</option>
                     <option value ="creative" >创意</option>
@@ -299,6 +299,13 @@ table.gridtable td {
                    
                 
             </div>
+            
+            <div class="{{ classA }}">
+            <span class="kv"> 找到 {{ count }} 条结果 ( 用时 {{ cost }} ) </span>
+            <a href=# v-on:click="searchRunner2">下一页</a>
+
+        </div>
+            
         </div>
 
 
@@ -321,6 +328,7 @@ table.gridtable td {
     nextpage:"",
     cost:"",
     pagesize:'',
+    fieldname:[],
     count:0,
   },
   
@@ -370,6 +378,20 @@ table.gridtable td {
   },
   
   
+  idxchange:function(){
+      console.log("idxchange")
+      if (this.indexname=="keyword") {
+          //this.fieldname.push([{"value":"keyword","text":"关键词"}])
+          this.fieldname.push(["keyword"])
+      }else{
+          //this.fieldname.push([{"value":"creativetitle","text":"标题"},{"value":"creativedesc1","text":"描述1"},{"value":"creativedesc2","text":"描述2"}])
+              this.fieldname.push(["creativetitle","creativedesc1","creativedesc2"])
+    }
+      
+      
+  },
+  
+  
   searchRunner2: function () {
       var searchmsg=this.searchDT.trim()
      
@@ -398,7 +420,7 @@ table.gridtable td {
         }).then(function(response) {
             var data = response.data;
             this.page=this.page+1
-            this.nextpage = "http://10.254.47.13:9990/v1/_search?cid="+ this.cid + "&index="+ this.indexname +"&" +this.queryfield+ "=" +this.searchDT +   "&ps=10&matchtype="+this.matchtype+"&pg="+this.page
+            this.nextpage = "http://10.254.47.13:9990/v1/_search?cid="+ this.cid + "&index="+ this.indexname +"&" +this.queryfield+ "=" +this.searchDT +   "&ps="+this.pagesize+"&matchtype="+this.matchtype+"&pg="+this.page
       
             this.classB="curd"
             this.classA="curad"
