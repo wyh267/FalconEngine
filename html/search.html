@@ -411,7 +411,7 @@ table.gridtable td {
       //this.searchTitle = searchmsg;
       //this.results.push({title:searchmsg})
       //10.254.47.13:9990/v1/_search?cid=2624&index=keyword&ps=10&pg=1&matchtype=range&campaign_id=21931525
-      var url = "http://10.254.47.13:9990/v1/_search?cid="+ this.cid + "&index="+ this.indexname +"&" +this.queryfield+ "=" +this.searchDT +   "&ps=10&matchtype="+this.matchtype+"&pg="+this.page
+      var url = "http://10.254.47.13:9990/v1/_search?cid="+ this.cid + "&index="+ this.indexname +"&" +this.queryfield+ "=" +this.searchDT +   "&ps="+this.pagesize+"&matchtype="+this.matchtype+"&pg="+this.page
       console.log(url)
       this.$http.get(url, function(data) {
             //this.set('results', data);
