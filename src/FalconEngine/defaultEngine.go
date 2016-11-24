@@ -449,7 +449,7 @@ func (this *DefaultEngine) LoadData(method string, parms map[string]string, body
 		}
 		rcount++
 		if rcount%10000 == 0 {
-			this.Logger.Info("[INFO] Read Data [ %v ] ")
+			this.Logger.Info("[INFO] Read Data [ %v ] ", rcount)
 		}
 		//fmt.Println(sptext)
 	}
