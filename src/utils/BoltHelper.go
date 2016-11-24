@@ -173,8 +173,11 @@ func (this *BoltHelper) UpdateMuti(tablename string, kv map[string]string) error
 			return fmt.Errorf("Tablename[%v] not found", tablename)
 		}
 		for k, v := range kv {
-			err := b.Put([]byte(k), []byte(v))
-			return err
+			//fmt.Printf("k %v  v :%v ", k, v)
+			if err := b.Put([]byte(k), []byte(v)); err != nil {
+				return err
+			}
+
 		}
 		return nil
 	})
