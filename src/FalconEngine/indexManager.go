@@ -110,7 +110,7 @@ func (this *IndexMgt) updateDocument(indexname string, document map[string]strin
 		return "", fmt.Errorf("[ERROR] index[%v] not found", indexname)
 	}
 
-	return "{ \"status\":\"OK\" }", this.indexers[indexname].UpdateDocument(document)
+	return "{ \"status\":\"OK\" }", this.indexers[indexname].UpdateDocument(document, utils.UPDATE_TYPE_MODIFY)
 }
 
 func (this *IndexMgt) sync(indexname string) error {

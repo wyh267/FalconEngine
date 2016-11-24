@@ -35,7 +35,8 @@ type SemSearchMgt struct {
 	meaningsIdx *fi.Index
 	indexers    map[string]*fi.Index
 	IndexInfos  map[string][]utils.SimpleFieldInfo `json:"indexinfos"`
-	Logger      *utils.Log4FE                      `json"-"`
+	//detail      *utils.BoltHelper
+	Logger *utils.Log4FE `json"-"`
 }
 
 /*
@@ -190,7 +191,17 @@ func (this *SemSearchMgt) updateDocument(indexname string, document map[string]s
 		return "", fmt.Errorf("[ERROR] index[%v] not found", indexname)
 	}
 
-	return "{ \"status\":\"OK\" }", this.indexers[indexname].UpdateDocument(document)
+	return "{ \"status\":\"OK\" }", this.indexers[indexname].UpdateDocument(document, utils.UPDATE_TYPE_MODIFY)
+}
+
+func (this *SemSearchMgt) addDocument(indexname string, document map[string]string) (string, error) {
+
+	if _, ok := this.indexers[indexname]; !ok {
+		this.Logger.Error("[ERROR] index[%v] not found", indexname)
+		return "", fmt.Errorf("[ERROR] index[%v] not found", indexname)
+	}
+
+	return "{ \"status\":\"OK\" }", this.indexers[indexname].UpdateDocument(document, utils.UPDATE_TYPE_ADD)
 }
 
 func (this *SemSearchMgt) sync(indexname string) error {

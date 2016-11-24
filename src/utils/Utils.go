@@ -47,6 +47,9 @@ const BASE_PREFIX_SEGMENT uint64 = 1000
 
 const SIZE_OF_TRIE_NODE int = 10
 
+const UPDATE_TYPE_ADD uint64 = 1
+const UPDATE_TYPE_MODIFY uint64 = 2
+
 // 索引类型说明
 const (
 	IDX_TYPE_STRING        = 1 //字符型索引[全词匹配]

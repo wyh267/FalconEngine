@@ -46,11 +46,46 @@ type DefaultResult struct {
 
 type DefaultEngine struct {
 	idxManagers map[string]*SemSearchMgt
+	detail      *utils.BoltHelper
 	Logger      *utils.Log4FE `json:"-"`
 }
 
 func NewDefaultEngine(logger *utils.Log4FE) *DefaultEngine {
 	this := &DefaultEngine{Logger: logger, idxManagers: make(map[string]*SemSearchMgt)}
+	this.detail = utils.NewBoltHelper(fmt.Sprintf("%v/%v.dtl", utils.IDX_ROOT_PATH, "Detail"), 666, logger)
+	if this.detail == nil {
+		return nil
+	}
+
+	if _, err := this.detail.CreateTable(IAccount); err != nil {
+		this.Logger.Error("[ERROR] Create Table[%v] Error", IAccount)
+		return nil
+	}
+	this.Logger.Info("[INFO] Create Table[%v] OK", IAccount)
+
+	if _, err := this.detail.CreateTable(ICampaign); err != nil {
+		this.Logger.Error("[ERROR] Create Table[%v] Error", ICampaign)
+		return nil
+	}
+	this.Logger.Info("[INFO] Create Table[%v] OK", ICampaign)
+
+	if _, err := this.detail.CreateTable(IAdgroup); err != nil {
+		this.Logger.Error("[ERROR] Create Table[%v] Error", IAdgroup)
+		return nil
+	}
+	this.Logger.Info("[INFO] Create Table[%v] OK", IAdgroup)
+
+	if _, err := this.detail.CreateTable(IKeyword); err != nil {
+		this.Logger.Error("[ERROR] Create Table[%v] Error", IKeyword)
+		return nil
+	}
+	this.Logger.Info("[INFO] Create Table[%v] OK", IKeyword)
+
+	if _, err := this.detail.CreateTable(ICreative); err != nil {
+		this.Logger.Error("[ERROR] Create Table[%v] Error", ICreative)
+		return nil
+	}
+	this.Logger.Info("[INFO] Create Table[%v] OK", ICreative)
 	return this
 }
 
@@ -404,9 +439,10 @@ func (this *DefaultEngine) LoadData(method string, parms map[string]string, body
 	rcount := 0
 	for scanner.Scan() {
 		content := make(map[string]string)
+		var textcontent string
 		if isJson {
-
-			if err := json.Unmarshal([]byte(scanner.Text()), &content); err != nil {
+			textcontent = scanner.Text()
+			if err := json.Unmarshal([]byte(textcontent), &content); err != nil {
 				//this.Logger.Error("[ERROR]  %v", err)
 				this.Logger.Error("[INFO]  %v \t %v ", err, scanner.Text())
 				continue
@@ -435,30 +471,48 @@ func (this *DefaultEngine) LoadData(method string, parms map[string]string, body
 			return "", errors.New(eNoIndexname)
 		}
 
-		/*
-			accid, ok := content["account_id"]
-			if !ok {
-				return "", errors.New("account_id不存在")
-			}
+		accid, ok := content["account_id"]
+		if !ok {
+			return "", errors.New("account_id不存在")
+		}
 
-			switch indexname {
-			case IKeyword:
-				if kid, ok := content["media_keyword_id"]; ok {
-					content["_pk"] = fmt.Sprintf("%v.%v", accid, kid)
-				} else {
-					return "", errors.New("media_keyword_id")
-				}
-			case ICreative:
-				if kid, ok := content["media_creative_id"]; ok {
-					content["_pk"] = fmt.Sprintf("%v.%v", accid, kid)
-				} else {
-					return "", errors.New("creative_id不存在")
-				}
-			default:
+		detailkey := accid
 
+		switch indexname {
+		case IKeyword:
+			if kid, ok := content["media_keyword_id"]; ok {
+				detailkey = fmt.Sprintf("%v.%v", accid, kid)
+			} else {
+				detailkey = ""
 			}
-		*/
-		this.idxManagers[cid].updateDocument(indexname, content)
+		case ICreative:
+			if kid, ok := content["media_creative_id"]; ok {
+				detailkey = fmt.Sprintf("%v.%v", accid, kid)
+			} else {
+				detailkey = ""
+			}
+		case IAccount:
+
+			detailkey = content["account_id"]
+
+		case ICampaign:
+			if kid, ok := content["media_campaign_id"]; ok {
+				detailkey = fmt.Sprintf("%v.%v", accid, kid)
+			} else {
+				detailkey = ""
+			}
+		case IAdgroup:
+			if kid, ok := content["media_adgroup_id"]; ok {
+				detailkey = fmt.Sprintf("%v.%v", accid, kid)
+			} else {
+				detailkey = ""
+			}
+		default:
+			detailkey = ""
+		}
+
+		this.idxManagers[cid].addDocument(indexname, content)
+		//this.idxManagers[cid].updateDocument(indexname, content)
 		idxCount[indexname] = idxCount[indexname] + 1
 
 		if idxCount[indexname]%loadstruct.SyncCount == 0 {
@@ -469,6 +523,9 @@ func (this *DefaultEngine) LoadData(method string, parms map[string]string, body
 			this.Logger.Info("[INFO] Read Data [ %v ] ", rcount)
 		}
 		//fmt.Println(sptext)
+		//更新
+		this.updateDetail(indexname, detailkey, textcontent)
+
 	}
 
 	for cid, _ := range this.idxManagers {
@@ -480,5 +537,11 @@ func (this *DefaultEngine) LoadData(method string, parms map[string]string, body
 	}
 
 	return eDefaultEngineLoadOk, nil
+
+}
+
+func (this *DefaultEngine) updateDetail(indexname, key, value string) error {
+
+	return this.detail.Update(indexname, key, value)
 
 }

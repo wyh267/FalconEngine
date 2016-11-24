@@ -245,7 +245,7 @@ func (this *Index) storeStruct() error {
 
 }
 
-func (this *Index) UpdateDocument(content map[string]string) error {
+func (this *Index) UpdateDocument(content map[string]string, updateType uint64) error {
 
 	if len(this.Fields) == 0 {
 		this.Logger.Error("[ERROR] No Field or Segment is nil")
@@ -276,7 +276,7 @@ func (this *Index) UpdateDocument(content map[string]string) error {
 
 	//无主键的表直接添加
 
-	if this.PrimaryKey == "" {
+	if updateType == utils.UPDATE_TYPE_ADD || this.PrimaryKey == "" {
 		return this.memorySegment.AddDocument(docid, content)
 	}
 
