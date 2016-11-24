@@ -75,7 +75,7 @@ func newSemSearchMgt(cid string, logger *utils.Log4FE) *SemSearchMgt {
 	this.IndexInfos[IAdgroup] = append(this.IndexInfos[IAdgroup], utils.SimpleFieldInfo{FieldName: "media_adgroup_status", FieldType: utils.IDX_TYPE_NUMBER})
 
 	this.IndexInfos[IKeyword] = make([]utils.SimpleFieldInfo, 0)
-	this.IndexInfos[IKeyword] = append(this.IndexInfos[IKeyword], utils.SimpleFieldInfo{FieldName: "_pk", FieldType: utils.IDX_TYPE_PK})
+	//this.IndexInfos[IKeyword] = append(this.IndexInfos[IKeyword], utils.SimpleFieldInfo{FieldName: "_pk", FieldType: utils.IDX_TYPE_PK})
 	this.IndexInfos[IKeyword] = append(this.IndexInfos[IKeyword], utils.SimpleFieldInfo{FieldName: "account_id", FieldType: utils.IDX_TYPE_NUMBER})
 	this.IndexInfos[IKeyword] = append(this.IndexInfos[IKeyword], utils.SimpleFieldInfo{FieldName: "media_campaign_id", FieldType: utils.IDX_TYPE_NUMBER})
 	this.IndexInfos[IKeyword] = append(this.IndexInfos[IKeyword], utils.SimpleFieldInfo{FieldName: "media_adgroup_id", FieldType: utils.IDX_TYPE_NUMBER})
@@ -85,7 +85,7 @@ func newSemSearchMgt(cid string, logger *utils.Log4FE) *SemSearchMgt {
 	this.IndexInfos[IKeyword] = append(this.IndexInfos[IKeyword], utils.SimpleFieldInfo{FieldName: "match_type", FieldType: utils.IDX_TYPE_NUMBER})
 
 	this.IndexInfos[ICreative] = make([]utils.SimpleFieldInfo, 0)
-	this.IndexInfos[ICreative] = append(this.IndexInfos[ICreative], utils.SimpleFieldInfo{FieldName: "_pk", FieldType: utils.IDX_TYPE_PK})
+	//this.IndexInfos[ICreative] = append(this.IndexInfos[ICreative], utils.SimpleFieldInfo{FieldName: "_pk", FieldType: utils.IDX_TYPE_PK})
 	this.IndexInfos[ICreative] = append(this.IndexInfos[ICreative], utils.SimpleFieldInfo{FieldName: "account_id", FieldType: utils.IDX_TYPE_NUMBER})
 	this.IndexInfos[ICreative] = append(this.IndexInfos[ICreative], utils.SimpleFieldInfo{FieldName: "media_campaign_id", FieldType: utils.IDX_TYPE_NUMBER})
 	this.IndexInfos[ICreative] = append(this.IndexInfos[ICreative], utils.SimpleFieldInfo{FieldName: "media_adgroup_id", FieldType: utils.IDX_TYPE_NUMBER})
