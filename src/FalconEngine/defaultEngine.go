@@ -47,11 +47,12 @@ type DefaultResult struct {
 type DefaultEngine struct {
 	idxManagers map[string]*SemSearchMgt
 	detail      *utils.BoltHelper
+	mdetail     map[string]map[string]string
 	Logger      *utils.Log4FE `json:"-"`
 }
 
 func NewDefaultEngine(logger *utils.Log4FE) *DefaultEngine {
-	this := &DefaultEngine{Logger: logger, idxManagers: make(map[string]*SemSearchMgt)}
+	this := &DefaultEngine{Logger: logger, idxManagers: make(map[string]*SemSearchMgt), mdetail: make(map[string]map[string]string)}
 	this.detail = utils.NewBoltHelper(fmt.Sprintf("%v/%v.dtl", utils.IDX_ROOT_PATH, "Detail"), 666, logger)
 	if this.detail == nil {
 		return nil
@@ -62,30 +63,35 @@ func NewDefaultEngine(logger *utils.Log4FE) *DefaultEngine {
 		return nil
 	}
 	this.Logger.Info("[INFO] Create Table[%v] OK", IAccount)
+	this.mdetail[IAccount] = make(map[string]string)
 
 	if _, err := this.detail.CreateTable(ICampaign); err != nil {
 		this.Logger.Error("[ERROR] Create Table[%v] Error", ICampaign)
 		return nil
 	}
 	this.Logger.Info("[INFO] Create Table[%v] OK", ICampaign)
+	this.mdetail[ICampaign] = make(map[string]string)
 
 	if _, err := this.detail.CreateTable(IAdgroup); err != nil {
 		this.Logger.Error("[ERROR] Create Table[%v] Error", IAdgroup)
 		return nil
 	}
 	this.Logger.Info("[INFO] Create Table[%v] OK", IAdgroup)
+	this.mdetail[IAdgroup] = make(map[string]string)
 
 	if _, err := this.detail.CreateTable(IKeyword); err != nil {
 		this.Logger.Error("[ERROR] Create Table[%v] Error", IKeyword)
 		return nil
 	}
 	this.Logger.Info("[INFO] Create Table[%v] OK", IKeyword)
+	this.mdetail[IKeyword] = make(map[string]string)
 
 	if _, err := this.detail.CreateTable(ICreative); err != nil {
 		this.Logger.Error("[ERROR] Create Table[%v] Error", ICreative)
 		return nil
 	}
 	this.Logger.Info("[INFO] Create Table[%v] OK", ICreative)
+	this.mdetail[ICreative] = make(map[string]string)
 	return this
 }
 
@@ -521,13 +527,14 @@ func (this *DefaultEngine) LoadData(method string, parms map[string]string, body
 		rcount++
 		if rcount%10000 == 0 {
 			this.Logger.Info("[INFO] Read Data [ %v ] ", rcount)
+			this.syncDetail()
 		}
 		//fmt.Println(sptext)
 		//更新
 		this.updateDetail(indexname, detailkey, textcontent)
 
 	}
-
+	this.syncDetail()
 	for cid, _ := range this.idxManagers {
 		this.idxManagers[cid].syncAll()
 		if loadstruct.IsMerge {
@@ -542,6 +549,23 @@ func (this *DefaultEngine) LoadData(method string, parms map[string]string, body
 
 func (this *DefaultEngine) updateDetail(indexname, key, value string) error {
 
-	return this.detail.Update(indexname, key, value)
+	this.mdetail[indexname][key] = value
 
+	return nil
+
+}
+
+func (this *DefaultEngine) syncDetail() error {
+
+	for indexname, val := range this.mdetail {
+		this.Logger.Info("[INFO] sync detail [%v]", indexname)
+		this.detail.UpdateMuti(indexname, val)
+	}
+	this.mdetail = make(map[string]map[string]string)
+	this.mdetail[IAccount] = make(map[string]string)
+	this.mdetail[ICampaign] = make(map[string]string)
+	this.mdetail[IAdgroup] = make(map[string]string)
+	this.mdetail[IKeyword] = make(map[string]string)
+	this.mdetail[ICreative] = make(map[string]string)
+	return nil
 }
