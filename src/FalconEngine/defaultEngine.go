@@ -359,11 +359,11 @@ func (this *DefaultEngine) UpdateDocument(method string, parms map[string]string
 
 func (this *DefaultEngine) LoadData(method string, parms map[string]string, body []byte) (string, error) {
 
-	cid, hascid := parms["cid"]
+	//cid, hascid := parms["cid"]
 	var indexname string
 	var hasindexname bool
 
-	if !hascid || method != "POST" {
+	if /*!hascid ||*/ method != "POST" {
 		return eDefaultEngineLoadFail, errors.New(eProcessoParms)
 	}
 
@@ -415,6 +415,20 @@ func (this *DefaultEngine) LoadData(method string, parms map[string]string, body
 			return "", errors.New(eProcessoParms)
 		}
 
+		cid, hascid := content["cid"]
+
+		if !hascid {
+			this.Logger.Error("[ERROR]  %v", eProcessoParms)
+			continue
+		}
+
+		if _, ok := this.idxManagers[cid]; !ok {
+			this.idxManagers[cid] = newSemSearchMgt(cid, this.Logger)
+			if this.idxManagers[cid] == nil {
+				return "", fmt.Errorf("Cid[%v] Create Error", cid)
+			}
+		}
+
 		indexname, hasindexname = content["indexname"]
 		if !hasindexname {
 			return "", errors.New(eNoIndexname)
@@ -455,9 +469,13 @@ func (this *DefaultEngine) LoadData(method string, parms map[string]string, body
 		}
 		//fmt.Println(sptext)
 	}
-	this.idxManagers[cid].syncAll()
-	if loadstruct.IsMerge {
-		return eDefaultEngineLoadOk, this.idxManagers[cid].mergeAll()
+
+	for cid, _ := range this.idxManagers {
+		this.idxManagers[cid].syncAll()
+		if loadstruct.IsMerge {
+			return eDefaultEngineLoadOk, this.idxManagers[cid].mergeAll()
+		}
+
 	}
 
 	return eDefaultEngineLoadOk, nil
