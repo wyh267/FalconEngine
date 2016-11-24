@@ -522,7 +522,10 @@ func (this *DefaultEngine) LoadData(method string, parms map[string]string, body
 		idxCount[indexname] = idxCount[indexname] + 1
 
 		if idxCount[indexname]%loadstruct.SyncCount == 0 {
-			this.idxManagers[cid].sync(indexname)
+
+			for cid, _ := range this.idxManagers {
+				this.idxManagers[cid].sync(indexname)
+			}
 		}
 		rcount++
 		if rcount%10000 == 0 {
@@ -535,10 +538,10 @@ func (this *DefaultEngine) LoadData(method string, parms map[string]string, body
 
 	}
 	this.syncDetail()
-	for cid, _ := range this.idxManagers {
-		this.idxManagers[cid].syncAll()
+	for c, _ := range this.idxManagers {
+		this.idxManagers[c].syncAll()
 		if loadstruct.IsMerge {
-			return eDefaultEngineLoadOk, this.idxManagers[cid].mergeAll()
+			return eDefaultEngineLoadOk, this.idxManagers[c].mergeAll()
 		}
 
 	}
