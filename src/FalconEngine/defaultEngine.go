@@ -557,8 +557,8 @@ func (this *DefaultEngine) updateDetail(indexname, key, value string) error {
 
 func (this *DefaultEngine) syncDetail() error {
 
+	this.Logger.Info("[INFO] sync detail ")
 	for indexname, val := range this.mdetail {
-		this.Logger.Info("[INFO] sync detail [%v]", val)
 		this.detail.UpdateMuti(indexname, val)
 	}
 	this.mdetail = make(map[string]map[string]string)
