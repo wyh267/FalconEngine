@@ -28,26 +28,32 @@ var INITIALS []string = strings.Split("b,p,m,f,d,t,n,l,g,k,h,j,q,x,r,zh,ch,sh,z,
 var keyString string
 var jieba *gojieba.Jieba
 var sympolMap = map[string]string{
+	"a": "a1",
 	"ā": "a1",
 	"á": "a2",
 	"ǎ": "a3",
 	"à": "a4",
+	"e": "e1",
 	"ē": "e1",
 	"é": "e2",
 	"ě": "e3",
 	"è": "e4",
+	"o": "o1",
 	"ō": "o1",
 	"ó": "o2",
 	"ǒ": "o3",
 	"ò": "o4",
+	"i": "i1",
 	"ī": "i1",
 	"í": "i2",
 	"ǐ": "i3",
 	"ì": "i4",
+	"u": "u1",
 	"ū": "u1",
 	"ú": "u2",
 	"ǔ": "u3",
 	"ù": "u4",
+	"v": "v1",
 	"ü": "v0",
 	"ǘ": "v2",
 	"ǚ": "v3",
@@ -78,6 +84,7 @@ func getMapKeys() string {
 
 func normalStr(str string) string {
 	findRet := reg.FindString(str)
+	//fmt.Printf("%v  === %v == %v\n", str, findRet, sympolMap[findRet])
 	return strings.Replace(str, findRet, string([]byte(sympolMap[findRet])[0]), -1)
 }
 
