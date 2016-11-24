@@ -541,7 +541,7 @@ func (this *DefaultEngine) LoadData(method string, parms map[string]string, body
 	for c, _ := range this.idxManagers {
 		this.idxManagers[c].syncAll()
 		if loadstruct.IsMerge {
-			return eDefaultEngineLoadOk, this.idxManagers[c].mergeAll()
+			this.idxManagers[c].mergeAll()
 		}
 
 	}
