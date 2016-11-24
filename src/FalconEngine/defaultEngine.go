@@ -524,11 +524,11 @@ func (this *DefaultEngine) LoadData(method string, parms map[string]string, body
 		if idxCount[indexname]%loadstruct.SyncCount == 0 {
 
 			for cid, _ := range this.idxManagers {
-				this.idxManagers[cid].sync(indexname)
+				this.idxManagers[cid].syncAll()
 			}
 		}
 		rcount++
-		if rcount%10000 == 0 {
+		if rcount%50000 == 0 {
 			this.Logger.Info("[INFO] Read Data [ %v ] ", rcount)
 			this.syncDetail()
 		}
