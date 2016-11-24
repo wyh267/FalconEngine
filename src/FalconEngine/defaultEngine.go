@@ -407,7 +407,8 @@ func (this *DefaultEngine) LoadData(method string, parms map[string]string, body
 		if isJson {
 
 			if err := json.Unmarshal([]byte(scanner.Text()), &content); err != nil {
-				this.Logger.Error("[ERROR]  %v", err)
+				//this.Logger.Error("[ERROR]  %v", err)
+				this.Logger.Error("[INFO]  %v \t %v ", err, scanner.Text())
 				continue
 			}
 
