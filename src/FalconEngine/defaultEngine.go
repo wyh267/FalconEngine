@@ -401,7 +401,7 @@ func (this *DefaultEngine) LoadData(method string, parms map[string]string, body
 	if loadstruct.SyncCount <= 0 {
 		loadstruct.SyncCount = 1000
 	}
-
+	rcount := 0
 	for scanner.Scan() {
 		content := make(map[string]string)
 		if isJson {
@@ -446,6 +446,10 @@ func (this *DefaultEngine) LoadData(method string, parms map[string]string, body
 
 		if idxCount[indexname]%loadstruct.SyncCount == 0 {
 			this.idxManagers[cid].sync(indexname)
+		}
+		rcount++
+		if rcount%10000 == 0 {
+			this.Logger.Info("[INFO] Read Data [ %v ] ")
 		}
 		//fmt.Println(sptext)
 	}
