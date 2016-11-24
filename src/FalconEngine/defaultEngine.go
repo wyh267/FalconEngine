@@ -450,9 +450,9 @@ func (this *DefaultEngine) LoadData(method string, parms map[string]string, body
 			this.idxManagers[cid].sync(indexname)
 		}
 		rcount++
-		if rcount%10000 == 0 {
-			this.Logger.Info("[INFO] Read Data [ %v ] ", rcount)
-		}
+		//if rcount%100 == 0 {
+		this.Logger.Info("[INFO] Read Data [ %v ] ", rcount)
+		//}
 		//fmt.Println(sptext)
 	}
 	this.idxManagers[cid].syncAll()
