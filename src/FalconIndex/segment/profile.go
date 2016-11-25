@@ -341,11 +341,11 @@ func (this *profile) filterNums(pos uint32, filtertype uint64, rangenum []int64)
 			return false
 		case utils.FILT_NOT:
 			for _, start := range rangenum {
-				if ok := (0xFFFFFFFF&value != 0xFFFFFFFF) && (value != start); ok {
-					return true
+				if ok := (0xFFFFFFFF&value != 0xFFFFFFFF) && (value == start); ok {
+					return false
 				}
 			}
-			return false
+			return true
 
 		default:
 			return false
