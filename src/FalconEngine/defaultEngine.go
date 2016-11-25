@@ -322,6 +322,18 @@ func (this *DefaultEngine) Search(method string, parms map[string]string, body [
 	for _, docid := range docids[start:end] {
 		val, ok := indexer.GetDocument(docid.Docid)
 		if ok {
+			if accid, ok1 := val["account_id"]; ok1 {
+				if capid, ok2 := val["media_campaign_id"]; ok2 {
+					vstr, err := this.detail.Get(ICampaign, fmt.Sprintf("%v.%v", accid, capid))
+					var v map[string]string
+					err = json.Unmarshal([]byte(vstr), v)
+					if err == nil {
+						val["media_campaign_name"] = v["media_campaign_name"]
+					}
+				}
+
+			}
+
 			//for _, term := range terms {
 			//	val["title"] = strings.Replace(val["title"], term, "[["+term+"]]", -1)
 			//}
