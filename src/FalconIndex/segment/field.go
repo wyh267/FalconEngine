@@ -196,11 +196,16 @@ func (this *FSField) getValue(docid uint32) (string, bool) {
 // Filter function description : 过滤
 // params :
 // return :
-func (this *FSField) filter(docid uint32, filtertype uint64, start, end int64, str string) bool {
+func (this *FSField) filter(docid uint32, filtertype uint64, start, end int64, rangenum []int64, str string) bool {
 
 	if docid >= this.startDocId && docid < this.maxDocId && this.pfl != nil {
 		//this.Logger.Info("[INFO] FSField docid %v start %v", docid, start)
-		return this.pfl.filter(docid-this.startDocId, filtertype, start, end, str)
+		if len(rangenum) == 0 {
+			return this.pfl.filter(docid-this.startDocId, filtertype, start, end, str)
+		} else {
+			return this.pfl.filterNums(docid-this.startDocId, filtertype, rangenum)
+		}
+
 	}
 
 	return false

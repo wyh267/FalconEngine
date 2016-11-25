@@ -315,6 +315,47 @@ func (this *profile) getIntValue(pos uint32) (int64, bool) {
 	return 0xFFFFFFFF, false
 }
 
+func (this *profile) filterNums(pos uint32, filtertype uint64, rangenum []int64) bool {
+	var value int64
+	if this.fake {
+		return false
+	}
+
+	if this.fieldType == utils.IDX_TYPE_NUMBER {
+		if this.isMomery {
+			value = this.pflNumber[pos]
+		} else if this.pflMmap == nil {
+			return false
+		}
+
+		offset := this.pflOffset + int64(pos*8)
+		value = this.pflMmap.ReadInt64(offset)
+
+		switch filtertype {
+		case utils.FILT_EQ:
+			for _, start := range rangenum {
+				if ok := (0xFFFFFFFF&value != 0xFFFFFFFF) && (value == start); ok {
+					return true
+				}
+			}
+			return false
+		case utils.FILT_NOT:
+			for _, start := range rangenum {
+				if ok := (0xFFFFFFFF&value != 0xFFFFFFFF) && (value != start); ok {
+					return true
+				}
+			}
+			return false
+
+		default:
+			return false
+		}
+
+	}
+
+	return false
+}
+
 // Filter function description : 过滤
 // params :
 // return :
@@ -353,34 +394,46 @@ func (this *profile) filter(pos uint32, filtertype uint64, start, end int64, str
 	}
 
 	if this.fieldType == utils.IDX_TYPE_STRING_SINGLE {
-
+		vl := strings.Split(str, ",")
 		switch filtertype {
 
 		case utils.FILT_STR_PREFIX:
 			if vstr, ok := this.getValue(pos); ok {
-				if strings.HasPrefix(vstr, str) {
-					return true
+
+				for _, v := range vl {
+					if strings.HasPrefix(vstr, v) {
+						return true
+					}
 				}
+
 			}
 			return false
 		case utils.FILT_STR_SUFFIX:
 			if vstr, ok := this.getValue(pos); ok {
-				if strings.HasSuffix(vstr, str) {
-					return true
+				for _, v := range vl {
+					if strings.HasSuffix(vstr, v) {
+						return true
+					}
 				}
 			}
 			return false
 		case utils.FILT_STR_RANGE:
 			if vstr, ok := this.getValue(pos); ok {
-				if strings.Contains(vstr, str) {
-					return true
+				for _, v := range vl {
+					if !strings.Contains(vstr, v) {
+						return false
+					}
 				}
+				return true
 			}
 			return false
 		case utils.FILT_STR_ALL:
+
 			if vstr, ok := this.getValue(pos); ok {
-				if vstr == str {
-					return true
+				for _, v := range vl {
+					if vstr == v {
+						return true
+					}
 				}
 			}
 			return false

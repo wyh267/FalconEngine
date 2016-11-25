@@ -141,6 +141,7 @@ func (this *DefaultEngine) Search(method string, parms map[string]string, body [
 			}
 		default: //搜索
 			value_list := strings.Split(value, ",")
+			//sf := utils.FSSearchFilted{FieldName: field, Type: utils.FILT_STR_PREFIX, RangeStr: make([]string, 0)}
 			for _, v := range value_list {
 				terms := utils.GSegmenter.SegmentSingle(v)
 				if len(terms) == 0 {
@@ -153,19 +154,27 @@ func (this *DefaultEngine) Search(method string, parms map[string]string, body [
 					queryst.Value = term
 					searchquerys = append(searchquerys, queryst)
 				}
-				switch matchtype {
-				case "prefix":
-					searchfilted = append(searchfilted, utils.FSSearchFilted{FieldName: field, MatchStr: value, Type: utils.FILT_STR_PREFIX})
-				case "suffix":
-					searchfilted = append(searchfilted, utils.FSSearchFilted{FieldName: field, MatchStr: value, Type: utils.FILT_STR_SUFFIX})
-				case "range":
-					searchfilted = append(searchfilted, utils.FSSearchFilted{FieldName: field, MatchStr: value, Type: utils.FILT_STR_RANGE})
-				case "all":
-					searchfilted = append(searchfilted, utils.FSSearchFilted{FieldName: field, MatchStr: value, Type: utils.FILT_STR_ALL})
-				default:
-					searchfilted = append(searchfilted, utils.FSSearchFilted{FieldName: field, MatchStr: value, Type: utils.FILT_STR_PREFIX})
 
-				}
+				//sf.RangeStr = append(sf.RangeStr, v)
+
+			}
+
+			switch matchtype {
+			case "prefix":
+				//sf.Type = utils.FILT_STR_PREFIX
+				searchfilted = append(searchfilted, utils.FSSearchFilted{FieldName: field, MatchStr: value, Type: utils.FILT_STR_PREFIX})
+			case "suffix":
+				//sf.Type = utils.FILT_STR_SUFFIX
+				searchfilted = append(searchfilted, utils.FSSearchFilted{FieldName: field, MatchStr: value, Type: utils.FILT_STR_SUFFIX})
+			case "range":
+				//sf.Type = utils.FILT_STR_RANGE
+				searchfilted = append(searchfilted, utils.FSSearchFilted{FieldName: field, MatchStr: value, Type: utils.FILT_STR_RANGE})
+			case "all":
+				//sf.Type = utils.FILT_STR_ALL
+				searchfilted = append(searchfilted, utils.FSSearchFilted{FieldName: field, MatchStr: value, Type: utils.FILT_STR_ALL})
+			default:
+				//sf.Type = utils.FILT_STR_PREFIX
+				searchfilted = append(searchfilted, utils.FSSearchFilted{FieldName: field, MatchStr: value, Type: utils.FILT_STR_PREFIX})
 
 			}
 

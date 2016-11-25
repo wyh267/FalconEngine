@@ -399,6 +399,7 @@ func (this *Segment) Query(fieldname string, key interface{}) ([]utils.DocIdNode
 // Filter function description : 过滤
 // params :
 // return :
+/*
 func (this *Segment) Filter(fieldname string, filtertype uint64, start, end int64, str string, docids []utils.DocIdNode) []utils.DocIdNode {
 
 	if _, hasField := this.fields[fieldname]; !hasField {
@@ -429,6 +430,7 @@ func (this *Segment) Filter(fieldname string, filtertype uint64, start, end int6
 	return res
 
 }
+*/
 
 // getFieldValue function description : 获取详情，单个字段
 // params :
@@ -537,7 +539,7 @@ func (this *Segment) SearchDocIds(query utils.FSSearchQuery,
 		for _, filter := range filteds {
 			if _, hasField := this.fields[filter.FieldName]; hasField {
 				if (bitmap != nil && bitmap.GetBit(uint64(docidinfo.Docid)) == 1) ||
-					(!this.fields[filter.FieldName].filter(docidinfo.Docid, filter.Type, filter.Start, filter.End, filter.MatchStr)) {
+					(!this.fields[filter.FieldName].filter(docidinfo.Docid, filter.Type, filter.Start, filter.End, filter.Range, filter.MatchStr)) {
 					match = false
 					break
 				}
@@ -650,7 +652,7 @@ func (this *Segment) SearchUnitDocIds(querys []utils.FSSearchQuery, filteds []ut
 		for _, filter := range filteds {
 			if _, hasField := this.fields[filter.FieldName]; hasField {
 				if (bitmap != nil && bitmap.GetBit(uint64(docidinfo.Docid)) == 1) ||
-					(!this.fields[filter.FieldName].filter(docidinfo.Docid, filter.Type, filter.Start, filter.End, filter.MatchStr)) {
+					(!this.fields[filter.FieldName].filter(docidinfo.Docid, filter.Type, filter.Start, filter.End, filter.Range, filter.MatchStr)) {
 					match = false
 					break
 				}
