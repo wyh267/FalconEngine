@@ -323,13 +323,21 @@ func (this *DefaultEngine) Search(method string, parms map[string]string, body [
 		val, ok := indexer.GetDocument(docid.Docid)
 		if ok {
 			if accid, ok1 := val["account_id"]; ok1 {
+				this.Logger.Info("[INFO] account_id %v", accid)
 				if capid, ok2 := val["media_campaign_id"]; ok2 {
+					this.Logger.Info("[INFO] media_campaign_id %v", capid)
 					vstr, err := this.detail.Get(ICampaign, fmt.Sprintf("%v.%v", accid, capid))
+					if err != nil {
+						this.Logger.Error("[ERROR] get err %v", err)
+					}
 					var v map[string]string
-					err = json.Unmarshal([]byte(vstr), v)
-					if err == nil {
+					err = json.Unmarshal([]byte(vstr), &v)
+					if err != nil {
+						this.Logger.Error("[ERROR] json err %v", err)
+					} else {
 						val["media_campaign_name"] = v["media_campaign_name"]
 					}
+
 				}
 
 			}
