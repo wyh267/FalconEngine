@@ -345,6 +345,8 @@ func (this *profile) filter(pos uint32, filtertype uint64, start, end int64, str
 			return (0xFFFFFFFF&value != 0xFFFFFFFF) && (value <= start)
 		case utils.FILT_RANGE:
 			return (0xFFFFFFFF&value != 0xFFFFFFFF) && (value >= start && value <= end)
+		case utils.FILT_NOT:
+			return (0xFFFFFFFF&value != 0xFFFFFFFF) && (value != start)
 		default:
 			return false
 		}

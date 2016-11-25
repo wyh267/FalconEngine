@@ -73,6 +73,7 @@ const (
 	FILT_OVER       uint64 = 2  //大于
 	FILT_LESS       uint64 = 3  //小于
 	FILT_RANGE      uint64 = 4  //范围内
+	FILT_NOT        uint64 = 5  //不等于
 	FILT_STR_PREFIX uint64 = 11 //前缀
 	FILT_STR_SUFFIX uint64 = 12 //后缀
 	FILT_STR_RANGE  uint64 = 13 //之内
