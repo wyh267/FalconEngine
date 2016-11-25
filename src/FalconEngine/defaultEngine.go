@@ -136,9 +136,16 @@ func (this *DefaultEngine) Search(method string, parms map[string]string, body [
 			searchfilted = append(searchfilted, sf)
 
 		case '_': //反向过滤
-			if valuenum, err := strconv.ParseInt(value, 0, 0); err == nil {
-				searchfilted = append(searchfilted, utils.FSSearchFilted{FieldName: field[1:], Start: valuenum, Type: utils.FILT_NOT})
+			value_list := strings.Split(value, ",")
+			sf := utils.FSSearchFilted{FieldName: field[1:], Type: utils.FILT_NOT, Range: make([]int64, 0)}
+			for _, v := range value_list {
+
+				if valuenum, err := strconv.ParseInt(v, 0, 0); err == nil {
+					sf.Range = append(sf.Range, valuenum)
+				}
 			}
+			searchfilted = append(searchfilted, sf)
+
 		default: //搜索
 			value_list := strings.Split(value, ",")
 			//sf := utils.FSSearchFilted{FieldName: field, Type: utils.FILT_STR_PREFIX, RangeStr: make([]string, 0)}
