@@ -17,6 +17,7 @@ import (
 	"os"
 	"reflect"
 	"strconv"
+	"strings"
 	"time"
 	"unsafe"
 	"utils"
@@ -124,36 +125,47 @@ func (this *DefaultEngine) Search(method string, parms map[string]string, body [
 
 		switch field[0] {
 		case '-': //正向过滤
-			if valuenum, err := strconv.ParseInt(value, 0, 0); err == nil {
-				searchfilted = append(searchfilted, utils.FSSearchFilted{FieldName: field[1:], Start: valuenum, Type: utils.FILT_EQ})
+			value_list := strings.Split(value, ",")
+			sf := utils.FSSearchFilted{FieldName: field[1:], Type: utils.FILT_EQ, Range: make([]int64, 0)}
+			for _, v := range value_list {
+
+				if valuenum, err := strconv.ParseInt(v, 0, 0); err == nil {
+					sf.Range = append(sf.Range, valuenum)
+				}
 			}
+			searchfilted = append(searchfilted, sf)
+
 		case '_': //反向过滤
 			if valuenum, err := strconv.ParseInt(value, 0, 0); err == nil {
 				searchfilted = append(searchfilted, utils.FSSearchFilted{FieldName: field[1:], Start: valuenum, Type: utils.FILT_NOT})
 			}
 		default: //搜索
-			terms := utils.GSegmenter.SegmentSingle(value)
-			if len(terms) == 0 {
-				return eDefaultEngineNotFound, nil
-			}
-			//this.Logger.Info("[INFO] SegmentTerms >>>  %v ", terms)
-			for _, term := range terms {
-				var queryst utils.FSSearchQuery
-				queryst.FieldName = field
-				queryst.Value = term
-				searchquerys = append(searchquerys, queryst)
-			}
-			switch matchtype {
-			case "prefix":
-				searchfilted = append(searchfilted, utils.FSSearchFilted{FieldName: field, MatchStr: value, Type: utils.FILT_STR_PREFIX})
-			case "suffix":
-				searchfilted = append(searchfilted, utils.FSSearchFilted{FieldName: field, MatchStr: value, Type: utils.FILT_STR_SUFFIX})
-			case "range":
-				searchfilted = append(searchfilted, utils.FSSearchFilted{FieldName: field, MatchStr: value, Type: utils.FILT_STR_RANGE})
-			case "all":
-				searchfilted = append(searchfilted, utils.FSSearchFilted{FieldName: field, MatchStr: value, Type: utils.FILT_STR_ALL})
-			default:
-				searchfilted = append(searchfilted, utils.FSSearchFilted{FieldName: field, MatchStr: value, Type: utils.FILT_STR_PREFIX})
+			value_list := strings.Split(value, ",")
+			for _, v := range value_list {
+				terms := utils.GSegmenter.SegmentSingle(v)
+				if len(terms) == 0 {
+					return eDefaultEngineNotFound, nil
+				}
+				//this.Logger.Info("[INFO] SegmentTerms >>>  %v ", terms)
+				for _, term := range terms {
+					var queryst utils.FSSearchQuery
+					queryst.FieldName = field
+					queryst.Value = term
+					searchquerys = append(searchquerys, queryst)
+				}
+				switch matchtype {
+				case "prefix":
+					searchfilted = append(searchfilted, utils.FSSearchFilted{FieldName: field, MatchStr: value, Type: utils.FILT_STR_PREFIX})
+				case "suffix":
+					searchfilted = append(searchfilted, utils.FSSearchFilted{FieldName: field, MatchStr: value, Type: utils.FILT_STR_SUFFIX})
+				case "range":
+					searchfilted = append(searchfilted, utils.FSSearchFilted{FieldName: field, MatchStr: value, Type: utils.FILT_STR_RANGE})
+				case "all":
+					searchfilted = append(searchfilted, utils.FSSearchFilted{FieldName: field, MatchStr: value, Type: utils.FILT_STR_ALL})
+				default:
+					searchfilted = append(searchfilted, utils.FSSearchFilted{FieldName: field, MatchStr: value, Type: utils.FILT_STR_PREFIX})
+
+				}
 
 			}
 

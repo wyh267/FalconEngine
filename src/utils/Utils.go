@@ -116,11 +116,12 @@ type FSSearchQuery struct {
 
 // FSSearchFilted function description : 过滤接口数据结构，内部都是求交集
 type FSSearchFilted struct {
-	FieldName string `json:"_field"`
-	Start     int64  `json:"_start"`
-	End       int64  `json:"_end"`
-	Type      uint64 `json:"_type"`
-	MatchStr  string `json:"_matchstr"`
+	FieldName string  `json:"_field"`
+	Start     int64   `json:"_start"`
+	End       int64   `json:"_end"`
+	Range     []int64 `json:"_range"`
+	Type      uint64  `json:"_type"`
+	MatchStr  string  `json:"_matchstr"`
 }
 
 //FSSearchSort description : 排序
