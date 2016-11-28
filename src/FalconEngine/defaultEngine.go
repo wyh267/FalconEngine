@@ -106,6 +106,9 @@ func NewDefaultEngine(logger *utils.Log4FE) *DefaultEngine {
 	return this
 }
 
+// Search function description : 搜索
+// params :
+// return :
 func (this *DefaultEngine) Search(method string, parms map[string]string, body []byte) (string, error) {
 
 	//this.Logger.Info("[INFO] DefaultEngine Search >>>>>>>>")
@@ -390,9 +393,6 @@ func (this *DefaultEngine) Search(method string, parms map[string]string, body [
 
 			}
 
-			//for _, term := range terms {
-			//	val["title"] = strings.Replace(val["title"], term, "[["+term+"]]", -1)
-			//}
 			defaultResult.Result = append(defaultResult.Result, val)
 		}
 	}
@@ -475,13 +475,6 @@ func (this *DefaultEngine) LoadData(method string, parms map[string]string, body
 	if /*!hascid ||*/ method != "POST" {
 		return eDefaultEngineLoadFail, errors.New(eProcessoParms)
 	}
-
-	//idxCount := make(map[string]int)
-	//idxCount["adgroup"] = 0
-	//idxCount["account"] = 0
-	//idxCount["campaign"] = 0
-	//idxCount["keyword"] = 0
-	//idxCount["creative"] = 0
 
 	var loadstruct utils.FSLoadStruct
 	err := json.Unmarshal(body, &loadstruct)
@@ -593,8 +586,6 @@ func (this *DefaultEngine) LoadData(method string, parms map[string]string, body
 		this.idxManagers[cid].addDocument(indexname, content)
 
 		rcount++
-		//this.idxManagers[cid].updateDocument(indexname, content)
-		//idxCount[indexname] = idxCount[indexname] + 1
 
 		if rcount%loadstruct.SyncCount == 0 {
 
