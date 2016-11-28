@@ -18,11 +18,12 @@ import (
 )
 
 const (
-	IKeyword  string = "keyword"
-	ICreative string = "creative"
-	IAdgroup  string = "adgroup"
-	ICampaign string = "campaign"
-	IAccount  string = "account"
+	IKeyword     string = "keyword"
+	ICreative    string = "creative"
+	IAdgroup     string = "adgroup"
+	ICampaign    string = "campaign"
+	IAccount     string = "account"
+	ICreativeMd5 string = "creativeMd5"
 )
 
 type SemSearchMgt struct {

@@ -11,6 +11,8 @@ package FalconEngine
 
 import (
 	"bufio"
+	"crypto/md5"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -93,6 +95,14 @@ func NewDefaultEngine(logger *utils.Log4FE) *DefaultEngine {
 	}
 	this.Logger.Info("[INFO] Create Table[%v] OK", ICreative)
 	this.mdetail[ICreative] = make(map[string]string)
+
+	if _, err := this.detail.CreateTable(ICreativeMd5); err != nil {
+		this.Logger.Error("[ERROR] Create Table[%v] Error", ICreativeMd5)
+		return nil
+	}
+	this.Logger.Info("[INFO] Create Table[%v] OK", ICreativeMd5)
+	this.mdetail[ICreativeMd5] = make(map[string]string)
+
 	return this
 }
 
@@ -106,6 +116,43 @@ func (this *DefaultEngine) Search(method string, parms map[string]string, body [
 	ps, hasps := parms["ps"]
 	pg, haspg := parms["pg"]
 	idstr, hasids := parms["_ids"]
+	md5str, hasmd5 := parms["_md5"]
+
+	//MD5查找
+	if hascid && hasindex && hasmd5 {
+		if indexname != ICreative {
+			return "not found", nil
+		}
+		md5s := strings.Split(md5str, ",")
+		var defaultResult DefaultResult
+		defaultResult.Result = make([]map[string]string, 0)
+
+		for _, id := range md5s {
+
+			_, err := this.detail.Get(ICreativeMd5, id)
+			if err == nil {
+				defaultResult.Result = append(defaultResult.Result, map[string]string{id: "yes"})
+
+			} else {
+				defaultResult.Result = append(defaultResult.Result, map[string]string{id: "no"})
+			}
+
+		}
+		endTime := time.Now()
+		defaultResult.CostTime = fmt.Sprintf("%v", endTime.Sub(startTime))
+		defaultResult.Status = "Found"
+		defaultResult.TotalCount = int64(len(md5s))
+
+		r, err := json.Marshal(defaultResult)
+		if err != nil {
+			return eDefaultEngineNotFound, err
+		}
+
+		bh := (*reflect.SliceHeader)(unsafe.Pointer(&r))
+		sh := reflect.StringHeader{bh.Data, bh.Len}
+		return *(*string)(unsafe.Pointer(&sh)), nil
+
+	}
 
 	//KV查找
 	if hasids && hascid && hasindex {
@@ -116,15 +163,11 @@ func (this *DefaultEngine) Search(method string, parms map[string]string, body [
 		for _, id := range ids {
 
 			res, err := this.detail.Get(indexname, id)
-			if err != nil {
-				er := make(map[string]string)
-				er[id] = "not found"
-				defaultResult.Result = append(defaultResult.Result, er)
-			} else {
+			if err == nil {
 				var v map[string]string
 				err1 := json.Unmarshal([]byte(res), &v)
 				if err1 != nil {
-					v[id] = "not found"
+					//v[id] = "not found"
 					this.Logger.Error("[ERROR] json err %v", err)
 				}
 				defaultResult.Result = append(defaultResult.Result, v)
@@ -135,8 +178,6 @@ func (this *DefaultEngine) Search(method string, parms map[string]string, body [
 
 		endTime := time.Now()
 		defaultResult.CostTime = fmt.Sprintf("%v", endTime.Sub(startTime))
-		//defaultResult.PageNum = npg
-		//defaultResult.PageSize = nps
 		defaultResult.Status = "Found"
 		defaultResult.TotalCount = int64(len(ids))
 
@@ -435,12 +476,12 @@ func (this *DefaultEngine) LoadData(method string, parms map[string]string, body
 		return eDefaultEngineLoadFail, errors.New(eProcessoParms)
 	}
 
-	idxCount := make(map[string]int)
-	idxCount["adgroup"] = 0
-	idxCount["account"] = 0
-	idxCount["campaign"] = 0
-	idxCount["keyword"] = 0
-	idxCount["creative"] = 0
+	//idxCount := make(map[string]int)
+	//idxCount["adgroup"] = 0
+	//idxCount["account"] = 0
+	//idxCount["campaign"] = 0
+	//idxCount["keyword"] = 0
+	//idxCount["creative"] = 0
 
 	var loadstruct utils.FSLoadStruct
 	err := json.Unmarshal(body, &loadstruct)
@@ -524,6 +565,7 @@ func (this *DefaultEngine) LoadData(method string, parms map[string]string, body
 			}
 		case ICreative:
 			if hcrtid && hcapid && hadgid {
+
 				detailkey = fmt.Sprintf("%v.%v.%v.%v.%v", cid, accid, capid, adgid, crtid)
 			} else {
 				detailkey = ""
@@ -549,16 +591,18 @@ func (this *DefaultEngine) LoadData(method string, parms map[string]string, body
 		}
 
 		this.idxManagers[cid].addDocument(indexname, content)
-		//this.idxManagers[cid].updateDocument(indexname, content)
-		idxCount[indexname] = idxCount[indexname] + 1
 
-		if idxCount[indexname]%loadstruct.SyncCount == 0 {
+		rcount++
+		//this.idxManagers[cid].updateDocument(indexname, content)
+		//idxCount[indexname] = idxCount[indexname] + 1
+
+		if rcount%loadstruct.SyncCount == 0 {
 
 			for cid, _ := range this.idxManagers {
 				this.idxManagers[cid].syncAll()
 			}
 		}
-		rcount++
+
 		if rcount%50000 == 0 {
 			this.Logger.Info("[INFO] Read Data [ %v ] ", rcount)
 			this.syncDetail()
@@ -585,6 +629,32 @@ func (this *DefaultEngine) updateDetail(indexname, key, value string) error {
 
 	this.mdetail[indexname][key] = value
 
+	if indexname == ICreative {
+		valuemap := make(map[string]string)
+
+		err := json.Unmarshal([]byte(value), &valuemap)
+		if err != nil {
+			this.Logger.Error("[ERROR]  %v parse json err : %v Value[%v]", ICreative, err, value)
+			return nil
+		}
+
+		cid, hcid := valuemap["cid"]
+		capid, hcap := valuemap["media_campaign_id"]
+		adgid, hadg := valuemap["media_adgroup_id"]
+		crtid, hcrt := valuemap["media_creative_id"]
+		title, htitle := valuemap["media_creative_title"]
+		desc1, hdesc1 := valuemap["media_creative_description1"]
+		desc2, hdesc2 := valuemap["media_creative_description2"]
+		if hcid && hcap && hadg && hcrt && htitle && hdesc1 && hdesc2 {
+			h := md5.New()
+			h.Write([]byte(fmt.Sprintf("%v.%v.%v.%v.%v.%v.%v", cid, capid, adgid, crtid, title, desc1, desc2)))
+			this.mdetail[ICreativeMd5][hex.EncodeToString(h.Sum(nil))] = "yes" // 需要加密的字符串为 123456
+			//this.Logger.Info("[INFO]  MD5 : %v", hex.EncodeToString(h.Sum(nil)))
+			//fmt.Printf("%s\n", hex.EncodeToString(h.Sum(nil))) // 输出加密结果
+		}
+
+	}
+
 	return nil
 
 }
@@ -601,5 +671,6 @@ func (this *DefaultEngine) syncDetail() error {
 	this.mdetail[IAdgroup] = make(map[string]string)
 	this.mdetail[IKeyword] = make(map[string]string)
 	this.mdetail[ICreative] = make(map[string]string)
+	this.mdetail[ICreativeMd5] = make(map[string]string)
 	return nil
 }
