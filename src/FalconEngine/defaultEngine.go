@@ -273,7 +273,7 @@ func (this *DefaultEngine) Search(method string, parms map[string]string, body [
 						if err != nil {
 							this.Logger.Error("[ERROR] json err %v", err)
 						} else {
-							val["media_campaign_name"] = v["media_campaign_name"]
+							val["media_adgroup_name"] = v["media_adgroup_name"]
 						}
 
 					}
@@ -283,7 +283,7 @@ func (this *DefaultEngine) Search(method string, parms map[string]string, body [
 					if err != nil {
 						this.Logger.Error("[ERROR] json err %v", err)
 					} else {
-						val["media_adgroup_name"] = v["media_adgroup_name"]
+						val["media_campaign_name"] = v["media_campaign_name"]
 					}
 
 				}
