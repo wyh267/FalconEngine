@@ -12,3 +12,6 @@ index/
 *jzlservice/
 .DS_Store
 nohup.out
+*.lst
+*.tgz
+t.go
