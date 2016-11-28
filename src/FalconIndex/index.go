@@ -14,7 +14,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"sort"
 	"sync"
 	"tree"
 	"utils"
@@ -40,6 +39,9 @@ type Index struct {
 	Logger          *utils.Log4FE `json:"-"`
 }
 
+// NewEmptyIndex function description : 新建空索引
+// params :
+// return :
 func NewEmptyIndex(name, pathname string, logger *utils.Log4FE) *Index {
 
 	this := &Index{Name: name, Logger: logger, StartDocId: 0, MaxDocId: 0, PrefixSegment: 1000,
@@ -52,12 +54,16 @@ func NewEmptyIndex(name, pathname string, logger *utils.Log4FE) *Index {
 	utils.MakeBitmapFile(bitmapname)
 	this.bitmap = utils.NewBitmap(bitmapname)
 
-	dictfilename := fmt.Sprintf("%v%v_dict.dic", this.Pathname, this.Name)
-	this.dict = tree.NewBTDB(dictfilename, logger)
+	//delete by wuyinghao 不使用字典了
+	//dictfilename := fmt.Sprintf("%v%v_dict.dic", this.Pathname, this.Name)
+	//this.dict = tree.NewBTDB(dictfilename, logger)
 
 	return this
 }
 
+// NewIndexWithLocalFile function description : 从文件载入索引
+// params :
+// return :
 func NewIndexWithLocalFile(name, pathname string, logger *utils.Log4FE) *Index {
 	this := &Index{Name: name, Logger: logger, StartDocId: 0, MaxDocId: 0, PrefixSegment: 1000,
 		SegmentNames: make([]string, 0), PrimaryKey: "", segments: make([]*fis.Segment, 0),
@@ -76,11 +82,12 @@ func NewIndexWithLocalFile(name, pathname string, logger *utils.Log4FE) *Index {
 		return this
 	}
 
-	dictfilename := fmt.Sprintf("%v%v_dict.dic", this.Pathname, this.Name)
-	if utils.Exist(dictfilename) {
-		this.Logger.Info("[INFO] Load dictfilename %v", dictfilename)
-		this.dict = tree.NewBTDB(dictfilename, logger)
-	}
+	//delete by wuyinghao 不使用字典了
+	//dictfilename := fmt.Sprintf("%v%v_dict.dic", this.Pathname, this.Name)
+	//if utils.Exist(dictfilename) {
+	//	this.Logger.Info("[INFO] Load dictfilename %v", dictfilename)
+	//	this.dict = tree.NewBTDB(dictfilename, logger)
+	//}
 
 	for _, segmentname := range this.SegmentNames {
 		segment := fis.NewSegmentWithLocalFile(segmentname, this.dict, logger)
@@ -123,10 +130,11 @@ func (this *Index) AddField(field utils.SimpleFieldInfo) error {
 	}
 
 	this.Fields[field.FieldName] = field
-	if field.FieldType == utils.IDX_TYPE_STRING_SEG ||
-		field.FieldType == utils.IDX_TYPE_STRING_SINGLE {
-		//	this.dict.AddBTree(field.FieldName)
-	}
+	//delete by wuyinghao 不使用字典了
+	//if field.FieldType == utils.IDX_TYPE_STRING_SEG ||
+	//	field.FieldType == utils.IDX_TYPE_STRING_SINGLE {
+	//	this.dict.AddBTree(field.FieldName)
+	//}
 	if field.FieldType == utils.IDX_TYPE_PK {
 		this.PrimaryKey = field.FieldName
 		primaryname := fmt.Sprintf("%v%v_primary.pk", this.Pathname, this.Name)
@@ -474,73 +482,5 @@ func (this *Index) SearchDocIds(querys []utils.FSSearchQuery, filteds []utils.FS
 	//sort.Sort(utils.DocWeightSort(docids))
 	//this.Logger.Info("[INFO] docids  %v", docids)
 	return docids, true
-
-}
-
-func (this *Index) SimpleSearch(querys []utils.FSSearchQuery, filteds []utils.FSSearchFilted, ps, pg int) ([]map[string]string, bool) {
-
-	var ok bool
-	docids := <-utils.GetDocIDsChan
-	if len(querys) >= 1 {
-		for _, segment := range this.segments {
-			docids, _ = segment.SearchDocIds(querys[0], filteds, this.bitmap, docids)
-		}
-
-		docids = utils.ComputeWeight(docids, len(docids), this.MaxDocId)
-	}
-
-	if len(querys) == 1 {
-		goto END
-	}
-
-	for _, query := range querys[1:] {
-
-		subdocids := <-utils.GetDocIDsChan
-		for _, segment := range this.segments {
-			subdocids, _ = segment.SearchDocIds(query, filteds, this.bitmap, subdocids)
-		}
-
-		docids, ok = utils.InteractionWithStartAndDf(docids, subdocids, 0, len(subdocids), this.MaxDocId)
-		utils.GiveDocIDsChan <- subdocids
-		if !ok {
-			utils.GiveDocIDsChan <- docids
-			return nil, false
-		}
-
-	}
-
-	/*
-		//docids := make([]utils.DocIdNode, 0)
-		docids := <-utils.GetDocIDsChan
-		for _, segment := range this.segments {
-			docids, _ = segment.SearchUnitDocIds(querys, filteds, this.bitmap, docids, this.MaxDocId)
-			//this.Logger.Info("[INFO] segment[%v] docids %v", segment.SegmentName, docids)
-		}
-	*/
-
-END:
-	lens := len(docids)
-
-	if ps*(pg-1) >= lens {
-		return nil, false
-	}
-
-	start := ps * (pg - 1)
-	end := ps * pg
-
-	if end >= lens {
-		end = lens
-	}
-
-	sort.Sort(utils.DocWeightSort(docids))
-	res := make([]map[string]string, 0)
-	for _, docid := range docids[start:end] {
-		val, ok := this.GetDocument(docid.Docid)
-		if ok {
-			res = append(res, val)
-		}
-	}
-	utils.GiveDocIDsChan <- docids
-	return res, true
 
 }

@@ -40,16 +40,6 @@ type SemSearchMgt struct {
 	Logger *utils.Log4FE `json"-"`
 }
 
-/*
-type SimpleFieldInfo struct {
-	FieldName string `json:"fieldname"`
-	FieldType uint64 `json:"fieldtype"`
-	PflOffset int64  `json:"pfloffset"` //正排索引的偏移量
-	PflLen    int    `json:"pfllen"`    //正排索引长度
-}
-
-*/
-
 func newSemSearchMgt(cid string, logger *utils.Log4FE) *SemSearchMgt {
 
 	this := &SemSearchMgt{Cid: cid, keywordsIdx: nil, meaningsIdx: nil, adgroupIdx: nil,
@@ -223,29 +213,6 @@ func (this *SemSearchMgt) mergeIndex(indexname string) error {
 	}
 
 	return this.indexers[indexname].MergeSegments()
-}
-
-func (this *SemSearchMgt) Search(indexname string, querys []utils.FSSearchQuery, filters []utils.FSSearchFilted, ps, pg int) ([]map[string]string, bool) {
-
-	if _, ok := this.indexers[indexname]; !ok {
-		this.Logger.Error("[ERROR] index[%v] not found", indexname)
-		return nil, false //fmt.Errorf("[ERROR] index[%v] not found", indexname)
-	}
-
-	return this.indexers[indexname].SimpleSearch(querys, filters, ps, pg)
-}
-
-func (this *SemSearchMgt) searchDocIds(indexname string,
-	querys []utils.FSSearchQuery,
-	filters []utils.FSSearchFilted) ([]utils.DocIdNode, bool) {
-
-	if _, ok := this.indexers[indexname]; !ok {
-		this.Logger.Error("[ERROR] index[%v] not found", indexname)
-		return nil, false //fmt.Errorf("[ERROR] index[%v] not found", indexname)
-	}
-
-	return this.indexers[indexname].SearchDocIds(querys, filters)
-
 }
 
 func (this *SemSearchMgt) GetIndex(indexname string) *fi.Index {
