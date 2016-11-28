@@ -105,6 +105,50 @@ func (this *DefaultEngine) Search(method string, parms map[string]string, body [
 	indexname, hasindex := parms["index"]
 	ps, hasps := parms["ps"]
 	pg, haspg := parms["pg"]
+	idstr, hasids := parms["_ids"]
+
+	//KV查找
+	if hasids && hascid && hasindex {
+		var defaultResult DefaultResult
+		defaultResult.Result = make([]map[string]string, 0)
+
+		ids := strings.Split(idstr, ",")
+		for _, id := range ids {
+
+			res, err := this.detail.Get(indexname, id)
+			if err != nil {
+				er := make(map[string]string)
+				er[id] = "not found"
+				defaultResult.Result = append(defaultResult.Result, er)
+			} else {
+				var v map[string]string
+				err1 := json.Unmarshal([]byte(res), &v)
+				if err1 != nil {
+					v[id] = "not found"
+					this.Logger.Error("[ERROR] json err %v", err)
+				}
+				defaultResult.Result = append(defaultResult.Result, v)
+
+			}
+
+		}
+
+		endTime := time.Now()
+		defaultResult.CostTime = fmt.Sprintf("%v", endTime.Sub(startTime))
+		//defaultResult.PageNum = npg
+		//defaultResult.PageSize = nps
+		defaultResult.Status = "Found"
+		defaultResult.TotalCount = int64(len(ids))
+
+		r, err := json.Marshal(defaultResult)
+		if err != nil {
+			return eDefaultEngineNotFound, err
+		}
+
+		bh := (*reflect.SliceHeader)(unsafe.Pointer(&r))
+		sh := reflect.StringHeader{bh.Data, bh.Len}
+		return *(*string)(unsafe.Pointer(&sh)), nil
+	}
 
 	if !hascid || !hasindex || !haspg || !hasps {
 		return "", errors.New(eProcessoParms)

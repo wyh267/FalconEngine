@@ -62,40 +62,34 @@ func (this *Segmenter) SegmentSingle(content string) []string {
 
 func (this *Segmenter) SegmentWithSingle(content string) ([]TermInfo, int) {
 	rstr := []rune(content)
-	termmap := make(map[rune]TermInfo)
-	pyl := GOptions.Convert(content)
-	var end int
-	if len(pyl) > 3 {
-		end = 3
-	} else {
-		end = len(pyl)
-	}
-	var py uint32 = 0
+	termmap := make(map[rune]bool)
+	//pyl := GOptions.Convert(content)
+	//var end int
+	//if len(pyl) > 3 {
+	//	end = 3
+	//} else {
+	//	end = len(pyl)
+	//}
+	//var py uint32 = 0
 
-	for i, p := range pyl[:end] {
-		//fmt.Printf("str : %v py : %v p0 : %v i:%v \n", content, pyl, p, i)
-		py = (uint32(p[0]) << uint32((end-1-i)*8)) | uint32(py)
-	}
+	//for i, p := range pyl[:end] {
+	//	py = (uint32(p[0]) << uint32((end-1-i)*8)) | uint32(py)
+	//}
 
-	//fmt.Printf("str : %v py : %v pyint : %v ", content, pyl, py)
-
+	resterms := make([]TermInfo, 0)
 	for _, r := range rstr {
-		//if _, ok := termmap[r]; !ok {
-		//	termmap[r] = TermInfo{Term: string(r), Tf: i}
-		//} else {
-
-		termmap[r] = TermInfo{Term: string(r), Tf: int(py)}
-		//}
-
+		if _, ok := termmap[r]; !ok {
+			resterms = append(resterms, TermInfo{Term: string(r), Tf: 0})
+		}
+		//termmap[r] = TermInfo{Term: string(r), Tf: int(py)}
 	}
 
-	resterms := make([]TermInfo, len(termmap))
-	idx := 0
-	for _, tt := range termmap {
-		resterms[idx] = tt
-		idx++
-	}
-	//fmt.Printf("[TREMSSSSS::::%v] ",resterms)
+	//resterms := make([]TermInfo, len(termmap))
+	//idx := 0
+	//for _, tt := range termmap {
+	//	resterms[idx] = tt
+	//	idx++
+	//}
 	return resterms, len(rstr)
 
 }
