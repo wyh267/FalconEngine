@@ -190,167 +190,6 @@ func (this *DefaultEngine) Search(method string, parms map[string]string, body [
 		//if filed == "_show"
 
 	}
-	/*
-		accountid, hasaccountid := parms["account_id"]
-		adgroupid, hasadgroupid := parms["adgroup_id"]
-		campaignid, hascampaignid := parms["campaign_id"]
-		keywordid, haskeywordid := parms["keyword_id"]
-
-		keyword, haskeyword := parms["keyword"]
-
-		creativetitle, hastitle := parms["creativetitle"]
-		creativedesc1, hasdesc1 := parms["creativedesc1"]
-		creativedesc2, hasdesc2 := parms["creativedesc2"]
-
-		matchtype, hasmatchtype := parms["matchtype"]
-
-		searchquerys := make([]utils.FSSearchQuery, 0)
-		searchfilted := make([]utils.FSSearchFilted, 0)
-
-		switch indexname {
-		case IKeyword:
-			if haskeyword && hasmatchtype {
-				terms := utils.GSegmenter.SegmentSingle(keyword)
-				if len(terms) == 0 {
-					return eDefaultEngineNotFound, nil
-				}
-				//this.Logger.Info("[INFO] SegmentTerms >>>  %v ", terms)
-				for _, term := range terms {
-					var queryst utils.FSSearchQuery
-					queryst.FieldName = "media_keyword"
-					queryst.Value = term
-					searchquerys = append(searchquerys, queryst)
-				}
-				switch matchtype {
-				case "prefix":
-					searchfilted = append(searchfilted, utils.FSSearchFilted{FieldName: "media_keyword", MatchStr: keyword, Type: utils.FILT_STR_PREFIX})
-				case "suffix":
-					searchfilted = append(searchfilted, utils.FSSearchFilted{FieldName: "media_keyword", MatchStr: keyword, Type: utils.FILT_STR_SUFFIX})
-				case "range":
-					searchfilted = append(searchfilted, utils.FSSearchFilted{FieldName: "media_keyword", MatchStr: keyword, Type: utils.FILT_STR_RANGE})
-				case "all":
-					searchfilted = append(searchfilted, utils.FSSearchFilted{FieldName: "media_keyword", MatchStr: keyword, Type: utils.FILT_STR_ALL})
-
-				default:
-					searchfilted = append(searchfilted, utils.FSSearchFilted{FieldName: "media_keyword", MatchStr: keyword, Type: utils.FILT_STR_PREFIX})
-
-				}
-
-			}
-
-		case ICreative:
-			if hastitle && hasmatchtype {
-				terms := utils.GSegmenter.SegmentSingle(creativetitle)
-				if len(terms) == 0 {
-					return eDefaultEngineNotFound, nil
-				}
-				for _, term := range terms {
-					var queryst utils.FSSearchQuery
-					queryst.FieldName = "media_creative_title"
-					queryst.Value = term
-					searchquerys = append(searchquerys, queryst)
-				}
-
-				switch matchtype {
-				case "prefix":
-					searchfilted = append(searchfilted, utils.FSSearchFilted{FieldName: "media_creative_title", MatchStr: creativetitle, Type: utils.FILT_STR_PREFIX})
-				case "suffix":
-					searchfilted = append(searchfilted, utils.FSSearchFilted{FieldName: "media_creative_title", MatchStr: creativetitle, Type: utils.FILT_STR_SUFFIX})
-				case "range":
-					searchfilted = append(searchfilted, utils.FSSearchFilted{FieldName: "media_creative_title", MatchStr: creativetitle, Type: utils.FILT_STR_RANGE})
-				case "all":
-					searchfilted = append(searchfilted, utils.FSSearchFilted{FieldName: "media_creative_title", MatchStr: creativetitle, Type: utils.FILT_STR_ALL})
-
-				default:
-					searchfilted = append(searchfilted, utils.FSSearchFilted{FieldName: "media_creative_title", MatchStr: creativetitle, Type: utils.FILT_STR_PREFIX})
-
-				}
-
-			}
-			if hasdesc1 && hasmatchtype {
-				terms := utils.GSegmenter.SegmentSingle(creativedesc1)
-				if len(terms) == 0 {
-					return eDefaultEngineNotFound, nil
-				}
-				for _, term := range terms {
-					var queryst utils.FSSearchQuery
-					queryst.FieldName = "media_creative_description1"
-					queryst.Value = term
-					searchquerys = append(searchquerys, queryst)
-				}
-
-				switch matchtype {
-				case "prefix":
-					searchfilted = append(searchfilted, utils.FSSearchFilted{FieldName: "media_creative_description1", MatchStr: creativedesc1, Type: utils.FILT_STR_PREFIX})
-				case "suffix":
-					searchfilted = append(searchfilted, utils.FSSearchFilted{FieldName: "media_creative_description1", MatchStr: creativedesc1, Type: utils.FILT_STR_SUFFIX})
-				case "range":
-					searchfilted = append(searchfilted, utils.FSSearchFilted{FieldName: "media_creative_description1", MatchStr: creativedesc1, Type: utils.FILT_STR_RANGE})
-				case "all":
-					searchfilted = append(searchfilted, utils.FSSearchFilted{FieldName: "media_creative_description1", MatchStr: creativedesc1, Type: utils.FILT_STR_ALL})
-
-				default:
-					searchfilted = append(searchfilted, utils.FSSearchFilted{FieldName: "media_creative_description1", MatchStr: creativedesc1, Type: utils.FILT_STR_PREFIX})
-
-				}
-			}
-			if hasdesc2 && hasmatchtype {
-				terms := utils.GSegmenter.SegmentSingle(creativedesc2)
-				if len(terms) == 0 {
-					return eDefaultEngineNotFound, nil
-				}
-				for _, term := range terms {
-					var queryst utils.FSSearchQuery
-					queryst.FieldName = "media_creative_description2"
-					queryst.Value = term
-					searchquerys = append(searchquerys, queryst)
-				}
-
-				switch matchtype {
-				case "prefix":
-					searchfilted = append(searchfilted, utils.FSSearchFilted{FieldName: "media_creative_description2", MatchStr: creativedesc2, Type: utils.FILT_STR_PREFIX})
-				case "suffix":
-					searchfilted = append(searchfilted, utils.FSSearchFilted{FieldName: "media_creative_description2", MatchStr: creativedesc2, Type: utils.FILT_STR_SUFFIX})
-				case "range":
-					searchfilted = append(searchfilted, utils.FSSearchFilted{FieldName: "media_creative_description2", MatchStr: creativedesc2, Type: utils.FILT_STR_RANGE})
-				case "all":
-					searchfilted = append(searchfilted, utils.FSSearchFilted{FieldName: "media_creative_description2", MatchStr: creativedesc2, Type: utils.FILT_STR_ALL})
-
-				default:
-					searchfilted = append(searchfilted, utils.FSSearchFilted{FieldName: "media_creative_description2", MatchStr: creativedesc2, Type: utils.FILT_STR_PREFIX})
-
-				}
-
-			}
-		default:
-			return "indexname错误", nil
-
-		}
-
-		if hasaccountid {
-			if accid, err := strconv.ParseInt(accountid, 0, 0); err == nil {
-				searchfilted = append(searchfilted, utils.FSSearchFilted{FieldName: "account_id", Start: accid, Type: utils.FILT_EQ})
-			}
-		}
-
-		if hascampaignid {
-			if campid, err := strconv.ParseInt(campaignid, 0, 0); err == nil {
-				searchfilted = append(searchfilted, utils.FSSearchFilted{FieldName: "media_campaign_id", Start: campid, Type: utils.FILT_EQ})
-			}
-		}
-
-		if hasadgroupid {
-			if adid, err := strconv.ParseInt(adgroupid, 0, 0); err == nil {
-				searchfilted = append(searchfilted, utils.FSSearchFilted{FieldName: "media_adgroup_id", Start: adid, Type: utils.FILT_EQ})
-			}
-		}
-
-		if haskeywordid {
-			if kid, err := strconv.ParseInt(keywordid, 0, 0); err == nil {
-				searchfilted = append(searchfilted, utils.FSSearchFilted{FieldName: "media_keyword_id", Start: kid, Type: utils.FILT_EQ})
-			}
-		}
-	*/
 	nps, ok1 := strconv.ParseInt(ps, 0, 0)
 	npg, ok2 := strconv.ParseInt(pg, 0, 0)
 	if ok1 != nil || ok2 != nil {
@@ -404,29 +243,43 @@ func (this *DefaultEngine) Search(method string, parms map[string]string, body [
 	for _, docid := range docids[start:end] {
 		val, ok := indexer.GetDocument(docid.Docid)
 		if ok {
-			if accid, ok1 := val["account_id"]; ok1 {
-				if capid, ok2 := val["media_campaign_id"]; ok2 {
-					vstr, err := this.detail.Get(ICampaign, fmt.Sprintf("%v.%v", accid, capid))
-					if err != nil {
-						this.Logger.Error("[ERROR] get err %v", err)
-					}
-					var v map[string]string
-					err = json.Unmarshal([]byte(vstr), &v)
-					if err != nil {
-						this.Logger.Error("[ERROR] json err %v", err)
-					} else {
-						val["media_campaign_name"] = v["media_campaign_name"]
-					}
 
+			accid, ok := val["account_id"]
+			if !ok {
+				this.Logger.Error("[ERROR]  account_id不存在")
+				continue
+			}
+
+			if accstr, err1 := this.detail.Get(IAccount, fmt.Sprintf("%v.%v", cid, accid)); err1 == nil {
+
+				var v map[string]string
+				err := json.Unmarshal([]byte(accstr), &v)
+				if err != nil {
+					this.Logger.Error("[ERROR] json err %v", err)
+				} else {
+					val["media_username"] = v["media_username"]
 				}
 
-				if capid, ok2 := val["media_adgroup_id"]; ok2 {
-					vstr, err := this.detail.Get(IAdgroup, fmt.Sprintf("%v.%v", accid, capid))
-					if err != nil {
-						this.Logger.Error("[ERROR] get err %v", err)
+			}
+
+			capid, hcapid := val["media_campaign_id"]
+			adgid, hadgid := val["media_adgroup_id"]
+
+			if (indexname == IKeyword || indexname == ICreative) && hadgid && hcapid {
+				if capstr, err1 := this.detail.Get(ICampaign, fmt.Sprintf("%v.%v.%v", cid, accid, capid)); err1 == nil {
+					if adgstr, err2 := this.detail.Get(IAdgroup, fmt.Sprintf("%v.%v.%v.%v", cid, accid, capid, adgid)); err2 == nil {
+						var v map[string]string
+						err := json.Unmarshal([]byte(adgstr), &v)
+						if err != nil {
+							this.Logger.Error("[ERROR] json err %v", err)
+						} else {
+							val["media_campaign_name"] = v["media_campaign_name"]
+						}
+
 					}
+
 					var v map[string]string
-					err = json.Unmarshal([]byte(vstr), &v)
+					err := json.Unmarshal([]byte(capstr), &v)
 					if err != nil {
 						this.Logger.Error("[ERROR] json err %v", err)
 					} else {
@@ -435,17 +288,19 @@ func (this *DefaultEngine) Search(method string, parms map[string]string, body [
 
 				}
 
-				vstr, err := this.detail.Get(IAccount, accid)
-				if err != nil {
-					this.Logger.Error("[ERROR] get err %v", err)
-				}
-				var v map[string]string
-				err = json.Unmarshal([]byte(vstr), &v)
-				if err != nil {
-					this.Logger.Error("[ERROR] json err %v", err)
-				} else {
-					val["media_username"] = v["media_username"]
-					val["media_username"] = v["media_username"]
+			}
+
+			if (indexname == IAdgroup) && hcapid {
+				if capstr, err1 := this.detail.Get(ICampaign, fmt.Sprintf("%v.%v.%v", cid, accid, capid)); err1 == nil {
+
+					var v map[string]string
+					err := json.Unmarshal([]byte(capstr), &v)
+					if err != nil {
+						this.Logger.Error("[ERROR] json err %v", err)
+					} else {
+						val["media_campaign_name"] = v["media_campaign_name"]
+					}
+
 				}
 
 			}
@@ -609,35 +464,39 @@ func (this *DefaultEngine) LoadData(method string, parms map[string]string, body
 		if !ok {
 			return "", errors.New("account_id不存在")
 		}
-
 		detailkey := accid
+
+		kid, hkid := content["media_keyword_id"]
+		capid, hcapid := content["media_campaign_id"]
+		adgid, hadgid := content["media_adgroup_id"]
+		crtid, hcrtid := content["media_creative_id"]
 
 		switch indexname {
 		case IKeyword:
-			if kid, ok := content["media_keyword_id"]; ok {
-				detailkey = fmt.Sprintf("%v.%v", accid, kid)
+			if hkid && hcapid && hadgid {
+				detailkey = fmt.Sprintf("%v.%v.%v.%v.%v", cid, accid, capid, adgid, kid)
 			} else {
 				detailkey = ""
 			}
 		case ICreative:
-			if kid, ok := content["media_creative_id"]; ok {
-				detailkey = fmt.Sprintf("%v.%v", accid, kid)
+			if hcrtid && hcapid && hadgid {
+				detailkey = fmt.Sprintf("%v.%v.%v.%v.%v", cid, accid, capid, adgid, crtid)
 			} else {
 				detailkey = ""
 			}
 		case IAccount:
 
-			detailkey = content["account_id"]
+			detailkey = fmt.Sprintf("%v.%v", cid, accid)
 
 		case ICampaign:
-			if kid, ok := content["media_campaign_id"]; ok {
-				detailkey = fmt.Sprintf("%v.%v", accid, kid)
+			if hcapid {
+				detailkey = fmt.Sprintf("%v.%v.%v", cid, accid, capid)
 			} else {
 				detailkey = ""
 			}
 		case IAdgroup:
-			if kid, ok := content["media_adgroup_id"]; ok {
-				detailkey = fmt.Sprintf("%v.%v", accid, kid)
+			if hadgid && hcapid {
+				detailkey = fmt.Sprintf("%v.%v.%v.%v", cid, accid, capid, adgid)
 			} else {
 				detailkey = ""
 			}
