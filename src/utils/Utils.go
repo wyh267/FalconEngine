@@ -1,14 +1,20 @@
 package utils
 
 import (
+	"bytes"
 	"container/list"
+	"io/ioutil"
 	"math"
+	"net"
+	"net/http"
 	"os"
 	"time"
 )
 
 // IDX_ROOT_PATH 默认索引存放位置
 const IDX_ROOT_PATH string = "./index/"
+
+const IDX_DETAIL_PATH string = "./detail/"
 
 // FALCONENGINENAME base名称
 const FALCONSEARCHERNAME string = "FALCONENGINE"
@@ -91,6 +97,8 @@ type SimpleFieldInfo struct {
 // IndexStrct 索引构造结构，包含字段信息
 type IndexStrct struct {
 	IndexName    string            `json:"indexname"`
+	ShardNum     uint64            `json:"shardnum"`
+	ShardField   string            `json:"shardfield"`
 	IndexMapping []SimpleFieldInfo `json:"indexmapping"`
 }
 
@@ -235,6 +243,25 @@ type Engine interface {
 	CreateIndex(method string, parms map[string]string, body []byte) error
 	UpdateDocument(method string, parms map[string]string, body []byte) (string, error)
 	LoadData(method string, parms map[string]string, body []byte) (string, error)
+	PullDetail(method string, parms map[string]string, body []byte) ([]string, uint64)
+	JoinNode(method string, parms map[string]string, body []byte) (string, error)
+	Heart(method string, parms map[string]string, body []byte) (map[string]string, error)
+	InitEngine() error
+}
+
+type NodeIndex struct {
+	IndexName    string              `json:"indexname"`
+	ShardNum     uint64              `json:"shardnum"`
+	Shard        []uint64            `json:"shard"`
+	IndexMapping []SimpleFieldInfo   `json:"indexmapping"`
+	ShardNodes   map[uint64][]string `json:"shardnodes"`
+}
+
+type NodeNetInfo struct {
+	Addr    string         `json:"addr"`
+	MPort   string         `json:"mport"`
+	CPort   string         `json:"cport"`
+	IdxChan chan NodeIndex `json:"-"`
 }
 
 /*****************************************************************************
@@ -580,5 +607,67 @@ func FormatDateTime(timestamp int64) (string, bool) {
 	}
 	tm := time.Unix(timestamp, 0)
 	return tm.Format("2006-01-02 15:04:05"), true
+
+}
+
+func RequestUrl(url string) ([]byte, error) {
+
+	client := &http.Client{
+		Transport: &http.Transport{
+			Dial: func(netw, addr string) (net.Conn, error) {
+				conn, err := net.DialTimeout(netw, addr, time.Second*2)
+				if err != nil {
+					return nil, err
+				}
+				conn.SetDeadline(time.Now().Add(time.Second * 2))
+				return conn, nil
+			},
+			ResponseHeaderTimeout: time.Second * 2,
+		},
+	}
+	rsp, err := client.Get(url)
+	if err != nil {
+		return nil, err
+	}
+	defer rsp.Body.Close()
+	body, err := ioutil.ReadAll(rsp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	return body, nil
+
+}
+
+func PostRequest(url string, b []byte) ([]byte, error) {
+
+	client := &http.Client{
+		Transport: &http.Transport{
+			Dial: func(netw, addr string) (net.Conn, error) {
+				conn, err := net.DialTimeout(netw, addr, time.Second*2)
+				if err != nil {
+					return nil, err
+				}
+				conn.SetDeadline(time.Now().Add(time.Second * 2))
+				return conn, nil
+			},
+			ResponseHeaderTimeout: time.Second * 2,
+		},
+	}
+
+	body := bytes.NewBuffer([]byte(b))
+	res, err := client.Post(url, "application/json;charset=utf-8", body)
+	if err != nil {
+
+		return nil, err
+	}
+	result, err := ioutil.ReadAll(res.Body)
+	res.Body.Close()
+	if err != nil {
+
+		return nil, err
+	}
+
+	return result, nil
 
 }

@@ -15,3 +15,5 @@ nohup.out
 *.lst
 *.tgz
 t.go
+*detail/
+*deploy/

@@ -24,11 +24,14 @@ import (
 )
 
 const (
-	URL_SEARCH  uint64 = 1 //普通搜索
-	URL_UPDATE  uint64 = 2 //更新数据
-	URL_CREATE  uint64 = 3 //建立索引
-	URL_CONTROL uint64 = 4
-	URL_SHOW    uint64 = 5
+	URL_SEARCH   uint64 = 1 //普通搜索
+	URL_UPDATE   uint64 = 2 //更新数据
+	URL_CREATE   uint64 = 3 //建立索引
+	URL_CONTROL  uint64 = 4
+	URL_SHOW     uint64 = 5
+	URL_PULLDATA uint64 = 6
+	URL_JOINNODE uint64 = 7
+	URL_HEART    uint64 = 8
 
 	URL_DEBUG_SEARCH  uint64 = 100 //调试
 	URL_LOADDATA      uint64 = 101
@@ -45,10 +48,11 @@ const (
 type HttpService struct {
 	Logger *utils.Log4FE `json:"-"`
 	engine utils.Engine
+	port   int
 }
 
-func NewHttpService(engine utils.Engine, logger *utils.Log4FE) *HttpService {
-	this := &HttpService{Logger: logger, engine: engine}
+func NewHttpService(engine utils.Engine, port int, logger *utils.Log4FE) *HttpService {
+	this := &HttpService{Logger: logger, engine: engine, port: port}
 	return this
 }
 
@@ -60,7 +64,8 @@ func (this *HttpService) Start() error {
 	}
 	//http.Handle("/html/", http.FileServer(http.Dir("html")))
 	this.Logger.Info("Server starting")
-	addr := fmt.Sprintf(":%d", 9990)
+	addr := fmt.Sprintf(":%d", this.port)
+	go this.engine.InitEngine()
 	err := http.ListenAndServe(addr, this)
 	if err != nil {
 		this.Logger.Error("Server start fail: %v", err)
@@ -131,8 +136,8 @@ func (this *HttpService) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			goto END
 		}
 		//result["_status"]= "sucess"
-		io.WriteString(w, "sucess")
-		return
+		//io.WriteString(w, "sucess")
+		//return
 	case URL_UPDATE:
 		res, err := this.engine.UpdateDocument(r.Method, parms, body)
 		if err != nil {
@@ -143,14 +148,14 @@ func (this *HttpService) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		//result["_status"]= "sucess"
 		io.WriteString(w, res)
 	case URL_LOADDATA:
-		res, err := this.engine.LoadData(r.Method, parms, body)
+		_, err := this.engine.LoadData(r.Method, parms, body)
 		if err != nil {
 			result["_errorcode"] = -1
 			result["_errormessage"] = err.Error()
 			goto END
 		}
 		//result["_status"]= "sucess"
-		io.WriteString(w, res)
+		//io.WriteString(w, res)
 
 	case URL_SHOW:
 		file1, err := os.OpenFile("./html/search.html", os.O_RDWR, os.ModeType)
@@ -169,6 +174,34 @@ func (this *HttpService) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		header.Add("Content-Type", "text/html")
 		io.WriteString(w, string(b))
 		return
+
+	case URL_PULLDATA:
+		res, maxid := this.engine.PullDetail(r.Method, parms, body)
+		if res == nil {
+			result["_errorcode"] = -1
+			result["_errormessage"] = fmt.Errorf("maxid error")
+			goto END
+		}
+		result["_data"] = res
+		result["_maxid"] = maxid
+
+	case URL_JOINNODE:
+		res, err := this.engine.JoinNode(r.Method, parms, body)
+		if err != nil {
+			result["_errorcode"] = -1
+			result["_errormessage"] = fmt.Errorf("maxid error")
+			goto END
+		}
+		result["_data"] = res
+
+	case URL_HEART:
+		res, err := this.engine.Heart(r.Method, parms, body)
+		if err != nil {
+			result["_errorcode"] = -1
+			result["_errormessage"] = err.Error()
+			goto END
+		}
+		result["_status"] = res["status"]
 
 	}
 
@@ -220,7 +253,7 @@ func (this *HttpService) parseArgs(r *http.Request) (map[string]string, error) {
 func (this *HttpService) ParseURL(url string) (int, uint64, error) {
 	//确定是否是本服务能提供的控制类型
 
-	urlPattern := "/v(\\d)/(_search|_update|_contrl|_create|_show|_debug|_status|_load)\\?"
+	urlPattern := "/v(\\d)/(_search|_update|_contrl|_create|_show|_debug|_status|_load|_pull|_join|_heart)\\?"
 	urlRegexp, err := regexp.Compile(urlPattern)
 	if err != nil {
 		return -1, 0, err
@@ -256,6 +289,15 @@ func (this *HttpService) ParseURL(url string) (int, uint64, error) {
 	}
 	if resource == "_load" {
 		return version, URL_LOADDATA, nil
+	}
+	if resource == "_pull" {
+		return version, URL_PULLDATA, nil
+	}
+	if resource == "_join" {
+		return version, URL_JOINNODE, nil
+	}
+	if resource == "_heart" {
+		return version, URL_HEART, nil
 	}
 
 	return -1, 0, errors.New("Error")
