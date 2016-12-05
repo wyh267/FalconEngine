@@ -116,6 +116,7 @@ func (this *HttpService) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	switch reqType {
 	case URL_SEARCH:
+		parms["_req"] = requestUrl
 		res, err := this.engine.Search(r.Method, parms, body)
 		if err != nil {
 			result["_errorcode"] = -1
