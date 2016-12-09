@@ -17,3 +17,7 @@ nohup.out
 t.go
 *detail/
 *deploy/
+*index_*/
+_index.path
+*.txt
+index
