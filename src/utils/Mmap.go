@@ -35,8 +35,6 @@ const (
 	MODE_CREATE
 )
 
-
-
 func NewMmap(file_name string, mode int) (*Mmap, error) {
 
 	this := &Mmap{MmapBytes: make([]byte, 0), FileName: file_name, FileLen: 0, MapType: 0, FilePointer: 0, FileFd: nil}
@@ -168,15 +166,12 @@ func (this *Mmap) Read(start, end int64) []byte {
 	return this.MmapBytes[start:end]
 }
 
+func (this *Mmap) Write(start int64, buffer []byte) error {
 
-func (this *Mmap) Write(start int64,buffer []byte) error {
+	copy(this.MmapBytes[start:int(start)+len(buffer)], buffer)
 
-    copy(this.MmapBytes[start:int(start)+len(buffer)],buffer)
-
-	return nil//this.MmapBytes[start:end]
+	return nil //this.MmapBytes[start:end]
 }
-
-
 
 func (this *Mmap) WriteUInt64(start int64, value uint64) error {
 
@@ -218,6 +213,13 @@ func (this *Mmap) AppendStringWithLen(value string) error {
 
 }
 
+func (this *Mmap) AppendDetail(shard uint64, value string) error {
+	this.AppendUInt64(shard)
+	this.AppendInt64(int64(len(value)))
+	this.AppendString(value)
+	return nil //this.Sync()
+}
+
 func (this *Mmap) AppendString(value string) error {
 
 	lens := int64(len(value))
@@ -239,6 +241,7 @@ func (this *Mmap) AppendBytes(value []byte) error {
 	}
 	dst := this.MmapBytes[this.FilePointer : this.FilePointer+lens]
 	copy(dst, value)
+
 	this.FilePointer += lens
 	return nil //this.Sync()
 

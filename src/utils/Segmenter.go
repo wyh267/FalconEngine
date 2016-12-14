@@ -10,16 +10,14 @@
 
 package utils
 
-import (
-	"fmt"
+import
+//"fmt"
 
-	"github.com/huichen/sego"
-)
+"github.com/huichen/sego"
 
 type Segmenter struct {
 	dictionary string
 	segmenter  sego.Segmenter
-    fssegmenter *FSSegmenter
 }
 
 // GSegmenter 分词器全局变量
@@ -34,48 +32,81 @@ var GSegmenter *Segmenter
 *
 ******************************************************************************/
 func NewSegmenter(dic_name string) *Segmenter {
-    /*    
 	var seg sego.Segmenter
-	this := &Segmenter{dictionary:dic_name, segmenter:seg}
+	this := &Segmenter{dic_name, seg}
 	this.segmenter.LoadDictionary(dic_name)
-	return this
-    */
-    this := &Segmenter{dictionary:dic_name} 
-	this.fssegmenter = NewFSSegmenter(dic_name)
-	if this == nil {
-		fmt.Errorf("ERROR segment is nil")
-		return nil
-	}
-	return this
-
-}
-
-func NewMyFSSegmenter(dic_name string) *Segmenter {
-    this := &Segmenter{dictionary:dic_name} 
-	this.fssegmenter = NewFSSegmenter(dic_name)
-	if this == nil {
-		fmt.Errorf("ERROR segment is nil")
-		return nil
-	}
 	return this
 }
 
 func (this *Segmenter) Segment(content string, search_mode bool) []string {
 
-      /*  
 	text := []byte(content)
 	segments := this.segmenter.Segment(text)
 	res := sego.SegmentsToSlice(segments, search_mode)
+
 	//fmt.Println("SEGMENT::: ",res)
 	return res
-    */
-    terms,_ := this.fssegmenter.Segment(content, search_mode)
-    return terms
+}
+
+func (this *Segmenter) SegmentSingle(content string) []string {
+
+	rstr := []rune(content)
+	resmap := make(map[string]bool)
+	res := make([]string, 0)
+	for _, r := range rstr {
+		resmap[string(r)] = true
+
+	}
+	for k := range resmap {
+		res = append(res, k)
+	}
+
+	return res
+}
+
+func (this *Segmenter) SegmentWithSingle(content string) ([]TermInfo, int) {
+	rstr := []rune(content)
+	termmap := make(map[rune]bool)
+	for _, r := range rstr {
+		termmap[r] = true
+	}
+	resterms := make([]TermInfo, 0)
+	for r := range termmap {
+		resterms = append(resterms, TermInfo{Term: string(r), Tf: 0})
+	}
+
+	//pyl := GOptions.Convert(content)
+	//var end int
+	//if len(pyl) > 3 {
+	//	end = 3
+	//} else {
+	//	end = len(pyl)
+	//}
+	//var py uint32 = 0
+
+	//for i, p := range pyl[:end] {
+	//	py = (uint32(p[0]) << uint32((end-1-i)*8)) | uint32(py)
+	//}
+
+	//resterms := make([]TermInfo, 0)
+	//for _, r := range rstr {
+	//	if _, ok := termmap[r]; !ok {
+	//		resterms = append(resterms, TermInfo{Term: string(r), Tf: 0})
+	//	}
+	//termmap[r] = TermInfo{Term: string(r), Tf: int(py)}
+	//}
+
+	//resterms := make([]TermInfo, len(termmap))
+	//idx := 0
+	//for _, tt := range termmap {
+	//	resterms[idx] = tt
+	//	idx++
+	//}
+	return resterms, len(resterms)
 
 }
 
 func (this *Segmenter) SegmentWithTf(content string, search_mode bool) ([]TermInfo, int) {
-
 
 	terms := this.Segment(content, search_mode)
 	termmap := make(map[string]TermInfo)
@@ -96,48 +127,37 @@ func (this *Segmenter) SegmentWithTf(content string, search_mode bool) ([]TermIn
 	//fmt.Printf("[TREMSSSSS::::%v] ",resterms)
 	return resterms, len(terms)
 
-/*
-    terms,_ := this.fssegmenter.Segment(content, search_mode)
-	termmap := make(map[string]TermInfo)
-	for _, term := range terms {
-		if _, ok := termmap[term]; !ok {
-			termmap[term] = TermInfo{Term: term, Tf: 1}
-		} else {
-			tf := termmap[term].Tf
-			termmap[term] = TermInfo{Term: term, Tf: tf + 1}
-		}
-	}
-	resterms := make([]TermInfo, len(termmap))
-	idx := 0
-	for _, tt := range termmap {
-		resterms[idx] = tt
-		idx++
-	}
-	//fmt.Printf("[TREMSSSSS::::%v] ",resterms)
-	return resterms, len(terms)
-*/
-}
+	/*
+	   	segments := this.segmenter.Segment([]byte(content))
+	   	if len(segments) == 0 {
+	   		return nil, 0
+	   	}
+	   	//terms := make([]TermInfo, len(segments))
+	       termmap:=make(map[string]TermInfo)
+	       idx:=0
+	   	for i := range segments {
+	   		if _,ok:=termmap[segments[i].Token().Text()];ok{
+	               t:=termmap[segments[i].Token().Text()]
+	               t.Tf=t.Tf+1
+	               termmap[segments[i].Token().Text()]=t
+	               continue
+	           }
+	   		t:= TermInfo{Term:segments[i].Token().Text(),Tf:1}
+	   		//terms[idx].Tf = 1//segments[i].Token().Frequency()
+	           //termmap[terms[idx].Term]=true
+	           termmap[segments[i].Token().Text()] =t
+	           //fmt.Printf("[TREM:%v,FREQ:%v] ",terms[idx].Term,terms[idx].Tf)
+	   		//idx++
+	   	}
+	       fmt.Printf("[TREM:%v] ",termmap)
 
-
-func (this *Segmenter) FSSegmentWithTf(content string, search_mode bool) ([]TermInfo, int) {
-
-	terms,_ := this.fssegmenter.Segment(content, search_mode)
-	termmap := make(map[string]TermInfo)
-	for _, term := range terms {
-		if _, ok := termmap[term]; !ok {
-			termmap[term] = TermInfo{Term: term, Tf: 1}
-		} else {
-			tf := termmap[term].Tf
-			termmap[term] = TermInfo{Term: term, Tf: tf + 1}
-		}
-	}
-	resterms := make([]TermInfo, len(termmap))
-	idx := 0
-	for _, tt := range termmap {
-		resterms[idx] = tt
-		idx++
-	}
-	//fmt.Printf("[TREMSSSSS::::%v] ",resterms)
-	return resterms, len(terms)
-
+	       terms := make([]TermInfo, len(termmap))
+	       for _,tt:=range termmap{
+	           terms[idx] = tt
+	           idx++
+	       }
+	       //this.Segment(content,search_mode)
+	   	//fmt.Println()
+	   	return terms, len(segments)
+	*/
 }

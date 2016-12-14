@@ -1,5 +1,5 @@
 /*****************************************************************************
- *  file name : field.go
+ *  file name : Field.go
  *  author : Wu Yinghao
  *  email  : wyh817@gmail.com
  *
@@ -54,6 +54,7 @@ func newEmptyField(fieldname string, start uint32, fieldtype uint64, dict *tree.
 	if fieldtype == utils.IDX_TYPE_STRING ||
 		fieldtype == utils.IDX_TYPE_STRING_SEG ||
 		fieldtype == utils.IDX_TYPE_STRING_LIST ||
+		fieldtype == utils.IDX_TYPE_STRING_SINGLE ||
 		fieldtype == utils.GATHER_TYPE {
 		this.ivt = newEmptyInvert(fieldtype, start, fieldname, this.dict, logger)
 	}
@@ -77,6 +78,7 @@ func newFieldWithLocalFile(fieldname, segmentname string, start, max uint32,
 	if fieldtype == utils.IDX_TYPE_STRING ||
 		fieldtype == utils.IDX_TYPE_STRING_SEG ||
 		fieldtype == utils.IDX_TYPE_STRING_LIST ||
+		fieldtype == utils.IDX_TYPE_STRING_SINGLE ||
 		fieldtype == utils.GATHER_TYPE {
 		this.ivt = newInvertWithLocalFile(btree, fieldtype, fieldname, segmentname,
 			idxMmap, this.dict, logger)
@@ -122,10 +124,8 @@ func (this *FSField) updateDocument(docid uint32, contentstr string) error {
 		this.Logger.Error("[ERROR] FSField --> UpdateDocument :: Wrong docid %v", docid)
 		return errors.New("[ERROR] Wrong docid")
 	}
-	if this.fieldType == utils.IDX_TYPE_NUMBER ||
-       this.fieldType == utils.IDX_TYPE_DATE || 
-       this.fieldType == utils.IDX_ONLYSTORE {
-		if err := this.pfl.updateDocument(docid-this.startDocId, contentstr); err != nil {
+	if this.fieldType == utils.IDX_TYPE_NUMBER {
+		if err := this.pfl.updateDocument(docid, contentstr); err != nil {
 			this.Logger.Error("[ERROR] FSField --> UpdateDocument :: Add Document Error %v", err)
 			return err
 		}
@@ -196,11 +196,16 @@ func (this *FSField) getValue(docid uint32) (string, bool) {
 // Filter function description : 过滤
 // params :
 // return :
-func (this *FSField) filter(docid uint32, filtertype uint64, start, end int64) bool {
+func (this *FSField) filter(docid uint32, filtertype uint64, start, end int64, rangenum []int64, str string) bool {
 
 	if docid >= this.startDocId && docid < this.maxDocId && this.pfl != nil {
+		//this.Logger.Info("[INFO] FSField docid %v start %v", docid, start)
+		if len(rangenum) == 0 {
+			return this.pfl.filter(docid-this.startDocId, filtertype, start, end, str)
+		} else {
+			return this.pfl.filterNums(docid-this.startDocId, filtertype, rangenum)
+		}
 
-		return this.pfl.filter(docid-this.startDocId, filtertype, start, end)
 	}
 
 	return false
@@ -263,7 +268,14 @@ func (this *FSField) mergeField(fields []*FSField, segmentname string, btree *tr
 		pfls := make([]*profile, 0)
 
 		for _, fd := range fields {
+			//if fd == nil {
+			//    this.Logger.Info("[INFO] fake profile docLen %v",docLen)
+			//    fakepfl:=newEmptyFakeProfile(this.fieldType,0,this.fieldName,0,docLen,this.Logger)
+			//     pfls = append(pfls,fakepfl)
+			//}else{
 			pfls = append(pfls, fd.pfl)
+			//}
+
 		}
 		this.pflOffset, this.pflLen, err = this.pfl.mergeProfiles(pfls, segmentname)
 		if err != nil {

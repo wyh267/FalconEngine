@@ -10,15 +10,13 @@
 package utils
 
 import (
+	"bufio"
 	"encoding/json"
 	"io/ioutil"
 	"os"
 	//"sort"
 	"fmt"
 )
-
-
-
 
 // WriteToJson function description : 写入json文件
 // params :
@@ -43,8 +41,6 @@ func WriteToJson(data interface{}, file_name string) error {
 
 }
 
-
-
 // ReadFromJson function description : 读取json文件
 // params :
 // return :
@@ -61,5 +57,32 @@ func ReadFromJson(file_name string) ([]byte, error) {
 		return nil, err
 	}
 	return buffer, nil
+
+}
+
+func ReadFile(path string) (string, error) {
+	fi, err := os.Open(path)
+	if err != nil {
+		return "", err
+	}
+	defer fi.Close()
+	fd, err := ioutil.ReadAll(fi)
+	return string(fd), nil
+}
+
+func WriteFile(path, content string) error {
+
+	f, err := os.Create(path) //创建文件
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	w := bufio.NewWriter(f) //创建新的 Writer 对象
+	_, err1 := w.WriteString(content)
+	if err1 != nil {
+		return err
+	}
+	w.Flush()
+	return nil
 
 }

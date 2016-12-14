@@ -1,7 +1,6 @@
 package utils
 
 import (
-
 	"errors"
 	"fmt"
 	"os"
@@ -39,7 +38,6 @@ func MakeBitmapFile(indexname string) error {
 		size += 8 - remainder
 	}
 
-	//file_name := fmt.Sprintf("%v/_bitmap.%v.bit", IDX_ROOT_PATH, indexname)
 	fout, err := os.Create(indexname)
 	defer fout.Close()
 	if err != nil {
@@ -128,14 +126,13 @@ func (this *Bitmap) String() string {
 	return fmt.Sprintf("%v", numSlice)
 }
 
-
 func (this *Bitmap) ReadBitmapFile(indexname string) error {
 
 	f, err := os.OpenFile(indexname, os.O_RDWR, 0664)
 	if err != nil {
 		return err
 	}
-    defer f.Close()
+	defer f.Close()
 	fi, err := f.Stat()
 	if err != nil {
 		fmt.Printf("ERR:%v", err)
@@ -146,7 +143,8 @@ func (this *Bitmap) ReadBitmapFile(indexname string) error {
 		fmt.Printf("MAPPING ERROR  %v \n", err)
 		return err
 	}
-    
+	//this.FileFd = f
+
 	return nil
 
 }
@@ -161,11 +159,17 @@ func (this *Bitmap) Sync() error {
 	return nil
 }
 
-
-
 func (this *Bitmap) Destroy(indexbitmapname string) error {
-    
-    syscall.Munmap(this.Data)
+
+	syscall.Munmap(this.Data)
 	os.Remove(indexbitmapname)
+	return nil
+}
+
+func (this *Bitmap) Close() error {
+
+	this.Sync()
+
+	syscall.Munmap(this.Data)
 	return nil
 }

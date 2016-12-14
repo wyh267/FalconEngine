@@ -15,6 +15,7 @@ import (
 	"errors"
 	"fmt"
 	"sync"
+	"time"
 	"tree"
 	"utils"
 )
@@ -29,55 +30,79 @@ type Index struct {
 	PrefixSegment uint64                           `json:"prefixsegment"`
 	SegmentNames  []string                         `json:"segmentnames"`
 
-	segments        []*fis.Segment //磁盘的段
-	memorySegment   *fis.Segment   //内存段
-	primary         *tree.BTreedb  //主键单独用B+树保存
-	bitmap          *utils.Bitmap  //bitmap用来删除数据
-	dict            *tree.BTreedb  //字典，保存DF信息，暂时无用
-	fieldnames      []string
+	segments      []*fis.Segment
+	memorySegment *fis.Segment
+	primary       *tree.BTreedb
+	bitmap        *utils.Bitmap
+	dict          *tree.BTreedb
+
+	pkmap map[string]string
+
 	idxSegmentMutex *sync.Mutex   //段锁，当段序列化到磁盘或者段合并时使用或者新建段时使用
 	Logger          *utils.Log4FE `json:"-"`
 }
 
+func (this *Index) Close() error {
+
+	this.idxSegmentMutex.Lock()
+	defer this.idxSegmentMutex.Unlock()
+	this.Logger.Info("[INFO] Close Index [%v]", this.Name)
+
+	if this.memorySegment != nil {
+		this.memorySegment.Close()
+	}
+
+	for _, seg := range this.segments {
+		seg.Close()
+	}
+
+	if this.primary != nil {
+		this.primary.Close()
+	}
+
+	if this.bitmap != nil {
+		this.bitmap.Close()
+	}
+
+	if this.dict != nil {
+		this.dict.Close()
+	}
+	this.Logger.Info("[INFO] Close Index [%v] Finish", this.Name)
+	return nil
+
+}
+
 // NewEmptyIndex function description : 新建空索引
-// params : name:索引名称
-//          pathname:路径名称
-// return : 索引实例
+// params :
+// return :
 func NewEmptyIndex(name, pathname string, logger *utils.Log4FE) *Index {
 
 	this := &Index{Name: name, Logger: logger, StartDocId: 0, MaxDocId: 0, PrefixSegment: 1000,
 		SegmentNames: make([]string, 0), PrimaryKey: "", segments: make([]*fis.Segment, 0),
 		memorySegment: nil, primary: nil, bitmap: nil, Pathname: pathname,
 		Fields: make(map[string]utils.SimpleFieldInfo), idxSegmentMutex: new(sync.Mutex),
-		dict: nil, fieldnames: make([]string, 0)}
+		dict: nil, pkmap: make(map[string]string)}
 
 	bitmapname := fmt.Sprintf("%v%v.bitmap", pathname, name)
 	utils.MakeBitmapFile(bitmapname)
 	this.bitmap = utils.NewBitmap(bitmapname)
 
-	/* delete by wuyinghao,去掉字典支持
-		dictfilename := fmt.Sprintf("%v%v_dict.dic", this.Pathname, this.Name)
-		this.dict = tree.NewBTDB(dictfilename)
-	    this.dict.Close()
-	*/
-	primaryname := fmt.Sprintf("%v%v_primary.pk", this.Pathname, this.Name)
-	this.primary = tree.NewBTDB(primaryname)
-	this.primary.AddBTree(utils.DEFAULT_PRIMARY_KEY)
-	this.PrimaryKey = utils.DEFAULT_PRIMARY_KEY
+	//delete by wuyinghao 不使用字典了
+	//dictfilename := fmt.Sprintf("%v%v_dict.dic", this.Pathname, this.Name)
+	//this.dict = tree.NewBTDB(dictfilename, logger)
 
 	return this
 }
 
-// NewIndexWithLocalFile function description : 从磁盘启动索引
-// params : name:索引名称
-//          pathname:路径名称
-// return : 索引实例
+// NewIndexWithLocalFile function description : 从文件载入索引
+// params :
+// return :
 func NewIndexWithLocalFile(name, pathname string, logger *utils.Log4FE) *Index {
 	this := &Index{Name: name, Logger: logger, StartDocId: 0, MaxDocId: 0, PrefixSegment: 1000,
 		SegmentNames: make([]string, 0), PrimaryKey: "", segments: make([]*fis.Segment, 0),
 		memorySegment: nil, primary: nil, bitmap: nil, Pathname: pathname,
 		Fields: make(map[string]utils.SimpleFieldInfo), idxSegmentMutex: new(sync.Mutex),
-		dict: nil, fieldnames: make([]string, 0)}
+		dict: nil, pkmap: make(map[string]string)}
 
 	metaFileName := fmt.Sprintf("%v%v.meta", pathname, name)
 	buffer, err := utils.ReadFromJson(metaFileName)
@@ -89,14 +114,13 @@ func NewIndexWithLocalFile(name, pathname string, logger *utils.Log4FE) *Index {
 	if err != nil {
 		return this
 	}
-    
-	/* delete by wuyinghao,去掉字典支持
-	dictfilename := fmt.Sprintf("%v%v_dict.dic", this.Pathname, this.Name)
-	if utils.Exist(dictfilename) {
-		this.Logger.Info("[INFO] Load dictfilename %v", dictfilename)
-		this.dict = tree.NewBTDB(dictfilename)
-	}
-	*/
+
+	//delete by wuyinghao 不使用字典了
+	//dictfilename := fmt.Sprintf("%v%v_dict.dic", this.Pathname, this.Name)
+	//if utils.Exist(dictfilename) {
+	//	this.Logger.Info("[INFO] Load dictfilename %v", dictfilename)
+	//	this.dict = tree.NewBTDB(dictfilename, logger)
+	//}
 
 	for _, segmentname := range this.SegmentNames {
 		segment := fis.NewSegmentWithLocalFile(segmentname, this.dict, logger)
@@ -108,10 +132,9 @@ func NewIndexWithLocalFile(name, pathname string, logger *utils.Log4FE) *Index {
 	segmentname := fmt.Sprintf("%v%v_%v", this.Pathname, this.Name, this.PrefixSegment)
 	var fields []utils.SimpleFieldInfo
 	for _, f := range this.Fields {
-		//if f.FieldType != utils.IDX_TYPE_PK {
+		if f.FieldType != utils.IDX_TYPE_PK {
 			fields = append(fields, f)
-			this.fieldnames = append(this.fieldnames, f.FieldName)
-		//}
+		}
 
 	}
 
@@ -122,19 +145,16 @@ func NewIndexWithLocalFile(name, pathname string, logger *utils.Log4FE) *Index {
 	bitmapname := fmt.Sprintf("%v%v.bitmap", pathname, name)
 	this.bitmap = utils.NewBitmap(bitmapname)
 
-	//if this.PrimaryKey != "" {
-	primaryname := fmt.Sprintf("%v%v_primary.pk", this.Pathname, this.Name)
-	this.primary = tree.NewBTDB(primaryname)
-	//}
+	if this.PrimaryKey != "" {
+		primaryname := fmt.Sprintf("%v%v_primary.pk", this.Pathname, this.Name)
+		this.primary = tree.NewBTDB(primaryname, logger)
+	}
 
 	this.Logger.Info("[INFO] Load Index %v success", this.Name)
 	return this
 
 }
 
-// AddField function description : 新增字段
-// params : field 字段信息
-// return :
 func (this *Index) AddField(field utils.SimpleFieldInfo) error {
 
 	if _, ok := this.Fields[field.FieldName]; ok {
@@ -143,70 +163,66 @@ func (this *Index) AddField(field utils.SimpleFieldInfo) error {
 	}
 
 	this.Fields[field.FieldName] = field
-	this.fieldnames = append(this.fieldnames, field.FieldName)
-	/* delete by wuyinghao,去掉字典支持
-	if field.FieldType == utils.IDX_TYPE_STRING_SEG {
-
-		this.dict.AddBTree(field.FieldName)
-
-	}
-	*/
+	//delete by wuyinghao 不使用字典了
+	//if field.FieldType == utils.IDX_TYPE_STRING_SEG ||
+	//	field.FieldType == utils.IDX_TYPE_STRING_SINGLE {
+	//	this.dict.AddBTree(field.FieldName)
+	//}
 	if field.FieldType == utils.IDX_TYPE_PK {
 		this.PrimaryKey = field.FieldName
+		primaryname := fmt.Sprintf("%v%v_primary.pk", this.Pathname, this.Name)
+		this.primary = tree.NewBTDB(primaryname, this.Logger)
 		this.primary.AddBTree(field.FieldName)
-	} //else {
-	this.idxSegmentMutex.Lock()
-	defer this.idxSegmentMutex.Unlock()
-
-	if this.memorySegment == nil {
-		segmentname := fmt.Sprintf("%v%v_%v", this.Pathname, this.Name, this.PrefixSegment)
-		var fields []utils.SimpleFieldInfo
-		for _, f := range this.Fields {
-			//if f.FieldType != utils.IDX_TYPE_PK {
-				fields = append(fields, f)
-			//}
-
-		}
-		this.memorySegment = fis.NewEmptySegmentWithFieldsInfo(segmentname, this.MaxDocId, fields, this.dict, this.Logger)
-		this.PrefixSegment++
-
-	} else if this.memorySegment.IsEmpty() {
-		err := this.memorySegment.AddField(field)
-		if err != nil {
-			this.Logger.Error("[ERROR] Add Field Error  %v", err)
-			return err
-		}
 	} else {
-		tmpsegment := this.memorySegment
-		if err := tmpsegment.Serialization(); err != nil {
-			return err
-		}
-		this.segments = append(this.segments, tmpsegment)
-		this.SegmentNames = make([]string, 0)
-		for _, seg := range this.segments {
-			this.SegmentNames = append(this.SegmentNames, seg.SegmentName)
-		}
+		this.idxSegmentMutex.Lock()
+		defer this.idxSegmentMutex.Unlock()
 
-		segmentname := fmt.Sprintf("%v%v_%v", this.Pathname, this.Name, this.PrefixSegment)
-		var fields []utils.SimpleFieldInfo
-		for _, f := range this.Fields {
-			//if f.FieldType != utils.IDX_TYPE_PK {
-				fields = append(fields, f)
-			//}
+		if this.memorySegment == nil {
+			segmentname := fmt.Sprintf("%v%v_%v", this.Pathname, this.Name, this.PrefixSegment)
+			var fields []utils.SimpleFieldInfo
+			for _, f := range this.Fields {
+				if f.FieldType != utils.IDX_TYPE_PK {
+					fields = append(fields, f)
+				}
+
+			}
+			this.memorySegment = fis.NewEmptySegmentWithFieldsInfo(segmentname, this.MaxDocId, fields, this.dict, this.Logger)
+			this.PrefixSegment++
+
+		} else if this.memorySegment.IsEmpty() {
+			err := this.memorySegment.AddField(field)
+			if err != nil {
+				this.Logger.Error("[ERROR] Add Field Error  %v", err)
+				return err
+			}
+		} else {
+			tmpsegment := this.memorySegment
+			if err := tmpsegment.Serialization(); err != nil {
+				return err
+			}
+			this.segments = append(this.segments, tmpsegment)
+			this.SegmentNames = make([]string, 0)
+			for _, seg := range this.segments {
+				this.SegmentNames = append(this.SegmentNames, seg.SegmentName)
+			}
+
+			segmentname := fmt.Sprintf("%v%v_%v", this.Pathname, this.Name, this.PrefixSegment)
+			var fields []utils.SimpleFieldInfo
+			for _, f := range this.Fields {
+				if f.FieldType != utils.IDX_TYPE_PK {
+					fields = append(fields, f)
+				}
+
+			}
+			this.memorySegment = fis.NewEmptySegmentWithFieldsInfo(segmentname, this.MaxDocId, fields, this.dict, this.Logger)
+			this.PrefixSegment++
 
 		}
-		this.memorySegment = fis.NewEmptySegmentWithFieldsInfo(segmentname, this.MaxDocId, fields, this.dict, this.Logger)
-		this.PrefixSegment++
 
 	}
-
-	//}
 	return this.storeStruct()
 }
 
-// DeleteField function description : 删除字段
-// params : 字段名称
-// return :
 func (this *Index) DeleteField(fieldname string) error {
 
 	if _, ok := this.Fields[fieldname]; !ok {
@@ -249,9 +265,9 @@ func (this *Index) DeleteField(fieldname string) error {
 	segmentname := fmt.Sprintf("%v%v_%v", this.Pathname, this.Name, this.PrefixSegment)
 	var fields []utils.SimpleFieldInfo
 	for _, f := range this.Fields {
-		//if f.FieldType != utils.IDX_TYPE_PK {
+		if f.FieldType != utils.IDX_TYPE_PK {
 			fields = append(fields, f)
-		//}
+		}
 
 	}
 	this.memorySegment = fis.NewEmptySegmentWithFieldsInfo(segmentname, this.MaxDocId, fields, this.dict, this.Logger)
@@ -261,52 +277,28 @@ func (this *Index) DeleteField(fieldname string) error {
 
 }
 
-// storeStruct function description : 存储索引元信息，json格式
-// params :
-// return :
 func (this *Index) storeStruct() error {
 	metaFileName := fmt.Sprintf("%v%v.meta", this.Pathname, this.Name)
 	if err := utils.WriteToJson(this, metaFileName); err != nil {
 		return err
 	}
+	startTime := time.Now()
+	this.Logger.Debug("[INFO] start muti set %v", startTime)
+	this.primary.MutiSet(this.PrimaryKey, this.pkmap)
+	endTime := time.Now()
+	this.Logger.Debug("[INFO] cost  muti set  %v", endTime.Sub(startTime))
+	this.pkmap = nil
+	this.pkmap = make(map[string]string)
+
 	return nil
 
 }
 
-
-
-func (this *Index) DeleteDocumentByDocId(docid uint32) error {
-    
-    if docid<this.MaxDocId {
-        this.bitmap.SetBit(uint64(docid),1)
-        this.Logger.Info("[INFO] Delete %v",docid)
-        return nil
-    }
-    
-    return fmt.Errorf("docid[%v] overflow..",docid)
-    
-}
-
-
-func (this *Index) DeleteDocument(primarykey string) error {
-    
-    ok,docid:=this.primary.Search(this.PrimaryKey,primarykey)
-    if ok {
-        return this.DeleteDocumentByDocId(uint32(docid))
-    }
-    
-    return fmt.Errorf("Key[%v] not found",primarykey)
-}
-
-
-// UpdateDocument function description : 更新文档，新增文档
-// params :
-// return :
-func (this *Index) UpdateDocument(content map[string]string) error {
+func (this *Index) UpdateDocument(content map[string]string, updateType uint64) (uint32, error) {
 
 	if len(this.Fields) == 0 {
 		this.Logger.Error("[ERROR] No Field or Segment is nil")
-		return errors.New("no field or segment is nil")
+		return 0, errors.New("no field or segment is nil")
 	}
 
 	if this.memorySegment == nil {
@@ -314,16 +306,16 @@ func (this *Index) UpdateDocument(content map[string]string) error {
 		segmentname := fmt.Sprintf("%v%v_%v", this.Pathname, this.Name, this.PrefixSegment)
 		var fields []utils.SimpleFieldInfo
 		for _, f := range this.Fields {
-			//if f.FieldType != utils.IDX_TYPE_PK {
+			if f.FieldType != utils.IDX_TYPE_PK {
 				fields = append(fields, f)
-			//}
+			}
 
 		}
 		this.memorySegment = fis.NewEmptySegmentWithFieldsInfo(segmentname, this.MaxDocId, fields, this.dict, this.Logger)
 		this.PrefixSegment++
 		if err := this.storeStruct(); err != nil {
 			this.idxSegmentMutex.Unlock()
-			return err
+			return 0, err
 		}
 		this.idxSegmentMutex.Unlock()
 	}
@@ -331,96 +323,47 @@ func (this *Index) UpdateDocument(content map[string]string) error {
 	docid := this.MaxDocId
 	this.MaxDocId++
 
-	//无主键的表直接添加
-	_, hasPrimary := content[this.PrimaryKey]
-	if this.PrimaryKey == utils.DEFAULT_PRIMARY_KEY && !hasPrimary {
-        // delete主键生成
-		/////uuid, _ := utils.NewV4()
-		////if err := this.primary.Set(utils.DEFAULT_PRIMARY_KEY, uuid.String(), uint64(docid)); err != nil {
-		////	this.MaxDocId--
-		////	return err
-		////}
-		////content[this.PrimaryKey]=uuid.String()
-		return this.memorySegment.AddDocument(docid, content)
-	}
+	if updateType == utils.UPDATE_TYPE_ADD {
+		//直接添加主键，不检查
+		if this.PrimaryKey != "" {
+			this.pkmap[content[this.PrimaryKey]] = fmt.Sprintf("%v", docid)
+			//if err := this.updatePrimaryKey(content[this.PrimaryKey], docid); err != nil {
+			//	return 0, err
+			//}
+			if this.MaxDocId%50000 == 0 {
+				startTime := time.Now()
+				this.Logger.Debug("[INFO] start muti set %v", startTime)
+				this.primary.MutiSet(this.PrimaryKey, this.pkmap)
+				endTime := time.Now()
+				this.Logger.Debug("[INFO] cost  muti set  %v", endTime.Sub(startTime))
+				this.pkmap = nil
+				this.pkmap = make(map[string]string)
+			}
 
-	if !hasPrimary {
+		}
+		//无主键的表直接添加
+		return docid, this.memorySegment.AddDocument(docid, content)
+	}
+	//this.Logger.Info("[INFO] update content %v", content)
+	if _, hasPrimary := content[this.PrimaryKey]; !hasPrimary {
 		this.Logger.Error("[ERROR] Primary Key Not Found %v", this.PrimaryKey)
-		this.MaxDocId--
-		return errors.New("No Primary Key")
+		return 0, errors.New("No Primary Key")
 	}
 
-	//查找主键
-	oldDocid, found := this.findPrimaryKey(content[this.PrimaryKey])
-	if !found {
-		if err := this.updatePrimaryKey(content[this.PrimaryKey], docid); err != nil {
-			this.MaxDocId--
-			return err
-		}
-		return this.memorySegment.AddDocument(docid, content)
+	oldDocid, founddoc := this.findPrimaryKey(content[this.PrimaryKey])
+	if founddoc {
+		//this.Logger.Info("[INFO] old Doc ID %v  new DocId %v ", oldDocid.Docid, docid)
+		this.bitmap.SetBit(uint64(oldDocid.Docid), 1)
 	}
 
-	//获取老的docid所有字段的信息
-	oldinfo, _ := this.GetDocument(oldDocid.Docid)
-	//找到主键,判断是否只有正排更新
-	onlyProfile := true
-	for k, _ := range content {
-		if this.Fields[k].FieldType != utils.IDX_TYPE_DATE &&
-			this.Fields[k].FieldType != utils.IDX_TYPE_DATE {
-			onlyProfile = false
-			break
-		}
-		/*
-		   if this.Fields[k].FieldType == utils.IDX_ONLYSTORE {
-		       oldonlystore,_:=this.GetDocumentWithField(oldDocid.Docid,k)
-		       if len(oldonlystore) < len(v){
-		           onlyProfile=false
-		           break
-		       }
-		   }
-		*/
-
-	}
-
-	//直接更新正排文件
-	if onlyProfile {
-		this.MaxDocId--
-		return this.updateProfileDocument(uint32(oldDocid.Docid), content)
-	}
-
-	//合并文档并进行更新
-	for k, v := range content {
-		oldinfo[k] = v
-	}
-	//删除老文档
-	this.bitmap.SetBit(uint64(oldDocid.Docid), 1)
-	//更新主键对应的docid
 	if err := this.updatePrimaryKey(content[this.PrimaryKey], docid); err != nil {
-		this.MaxDocId--
-		return err
+		return 0, err
 	}
-	return this.memorySegment.AddDocument(docid, oldinfo)
+	//this.Logger.Info("[INFO] AddDocument update content %v", content)
+	return docid, this.memorySegment.AddDocument(docid, content)
 
 }
 
-func (this *Index) updateProfileDocument(docid uint32, content map[string]string) error {
-
-	for _, segment := range this.segments {
-		if docid >= segment.StartDocId && docid < segment.MaxDocId {
-			return segment.UpdateDocument(docid, content)
-		}
-
-	}
-	if docid >= this.memorySegment.StartDocId && docid < this.memorySegment.MaxDocId {
-		return this.memorySegment.UpdateDocument(docid, content)
-	}
-	this.Logger.Error("[ERROR] updateDocument DocId[%v] not found", docid)
-	return errors.New("updateDocument:docid not found")
-}
-
-// updatePrimaryKey function description : 更新主键对应的docid
-// params : 主键，docid
-// return :
 func (this *Index) updatePrimaryKey(key string, docid uint32) error {
 
 	err := this.primary.Set(this.PrimaryKey, key, uint64(docid))
@@ -433,22 +376,28 @@ func (this *Index) updatePrimaryKey(key string, docid uint32) error {
 	return nil
 }
 
-// findPrimaryKey function description : 查找主键
-// params : 主键
-// return : docid，是否找到
 func (this *Index) findPrimaryKey(key string) (utils.DocIdNode, bool) {
 
 	ok, val := this.primary.Search(this.PrimaryKey, key)
-	if !ok || val >= uint64(this.memorySegment.StartDocId) {
+	if !ok /*|| val >= uint64(this.memorySegment.StartDocId)*/ {
 		return utils.DocIdNode{}, false
 	}
 	return utils.DocIdNode{Docid: uint32(val)}, true
 
 }
 
-// SyncMemorySegment function description : 将内存的段同步到磁盘中
-// params :
-// return :
+func (this *Index) FindPKDetail(key string) (map[string]string, bool) {
+
+	docid, found := this.findPrimaryKey(key)
+	if this.bitmap.GetBit(uint64(docid.Docid)) == 1 {
+		return nil, false
+	}
+	if found {
+		return this.GetDocument(docid.Docid)
+	}
+	return nil, false
+}
+
 func (this *Index) SyncMemorySegment() error {
 
 	if this.memorySegment == nil {
@@ -457,6 +406,10 @@ func (this *Index) SyncMemorySegment() error {
 	this.idxSegmentMutex.Lock()
 	defer this.idxSegmentMutex.Unlock()
 
+	if this.memorySegment.MaxDocId == this.memorySegment.StartDocId {
+		return nil
+	}
+	//this.Logger.Info("[INFO] Serialization Segment [%v]", this.memorySegment.SegmentName)
 	if err := this.memorySegment.Serialization(); err != nil {
 		this.Logger.Error("[ERROR] SyncMemorySegment Error %v", err)
 		return err
@@ -472,9 +425,6 @@ func (this *Index) SyncMemorySegment() error {
 
 }
 
-// checkMerge function description : 检查是否需要进行merge
-// params :
-// return :
 func (this *Index) checkMerge() (int, int, bool) {
 	var start int = -1
 	var end int = -1
@@ -487,23 +437,32 @@ func (this *Index) checkMerge() (int, int, bool) {
 
 }
 
-// MergeSegments function description : 合并段
-// params :
-// return :
-func (this *Index) MergeSegments() error {
+func (this *Index) MergeSegments(start int) error {
 
 	var startIdx int = -1
 	this.idxSegmentMutex.Lock()
 	defer this.idxSegmentMutex.Unlock()
-    if len(this.segments) <= 1 {
-        return nil
-    }
-	for idx := range this.segments {
-		if this.segments[idx].MaxDocId-this.segments[idx].StartDocId < 1000000 {
-			startIdx = idx
-			break
-		}
+	//this.Logger.Info("[INFO] segment lenssssssssssss %v", len(this.segments))
+	if len(this.segments) == 1 {
+		return nil
 	}
+	if start < 0 {
+
+		for idx := range this.segments {
+			if this.segments[idx].MaxDocId-this.segments[idx].StartDocId < 1000000 {
+				startIdx = idx
+				break
+			}
+		}
+	} else {
+
+		if start >= len(this.segments)-1 {
+			return nil
+		}
+		startIdx = start
+
+	}
+
 	if startIdx == -1 {
 		return nil
 	}
@@ -513,9 +472,9 @@ func (this *Index) MergeSegments() error {
 	segmentname := fmt.Sprintf("%v%v_%v", this.Pathname, this.Name, this.PrefixSegment)
 	var fields []utils.SimpleFieldInfo
 	for _, f := range this.Fields {
-		//if f.FieldType != utils.IDX_TYPE_PK {
+		if f.FieldType != utils.IDX_TYPE_PK {
 			fields = append(fields, f)
-		//}
+		}
 
 	}
 	tmpSegment := fis.NewEmptySegmentWithFieldsInfo(segmentname, mergeSegments[0].StartDocId, fields, this.dict, this.Logger)
@@ -547,44 +506,6 @@ func (this *Index) MergeSegments() error {
 
 }
 
-// GetFields function description : 获取所有字段名称
-// params :
-// return :
-func (this *Index) GetFields() []string {
-	return this.fieldnames
-}
-
-// GetDocumentWithField function description : 根据字段获取docid的详情
-// params : docid，字段列表
-// return : docid详情，是否找到
-func (this *Index) GetDocumentWithField(docid uint32, field string) (string, bool) {
-
-	for _, segment := range this.segments {
-		if docid >= segment.StartDocId && docid < segment.MaxDocId {
-			return segment.GetFieldValue(docid, field)
-		}
-	}
-	return "", false
-
-}
-
-// GetDocumentWithFields function description : 根据字段获取docid的详情
-// params : docid，字段列表
-// return : docid详情，是否找到
-func (this *Index) GetDocumentWithFields(docid uint32, fields []string) (map[string]string, bool) {
-
-	for _, segment := range this.segments {
-		if docid >= segment.StartDocId && docid < segment.MaxDocId {
-			return segment.GetValueWithFields(docid, fields)
-		}
-	}
-	return nil, false
-
-}
-
-// GetDocument function description : 获取docid所有字段的信息
-// params : docid
-// return : docid详情，是否找到
 func (this *Index) GetDocument(docid uint32) (map[string]string, bool) {
 
 	for _, segment := range this.segments {
@@ -595,240 +516,92 @@ func (this *Index) GetDocument(docid uint32) (map[string]string, bool) {
 	return nil, false
 }
 
-// SearchDocIdsCrossFields function description : 跨字段检索
-// params :
-// return :
-func (this *Index) SearchDocIdsCrossFields(querys []utils.FSSearchCrossFieldsQuery,
-	filteds []utils.FSSearchFilted) ([]utils.DocIdNode, bool) {
+func (this *Index) DeleteDocument(pk string) bool {
 
-	var ok bool
-	var crossMatch bool
-	var crossFlag bool
-	docids := make([]utils.DocIdNode,0)//<-utils.GetDocIDsChan
-	docidNode := utils.DocIdNode{Docid: 0}
-    //没有任何条件，返回所有结果集
-	if len(querys) == 0 && len(filteds) == 0 {
-		for docidnum := uint32(0); docidnum < this.segments[len(this.segments)-1].MaxDocId; docidnum++ {
-            if this.bitmap.GetBit(uint64(docidnum)) == 0 {
-                docidNode.Docid = docidnum
-			    docids = append(docids, docidNode)
-            }
-			
-		}
-		return docids, true
+	docid, found := this.findPrimaryKey(pk)
+	if found {
+		return this.bitmap.SetBit(uint64(docid.Docid), 1)
 	}
-    //只有过滤条件
-	if len(querys) == 0 && len(filteds) > 0 {
-		for docidnum := uint32(0); docidnum < this.segments[len(this.segments)-1].MaxDocId; docidnum++ {
-			docidNode.Docid = docidnum
-			for _, segment := range this.segments {
-
-				if docidnum >= segment.StartDocId && docidnum < segment.MaxDocId {
-					if segment.FilterDocId(filteds, this.bitmap, docidNode) {
-						docids = append(docids, docidNode)
-					}
-				}
-			}
-		}
-		if len(docids) > 0 {
-			return docids, true
-		}
-		// Delete free utils.GiveDocIDsChan <- docids
-		return nil, false
-	}
-
-	if len(querys) >= 1 {
-        //this.Logger.Info("[INFO] querys %v",querys)
-		for _, segment := range this.segments {
-			crossFlag = false
-			mergeDocids := make([]utils.DocIdNode,0)//<-utils.GetDocIDsChan 
-			for _, fieldname := range querys[0].FieldNames {
-				subMergeDocids := make([]utils.DocIdNode,0)//<-utils.GetDocIDsChan
-				subMergeDocids, crossMatch = segment.SearchDocIds(utils.FSSearchQuery{FieldName: fieldname, Value: querys[0].Value},
-					filteds, this.bitmap, subMergeDocids)
-                //this.Logger.Info("[INFO]crossMatch: %v fieldname:%v Value:%v subMergeDocids %v ",crossMatch,fieldname,querys[0].Value,subMergeDocids)
-				if crossMatch {
-					crossFlag = true
-					mergeDocids, _ = utils.Merge(mergeDocids, subMergeDocids)
-				}
-				// Delete free utils.GiveDocIDsChan <- subMergeDocids
-			}
-			if !crossFlag {
-				// Delete free utils.GiveDocIDsChan <- mergeDocids
-                continue
-			}
-			docids = append(docids, mergeDocids...)
-			// Delete free utils.GiveDocIDsChan <- mergeDocids
-		}
-		docids = utils.ComputeWeight(docids, len(docids), this.MaxDocId)
-	}
-   // this.Logger.Info("[INFO] docids %v",docids)
-	if len(querys) == 1 {
-		if len(docids) > 0 {
-			return docids, true
-		}
-		// Delete free utils.GiveDocIDsChan <- docids
-		return nil, false
-	}
-
-	for _, query := range querys[1:] {
-		fielddocids := make([]utils.DocIdNode,0)//<-utils.GetDocIDsChan
-		for _, segment := range this.segments {
-
-			mergeDocids := make([]utils.DocIdNode,0)//<-utils.GetDocIDsChan 
-			for _, fieldname := range query.FieldNames {
-				crossFlag = false
-				subdocids := make([]utils.DocIdNode,0)//<-utils.GetDocIDsChan
-				subdocids, crossMatch = segment.SearchDocIds(utils.FSSearchQuery{FieldName: fieldname, Value: query.Value},
-					filteds, this.bitmap, subdocids)
-                //this.Logger.Info("[INFO]crossMatch: %v fieldname:%v Value:%v subMergeDocids %v ",crossMatch,fieldname,query.Value,subdocids)
-				
-				if crossMatch {
-					crossFlag = true
-					mergeDocids, _ = utils.Merge(mergeDocids, subdocids)
-				}
-				// Delete free utils.GiveDocIDsChan <- subdocids
-			}
-			if !crossFlag {
-				// Delete free utils.GiveDocIDsChan <- mergeDocids
-				// Delete free utils.GiveDocIDsChan <- fielddocids
-                continue
-			}
-			fielddocids = append(fielddocids, mergeDocids...)
-			// Delete free utils.GiveDocIDsChan <- mergeDocids
-		}
-
-		//this.Logger.Info("[INFO] key[%v] doclens:%v",query.Value,len(subdocids))
-		docids, ok = utils.InteractionWithStartAndDf(docids, fielddocids, 0, len(fielddocids), this.MaxDocId)
-		// Delete free utils.GiveDocIDsChan <- fielddocids
-		if !ok {
-			// Delete free utils.GiveDocIDsChan <- docids
-			return nil, false
-		}
-
-	}
-
-
-	return docids, true
+	return false
 
 }
 
-// SearchDocIds function description : 标准查询接口
-// params : 查询结构体，过滤结构体
-// return :
-func (this *Index) SearchDocIds(querys []utils.FSSearchQuery, filteds []utils.FSSearchFilted) ([]utils.DocIdNode, bool) {
-    //this.Logger.Info("[INFO] filteds %v",filteds)
-	var ok bool
-	docids := make([]utils.DocIdNode,0)//<-utils.GetDocIDsChan
-	docidNode := utils.DocIdNode{Docid: 0}
-	if len(querys) == 0 && len(filteds) == 0 {
-		for docidnum := uint32(0); docidnum < this.segments[len(this.segments)-1].MaxDocId; docidnum++ {
-			if this.bitmap.GetBit(uint64(docidnum)) == 0 {
-                docidNode.Docid = docidnum
-			    docids = append(docids, docidNode)
-            }
-		}
+func (this *Index) SearchUnitDocIds(querys []utils.FSSearchQuery, filteds []utils.FSSearchFilted) ([]utils.DocIdNode, bool) {
+
+	docids := make([]utils.DocIdNode, 0)
+	for _, segment := range this.segments {
+		docids, _ = segment.SearchUnitDocIds(querys, filteds, this.bitmap, docids, this.MaxDocId)
+		//this.Logger.Info("[INFO] segment[%v] docids %v", segment.SegmentName, docids)
+	}
+
+	if len(docids) > 0 {
 		return docids, true
 	}
 
-	if len(querys) == 0 {
-		for docidnum := uint32(0); docidnum < this.segments[len(this.segments)-1].MaxDocId; docidnum++ {
-			docidNode.Docid = docidnum
-			for _, segment := range this.segments {
+	return nil, false
+}
 
-				if docidnum >= segment.StartDocId && docidnum < segment.MaxDocId {
-					if segment.FilterDocId(filteds, this.bitmap, docidNode) {
-						docids = append(docids, docidNode)
-					}
-				}
-			}
+func (this *Index) SearchDocIds(querys []utils.FSSearchQuery, filteds []utils.FSSearchFilted) ([]utils.DocIdNode, bool) {
+
+	var ok bool
+	docids := <-utils.GetDocIDsChan
+
+	if len(querys) == 0 || querys == nil {
+		for _, segment := range this.segments {
+			docids, _ = segment.SearchDocIds(utils.FSSearchQuery{}, filteds, this.bitmap, docids)
 		}
 		if len(docids) > 0 {
+			for _, doc := range docids {
+				if this.bitmap.GetBit(uint64(doc.Docid)) == 1 {
+					this.Logger.Info("[INFO] bitmap is 1 %v", doc.Docid)
+				}
+			}
 			return docids, true
 		}
-		// Delete free utils.GiveDocIDsChan <- docids
+		utils.GiveDocIDsChan <- docids
 		return nil, false
 	}
 
 	if len(querys) >= 1 {
-        
 		for _, segment := range this.segments {
-            //this.Logger.Info("[INFO] SearchDocIds querys[0] %v",querys[0])
 			docids, _ = segment.SearchDocIds(querys[0], filteds, this.bitmap, docids)
 		}
-		docids = utils.ComputeWeight(docids, len(docids), this.MaxDocId)
+		//this.Logger.Info("[INFO] key[%v] doclens:%v", querys[0].Value, len(docids))
+		//docids = utils.ComputeWeight(docids, len(docids), this.MaxDocId)
 	}
 
 	if len(querys) == 1 {
+		//sort.Sort(utils.DocWeightSort(docids))
 		if len(docids) > 0 {
 			return docids, true
 		}
-		// Delete free utils.GiveDocIDsChan <- docids
+		utils.GiveDocIDsChan <- docids
 		return nil, false
 	}
 
 	for _, query := range querys[1:] {
 
-		subdocids := make([]utils.DocIdNode,0)//<-utils.GetDocIDsChan
+		subdocids := <-utils.GetDocIDsChan
 		for _, segment := range this.segments {
 			subdocids, _ = segment.SearchDocIds(query, filteds, this.bitmap, subdocids)
 		}
 
+		//this.Logger.Info("[INFO] key[%v] doclens:%v", query.Value, len(subdocids))
 		docids, ok = utils.InteractionWithStartAndDf(docids, subdocids, 0, len(subdocids), this.MaxDocId)
-		// Delete free utils.GiveDocIDsChan <- subdocids
+		utils.GiveDocIDsChan <- subdocids
 		if !ok {
-			// Delete free utils.GiveDocIDsChan <- docids
+			utils.GiveDocIDsChan <- docids
 			return nil, false
 		}
 
 	}
 
-	return docids, true
-
-}
-
-// GatherFields function description : 汇总字段，根据字段名称和字段的值进行汇总统计【性能堪忧】TODO
-// params : docid列表，需要汇总的字段
-// return :
-func (this *Index) GatherFieldsByStruct(docids []utils.DocIdNode, gater utils.FSSearchGather) map[string]map[string]int {
-
-	return this.GatherFields(docids, gater.FieldNames)
-}
-
-// GatherFields function description : 汇总字段，根据字段名称和字段的值进行汇总统计【性能堪忧】TODO
-// params : docid列表，需要汇总的字段
-// return :
-func (this *Index) GatherFields(docids []utils.DocIdNode, gaters []string) map[string]map[string]int {
-
-	gaterMap := make(map[string]map[string]int)
-	for _, g := range gaters {
-		gaterMap[g] = make(map[string]int)
+	//sort.Sort(utils.DocWeightSort(docids))
+	//this.Logger.Info("[INFO] docids  %v", docids)
+	if len(docids) > 0 {
+		return docids, true
 	}
-
-	for _, docid := range docids {
-
-		res, _ := this.GetDocumentWithFields(docid.Docid, gaters)
-		for k, v := range res {
-			t := gaterMap[k]
-			if _, ok := t[v]; !ok {
-				t[v] = 1
-			} else {
-				t[v] = t[v] + 1
-			}
-			gaterMap[k] = t
-		}
-
-	}
-
-	return gaterMap
-}
-
-func (this *Index) GetFieldType(fieldname string) (uint64, bool) {
-
-	if _, ok := this.Fields[fieldname]; !ok {
-		return 0, false
-	}
-
-	return this.Fields[fieldname].FieldType, true
+	utils.GiveDocIDsChan <- docids
+	return nil, false
 
 }

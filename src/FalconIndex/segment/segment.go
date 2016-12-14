@@ -29,8 +29,9 @@ type FieldInfo struct {
 
 // Segment description:段结构
 type Segment struct {
-	StartDocId  uint32                           `json:"startdocid"`
-	MaxDocId    uint32                           `json:"maxdocid"`
+	StartDocId uint32 `json:"startdocid"`
+	MaxDocId   uint32 `json:"maxdocid"`
+	//SegmentNumber uint32                         `json:"segmentnumber"`
 	SegmentName string                           `json:"segmentname"`
 	FieldInfos  map[string]utils.SimpleFieldInfo `json:"fields"`
 	fields      map[string]*FSField
@@ -61,7 +62,7 @@ func NewEmptySegmentWithFieldsInfo(segmentname string, start uint32, fields []ut
 
 	}
 
-	this.Logger.Info("[INFO] Segment --> NewEmptySegmentWithFieldsInfo :: [%v] Success ", segmentname)
+	this.Logger.Info("[INFO] Make New Segment [%v] Success ", segmentname)
 	return this
 
 }
@@ -88,8 +89,8 @@ func NewSegmentWithLocalFile(segmentname string, dict *tree.BTreedb, logger *uti
 
 	btdbname := fmt.Sprintf("%v.bt", segmentname)
 	if utils.Exist(btdbname) {
-		this.Logger.Info("[INFO] Load B+Tree File : %v", btdbname)
-		this.btdb = tree.NewBTDB(btdbname)
+		this.Logger.Debug("[INFO] Load B+Tree File : %v", btdbname)
+		this.btdb = tree.NewBTDB(btdbname, logger)
 	}
 
 	this.idxMmap, err = utils.NewMmap(fmt.Sprintf("%v.idx", segmentname), utils.MODE_APPEND)
@@ -97,21 +98,21 @@ func NewSegmentWithLocalFile(segmentname string, dict *tree.BTreedb, logger *uti
 		fmt.Printf("mmap error : %v \n", err)
 	}
 	this.idxMmap.SetFileEnd(0)
-	this.Logger.Info("[INFO] Load Invert File : %v.idx ", segmentname)
+	this.Logger.Debug("[INFO] Load Invert File : %v.idx ", segmentname)
 
 	this.pflMmap, err = utils.NewMmap(fmt.Sprintf("%v.pfl", segmentname), utils.MODE_APPEND)
 	if err != nil {
 		fmt.Printf("mmap error : %v \n", err)
 	}
 	this.pflMmap.SetFileEnd(0)
-	this.Logger.Info("[INFO] Load Profile File : %v.pfl", segmentname)
+	this.Logger.Debug("[INFO] Load Profile File : %v.pfl", segmentname)
 
 	this.dtlMmap, err = utils.NewMmap(fmt.Sprintf("%v.dtl", segmentname), utils.MODE_APPEND)
 	if err != nil {
 		fmt.Printf("mmap error : %v \n", err)
 	}
 	this.dtlMmap.SetFileEnd(0)
-	this.Logger.Info("[INFO] Load Detail File : %v.dtl", segmentname)
+	this.Logger.Debug("[INFO] Load Detail File : %v.dtl", segmentname)
 
 	for _, field := range this.FieldInfos {
 		if field.PflLen == 0 {
@@ -148,7 +149,10 @@ func (this *Segment) AddField(sfield utils.SimpleFieldInfo) error {
 	indexer := newEmptyField(sfield.FieldName, this.MaxDocId, sfield.FieldType, this.dict, this.Logger)
 	this.FieldInfos[sfield.FieldName] = sfield
 	this.fields[sfield.FieldName] = indexer
-	this.Logger.Info("[INFO] Segment --> AddField :: Success ")
+	//if err := this.storeStruct(); err != nil {
+	//	return err
+	//}
+	//this.Logger.Info("[INFO] Segment --> AddField :: Success ")
 	return nil
 }
 
@@ -170,7 +174,11 @@ func (this *Segment) DeleteField(fieldname string) error {
 	this.fields[fieldname].destroy()
 	delete(this.FieldInfos, fieldname)
 	delete(this.fields, fieldname)
+	//if err := this.storeStruct(); err != nil {
+	//	return err
+	//}
 	this.Logger.Info("[INFO] Segment --> DeleteField[%v] :: Success ", fieldname)
+	// this.Fields[field.FieldName].Indexer=idf
 	return nil
 }
 
@@ -234,9 +242,9 @@ func (this *Segment) Serialization() error {
 
 	btdbname := fmt.Sprintf("%v.bt", this.SegmentName)
 	if this.btdb == nil {
-		this.btdb = tree.NewBTDB(btdbname)
+		this.btdb = tree.NewBTDB(btdbname, this.Logger)
 	}
-
+	this.Logger.Debug("[INFO] Serialization Segment File : [%v] Start", this.SegmentName)
 	for name, field := range this.FieldInfos {
 		if err := this.fields[name].serialization(this.SegmentName, this.btdb); err != nil {
 			this.Logger.Error("[ERROR] Segment --> Serialization %v", err)
@@ -260,6 +268,7 @@ func (this *Segment) Serialization() error {
 		this.Logger.Error("[ERROR] mmap error : %v \n", err)
 	}
 	this.idxMmap.SetFileEnd(0)
+	//this.Logger.Info("[INFO] Read Invert File : %v.idx ", this.SegmentName)
 
 	this.pflMmap, err = utils.NewMmap(fmt.Sprintf("%v.pfl", this.SegmentName), utils.MODE_APPEND)
 	if err != nil {
@@ -272,11 +281,12 @@ func (this *Segment) Serialization() error {
 		this.Logger.Error("[ERROR] mmap error : %v \n", err)
 	}
 	this.dtlMmap.SetFileEnd(0)
+	//this.Logger.Info("[INFO] Read Invert File : %v.pfl", this.SegmentName)
 
 	for name := range this.fields {
 		this.fields[name].setMmap(this.idxMmap, this.pflMmap, this.dtlMmap)
 	}
-	this.Logger.Info("[INFO] Serialization Segment File : %v", this.SegmentName)
+	this.Logger.Info("[INFO] Serialization Segment File : [%v] Finish", this.SegmentName)
 	return nil
 
 }
@@ -389,7 +399,8 @@ func (this *Segment) Query(fieldname string, key interface{}) ([]utils.DocIdNode
 // Filter function description : 过滤
 // params :
 // return :
-func (this *Segment) Filter(fieldname string, filtertype uint64, start, end int64, docids []utils.DocIdNode) []utils.DocIdNode {
+/*
+func (this *Segment) Filter(fieldname string, filtertype uint64, start, end int64, str string, docids []utils.DocIdNode) []utils.DocIdNode {
 
 	if _, hasField := this.fields[fieldname]; !hasField {
 		this.Logger.Warn("[WARN] Field[%v] not found", fieldname)
@@ -411,7 +422,7 @@ func (this *Segment) Filter(fieldname string, filtertype uint64, start, end int6
 
 	for _, docid := range docids {
 
-		if this.fields[fieldname].filter(docid.Docid, filtertype, start, end) {
+		if this.fields[fieldname].filter(docid.Docid, filtertype, start, end, str) {
 			res = append(res, docid)
 		}
 
@@ -419,6 +430,7 @@ func (this *Segment) Filter(fieldname string, filtertype uint64, start, end int6
 	return res
 
 }
+*/
 
 // getFieldValue function description : 获取详情，单个字段
 // params :
@@ -484,26 +496,6 @@ func (this *Segment) GetValueWithFields(docid uint32, fields []string) (map[stri
 
 }
 
-func (this *Segment) FilterDocId(filteds []utils.FSSearchFilted,
-	bitmap *utils.Bitmap,
-	docid utils.DocIdNode) bool {
-	for _, filter := range filteds {
-		if _, hasField := this.fields[filter.FieldName]; hasField {
-			if bitmap.GetBit(uint64(docid.Docid)) == 1 {
-				this.Logger.Debug("[INFO] bitmap fail")
-				return false
-			}
-			if !this.fields[filter.FieldName].filter(docid.Docid, filter.Type, filter.Start, filter.End) {
-				this.Logger.Debug("[INFO] not match %v", filter.FieldName)
-				return false
-			}
-			this.Logger.Debug("[DEBUG] SEGMENT[%v] QUERY  %v", this.SegmentName, docid)
-		}
-	}
-
-	return true
-}
-
 func (this *Segment) SearchDocIds(query utils.FSSearchQuery,
 	filteds []utils.FSSearchFilted,
 	bitmap *utils.Bitmap,
@@ -511,19 +503,27 @@ func (this *Segment) SearchDocIds(query utils.FSSearchQuery,
 
 	start := len(indocids)
 	//query查询
-    docids, match := this.fields[query.FieldName].query(query.Value)
-    //this.Logger.Info("[INFO]match : %v  SearchDocIds query.FieldName] %v query.Value : %v",match,query.FieldName,query.Value)
-	
-	if !match {
-		return indocids, false
-	}
+	if query.Value == "" {
+		docids := make([]utils.DocIdNode, 0)
+		for i := this.StartDocId; i < this.MaxDocId; i++ {
+			if bitmap.GetBit(uint64(i)) == 0 {
+				docids = append(docids, utils.DocIdNode{Docid: i})
+			}
+		}
+		indocids = append(indocids, docids...)
+	} else {
+		docids, match := this.fields[query.FieldName].query(query.Value)
+		// this.Logger.Info("[INFO] key[%v] len:%v",query.Value,len(docids))
+		if !match {
+			return indocids, false
+		}
 
-	indocids = append(indocids, docids...)
+		indocids = append(indocids, docids...)
+	}
 
 	//bitmap去掉数据
 	index := start
-	if (len(filteds) == 0 || filteds == nil ) && bitmap != nil {
-        
+	if (filteds == nil || len(filteds) == 0) && bitmap != nil {
 		for _, docid := range indocids[start:] {
 			//去掉bitmap删除的
 			if bitmap.GetBit(uint64(docid.Docid)) == 0 {
@@ -540,19 +540,14 @@ func (this *Segment) SearchDocIds(query utils.FSSearchQuery,
 		match := true
 		for _, filter := range filteds {
 			if _, hasField := this.fields[filter.FieldName]; hasField {
-				if bitmap.GetBit(uint64(docidinfo.Docid)) == 1 {
-					this.Logger.Debug("[INFO] bitmap fail")
-					match = false
-					break
-				}
-				if !this.fields[filter.FieldName].filter(docidinfo.Docid, filter.Type, filter.Start, filter.End) {
-					this.Logger.Debug("[INFO] not match %v", filter.FieldName)
+				if (bitmap != nil && bitmap.GetBit(uint64(docidinfo.Docid)) == 1) ||
+					(!this.fields[filter.FieldName].filter(docidinfo.Docid, filter.Type, filter.Start, filter.End, filter.Range, filter.MatchStr)) {
 					match = false
 					break
 				}
 				this.Logger.Debug("[DEBUG] SEGMENT[%v] QUERY  %v", this.SegmentName, docidinfo)
 			} else {
-				this.Logger.Debug("[ERROR] SEGMENT[%v] FILTER FIELD[%v] NOT FOUND", this.SegmentName, filter.FieldName)
+				this.Logger.Error("[ERROR] SEGMENT[%v] FILTER FIELD[%v] NOT FOUND", this.SegmentName, filter.FieldName)
 				return indocids[:start], true
 			}
 		}
@@ -596,38 +591,12 @@ func (this *Segment) SearchUnitDocIds(querys []utils.FSSearchQuery, filteds []ut
 
 			if !flag {
 				flag = true
-				if this.FieldInfos[query.FieldName].FieldType == utils.IDX_TYPE_STRING_SEG {
-
-					okdf, df := this.dict.Search(query.FieldName, query.Value)
-					if okdf {
-						indocids = utils.ComputeTfIdf(indocids, docids, int(df), maxdocid)
-					} else {
-						indocids = append(indocids, docids...)
-					}
-
-				} else {
-					indocids = append(indocids, docids...)
-				}
+				indocids = append(indocids, docids...)
 
 			} else {
-				if this.FieldInfos[query.FieldName].FieldType == utils.IDX_TYPE_STRING_SEG {
-					okdf, df := this.dict.Search(query.FieldName, query.Value)
-					if okdf {
-						indocids, ok = utils.InteractionWithStartAndDf(indocids, docids, start, int(df), maxdocid)
-						if !ok {
-							return indocids[:start], false
-						}
-					} else {
-						indocids, ok = utils.InteractionWithStart(indocids, docids, start)
-						if !ok {
-							return indocids[:start], false
-						}
-					}
-				} else {
-					indocids, ok = utils.InteractionWithStart(indocids, docids, start)
-					if !ok {
-						return indocids[:start], false
-					}
+				indocids, ok = utils.InteractionWithStart(indocids, docids, start)
+				if !ok {
+					return indocids[:start], false
 				}
 
 			}
@@ -659,7 +628,7 @@ func (this *Segment) SearchUnitDocIds(querys []utils.FSSearchQuery, filteds []ut
 		for _, filter := range filteds {
 			if _, hasField := this.fields[filter.FieldName]; hasField {
 				if (bitmap != nil && bitmap.GetBit(uint64(docidinfo.Docid)) == 1) ||
-					(!this.fields[filter.FieldName].filter(docidinfo.Docid, filter.Type, filter.Start, filter.End)) {
+					(!this.fields[filter.FieldName].filter(docidinfo.Docid, filter.Type, filter.Start, filter.End, filter.Range, filter.MatchStr)) {
 					match = false
 					break
 				}
@@ -689,14 +658,14 @@ func (this *Segment) IsEmpty() bool {
 
 func (this *Segment) MergeSegments(sgs []*Segment) error {
 
-	this.Logger.Info("[INFO] Segment >>>>> MergeSegments [%v]", this.SegmentName)
+	this.Logger.Info("[INFO] MergeSegments [%v] Start", this.SegmentName)
 	btdbname := fmt.Sprintf("%v.bt", this.SegmentName)
 	if this.btdb == nil {
-		this.btdb = tree.NewBTDB(btdbname)
+		this.btdb = tree.NewBTDB(btdbname, this.Logger)
 	}
 
 	for name, field := range this.FieldInfos {
-		this.Logger.Info("[INFO] Merge Field[%v]", name)
+		//this.Logger.Info("[INFO] Merge Field[%v]", name)
 		fs := make([]*FSField, 0)
 		for _, sg := range sgs {
 			if _, ok := sg.fields[name]; !ok {
@@ -737,7 +706,7 @@ func (this *Segment) MergeSegments(sgs []*Segment) error {
 	for name := range this.fields {
 		this.fields[name].setMmap(this.idxMmap, this.pflMmap, this.dtlMmap)
 	}
-	this.Logger.Info("[INFO] MergeSegments Segment File : %v", this.SegmentName)
+	this.Logger.Info("[INFO] MergeSegments [%v] Finish", this.SegmentName)
 	this.MaxDocId = sgs[len(sgs)-1].MaxDocId
 
 	return this.storeStruct()

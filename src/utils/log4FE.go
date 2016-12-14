@@ -5,6 +5,7 @@ import (
 	"os"
 	"path"
 	"runtime"
+
 	"github.com/apsdehal/go-logger"
 )
 

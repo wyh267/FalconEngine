@@ -1,5 +1,5 @@
 /*****************************************************************************
- *  file name : profile.go
+ *  file name : NumberProfile.go
  *  author : Wu Yinghao
  *  email  : wyh817@gmail.com
  *
@@ -16,6 +16,7 @@ import (
 	"os"
 	"reflect"
 	"strconv"
+	"strings"
 	"utils"
 )
 
@@ -104,7 +105,7 @@ func newProfileWithLocalFile(fieldType uint64, shift uint8, fullsegmentname stri
 	   		}
 	   	}
 	*/
-	this.Logger.Info("[INFO] Load  Profile : %v.pfl", fullsegmentname)
+	//this.Logger.Info("[INFO] Load  Profile : %v.pfl", fullsegmentname)
 	return this
 
 }
@@ -145,6 +146,7 @@ func (this *profile) addDocument(docid uint32, content interface{}) error {
 			if ok != nil {
 				value = 0xFFFFFFFF
 			}
+			//this.Logger.Info("[INFO] value %v", value)
 			this.pflNumber = append(this.pflNumber, value)
 			//this.pflString = append(this.pflString, fmt.Sprintf("%v", content))
 		} else if this.fieldType == utils.IDX_TYPE_DATE {
@@ -171,6 +173,7 @@ func (this *profile) serialization(fullsegmentname string) (int64, int, error) {
 	pflFileName := fmt.Sprintf("%v.pfl", fullsegmentname)
 	var pflFd *os.File
 	var err error
+	//this.Logger.Info("[INFO] NumberProfile --> Serialization :: Load NumberProfile pflFileName: %v", pflFileName)
 	pflFd, err = os.OpenFile(pflFileName, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0644)
 	if err != nil {
 		return 0, 0, err
@@ -195,6 +198,7 @@ func (this *profile) serialization(fullsegmentname string) (int64, int, error) {
 
 		//打开dtl文件
 		dtlFileName := fmt.Sprintf("%v.dtl", fullsegmentname)
+		//this.Logger.Info("[INFO] StringProfile --> Serialization :: Load StringProfile dtlFileName: %v", dtlFileName)
 		dtlFd, err := os.OpenFile(dtlFileName, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0644)
 		if err != nil {
 			return 0, 0, err
@@ -213,6 +217,7 @@ func (this *profile) serialization(fullsegmentname string) (int64, int, error) {
 				this.Logger.Error("[ERROR] StringProfile --> Serialization :: Write Error %v", err)
 			}
 			//存储offset
+			//this.Logger.Info("[INFO] dtloffset %v,%v",dtloffset,infolen)
 			binary.LittleEndian.PutUint64(lenBufer, uint64(dtloffset))
 			_, err = pflFd.Write(lenBufer)
 			if err != nil {
@@ -256,6 +261,10 @@ func (this *profile) getValue(pos uint32) (string, bool) {
 
 	offset := this.pflOffset + int64(pos*8)
 	if this.fieldType == utils.IDX_TYPE_NUMBER {
+		//ov:=this.pflMmap.ReadInt64(offset)
+		//if this.shift>0{
+		//    return fmt.Sprintf("%v",float64(ov)/(math.Pow10(int(this.shift))) ), true
+		//}
 		return fmt.Sprintf("%v", this.pflMmap.ReadInt64(offset)), true
 	} else if this.fieldType == utils.IDX_TYPE_DATE {
 		return utils.FormatDateTime(this.pflMmap.ReadInt64(offset))
@@ -265,6 +274,11 @@ func (this *profile) getValue(pos uint32) (string, bool) {
 	if this.dtlMmap == nil {
 		return "", false
 	}
+	/*
+	   if pos > 800000 {
+	        this.Logger.Info("[INFO] Offset %v Pos %v  ",offset,pos)
+	   }
+	*/
 	dtloffset := this.pflMmap.ReadInt64(offset)
 	lens := this.dtlMmap.ReadInt64(dtloffset)
 	return this.dtlMmap.ReadString(dtloffset+8, lens), true
@@ -291,45 +305,146 @@ func (this *profile) getIntValue(pos uint32) (int64, bool) {
 
 	offset := this.pflOffset + int64(pos*8)
 	if this.fieldType == utils.IDX_TYPE_NUMBER || this.fieldType == utils.IDX_TYPE_DATE {
+		//ov:=this.pflMmap.ReadInt64(offset)
+		//if this.shift>0{
+		//    return fmt.Sprintf("%v",float64(ov)/(math.Pow10(int(this.shift))) ), true
+		//}
 		return this.pflMmap.ReadInt64(offset), true
 	}
 
 	return 0xFFFFFFFF, false
 }
 
+func (this *profile) filterNums(pos uint32, filtertype uint64, rangenum []int64) bool {
+	var value int64
+	if this.fake {
+		return false
+	}
+
+	if this.fieldType == utils.IDX_TYPE_NUMBER {
+		if this.isMomery {
+			value = this.pflNumber[pos]
+		} else if this.pflMmap == nil {
+			return false
+		}
+
+		offset := this.pflOffset + int64(pos*8)
+		value = this.pflMmap.ReadInt64(offset)
+
+		switch filtertype {
+		case utils.FILT_EQ:
+			for _, start := range rangenum {
+				if ok := (0xFFFFFFFF&value != 0xFFFFFFFF) && (value == start); ok {
+					return true
+				}
+			}
+			return false
+		case utils.FILT_NOT:
+			for _, start := range rangenum {
+				if ok := (0xFFFFFFFF&value != 0xFFFFFFFF) && (value == start); ok {
+					return false
+				}
+			}
+			return true
+
+		default:
+			return false
+		}
+
+	}
+
+	return false
+}
+
 // Filter function description : 过滤
 // params :
 // return :
-func (this *profile) filter(pos uint32, filtertype uint64, start, end int64) bool {
+func (this *profile) filter(pos uint32, filtertype uint64, start, end int64, str string) bool {
 
 	var value int64
-	if (this.fieldType != utils.IDX_TYPE_NUMBER &&
-		this.fieldType != utils.IDX_TYPE_DATE) || (this.fake == true) {
-
+	if /*(this.fieldType != utils.IDX_TYPE_NUMBER && this.fieldType != utils.IDX_TYPE_DATE) ||*/ this.fake {
 		return false
 	}
 
-	if this.isMomery {
-		value = this.pflNumber[pos]
-	} else if this.pflMmap == nil {
-		return false
+	if this.fieldType == utils.IDX_TYPE_NUMBER {
+		if this.isMomery {
+			value = this.pflNumber[pos]
+		} else if this.pflMmap == nil {
+			return false
+		}
+
+		offset := this.pflOffset + int64(pos*8)
+		value = this.pflMmap.ReadInt64(offset)
+
+		switch filtertype {
+		case utils.FILT_EQ:
+
+			return (0xFFFFFFFF&value != 0xFFFFFFFF) && (value == start)
+		case utils.FILT_OVER:
+			return (0xFFFFFFFF&value != 0xFFFFFFFF) && (value >= start)
+		case utils.FILT_LESS:
+			return (0xFFFFFFFF&value != 0xFFFFFFFF) && (value <= start)
+		case utils.FILT_RANGE:
+			return (0xFFFFFFFF&value != 0xFFFFFFFF) && (value >= start && value <= end)
+		case utils.FILT_NOT:
+			return (0xFFFFFFFF&value != 0xFFFFFFFF) && (value != start)
+		default:
+			return false
+		}
 	}
 
-	offset := this.pflOffset + int64(pos*8)
-	value = this.pflMmap.ReadInt64(offset)
+	if this.fieldType == utils.IDX_TYPE_STRING_SINGLE {
+		vl := strings.Split(str, ",")
+		switch filtertype {
 
-	switch filtertype {
-	case utils.FILT_EQ:
-		return (0xFFFFFFFF&value != 0xFFFFFFFF) && (value == start)
-	case utils.FILT_OVER:
-		return (0xFFFFFFFF&value != 0xFFFFFFFF) && (value >= start)
-	case utils.FILT_LESS:
-		return (0xFFFFFFFF&value != 0xFFFFFFFF) && (value <= start)
-	case utils.FILT_RANGE:
-		return (0xFFFFFFFF&value != 0xFFFFFFFF) && (value >= start && value <= end)
-	default:
-		return false
+		case utils.FILT_STR_PREFIX:
+			if vstr, ok := this.getValue(pos); ok {
+
+				for _, v := range vl {
+					if strings.HasPrefix(vstr, v) {
+						return true
+					}
+				}
+
+			}
+			return false
+		case utils.FILT_STR_SUFFIX:
+			if vstr, ok := this.getValue(pos); ok {
+				for _, v := range vl {
+					if strings.HasSuffix(vstr, v) {
+						return true
+					}
+				}
+			}
+			return false
+		case utils.FILT_STR_RANGE:
+			if vstr, ok := this.getValue(pos); ok {
+				for _, v := range vl {
+					if !strings.Contains(vstr, v) {
+						return false
+					}
+				}
+				return true
+			}
+			return false
+		case utils.FILT_STR_ALL:
+
+			if vstr, ok := this.getValue(pos); ok {
+				for _, v := range vl {
+					if vstr == v {
+						return true
+					}
+				}
+			}
+			return false
+		default:
+			return false
+		}
+
 	}
+
+	return false
+
 }
 
 // destroy function description : 销毁
@@ -349,44 +464,16 @@ func (this *profile) setDtlMmap(mmap *utils.Mmap) {
 	this.dtlMmap = mmap
 }
 
-func (this *profile) updateDocument(docidpos uint32, content interface{}) error {
+func (this *profile) updateDocument(docid uint32, content interface{}) error {
 
-	if this.fieldType != utils.IDX_TYPE_NUMBER || 
-        this.fieldType != utils.IDX_TYPE_DATE || 
-        this.fieldType != utils.IDX_ONLYSTORE {
+	if this.fieldType != utils.IDX_TYPE_NUMBER || this.fieldType != utils.IDX_TYPE_DATE {
 		return errors.New("not support")
 	}
 
 	vtype := reflect.TypeOf(content)
 	var value int64 = 0xFFFFFFFF
 	switch vtype.Name() {
-    case "string":
-        var ok error
-		if this.fieldType == utils.IDX_TYPE_DATE {
-			value, _ = utils.IsDateTime(fmt.Sprintf("%v", content))
-		}else if this.fieldType == utils.IDX_TYPE_NUMBER {
-            value, ok = strconv.ParseInt(fmt.Sprintf("%v", content), 0, 0)
-            if ok != nil {
-                value = 0xFFFFFFFF
-            }
-        }else if this.fieldType == utils.IDX_ONLYSTORE {
-            
-            //TODO 存储
-            contentstr:=fmt.Sprintf("%v",content)
-            if this.isMomery == true {
-                this.pflString[docidpos] = contentstr
-            }else{
-                
-                offset := this.pflOffset + int64(docidpos*8)
-                dtloffset := this.pflMmap.ReadInt64(offset)
-	            lens := len(contentstr)
-                this.dtlMmap.WriteInt64(offset,int64(lens))
-	            return this.dtlMmap.WriteBytes(dtloffset+8, []byte(contentstr))
-            }
-            
-            
-        }
-	case  "int", "int8", "int16", "int32", "int64", "uint", "uint8", "uint16", "uint32", "uint64":
+	case "string", "int", "int8", "int16", "int32", "int64", "uint", "uint8", "uint16", "uint32", "uint64":
 		var ok error
 		if this.fieldType == utils.IDX_TYPE_DATE {
 			value, _ = utils.IsDateTime(fmt.Sprintf("%v", content))
@@ -406,9 +493,9 @@ func (this *profile) updateDocument(docidpos uint32, content interface{}) error 
 		value = 0xFFFFFFFF
 	}
 	if this.isMomery == true {
-		this.pflNumber[docidpos] = value
+		this.pflNumber[docid-this.startDocId] = value
 	} else {
-		offset := this.pflOffset + int64((docidpos)*8)
+		offset := this.pflOffset + int64((docid-this.startDocId)*8)
 		this.pflMmap.WriteInt64(offset, value)
 	}
 	return nil
@@ -416,10 +503,16 @@ func (this *profile) updateDocument(docidpos uint32, content interface{}) error 
 
 func (this *profile) mergeProfiles(srclist []*profile, fullsegmentname string) (int64, int, error) {
 
+	//this.Logger.Info("[INFO] mergeProfiles  %v",fullsegmentname )
+	//if this.startDocId != 0 {
+	//    this.Logger.Error("[ERROR] DocId Wrong %v",this.startDocId)
+	//    return 0,0,errors.New("DocId Wrong")
+	//}
 	//打开正排文件
 	pflFileName := fmt.Sprintf("%v.pfl", fullsegmentname)
 	var pflFd *os.File
 	var err error
+	//this.Logger.Info("[INFO] NumberProfile --> Serialization :: Load NumberProfile pflFileName: %v", pflFileName)
 	pflFd, err = os.OpenFile(pflFileName, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0644)
 	if err != nil {
 		return 0, 0, err
@@ -448,6 +541,7 @@ func (this *profile) mergeProfiles(srclist []*profile, fullsegmentname string) (
 
 		//打开dtl文件
 		dtlFileName := fmt.Sprintf("%v.dtl", fullsegmentname)
+		//this.Logger.Info("[INFO] StringProfile --> Serialization :: Load StringProfile dtlFileName: %v", dtlFileName)
 		dtlFd, err := os.OpenFile(dtlFileName, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0644)
 		if err != nil {
 			return 0, 0, err
@@ -468,6 +562,7 @@ func (this *profile) mergeProfiles(srclist []*profile, fullsegmentname string) (
 					this.Logger.Error("[ERROR] StringProfile --> Serialization :: Write Error %v", err)
 				}
 				//存储offset
+				//this.Logger.Info("[INFO] dtloffset %v,%v",dtloffset,infolen)
 				binary.LittleEndian.PutUint64(lenBufer, uint64(dtloffset))
 				_, err = pflFd.Write(lenBufer)
 				if err != nil {

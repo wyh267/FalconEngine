@@ -1,25 +1,30 @@
 package utils
 
 import (
-	//"container/list"
+	"bytes"
+	"container/list"
+	"io/ioutil"
 	"math"
+	"net"
+	"net/http"
 	"os"
 	"time"
 )
 
 // IDX_ROOT_PATH 默认索引存放位置
 const IDX_ROOT_PATH string = "./index/"
-const DEFAULT_PRIMARY_KEY string = "_id"
+
+const IDX_DETAIL_PATH string = "./detail/"
+
+// FALCONENGINENAME base名称
 const FALCONSEARCHERNAME string = "FALCONENGINE"
 
-// DocIdNode docid的基本结构体，包括docid和权重
 type DocIdNode struct {
 	Docid  uint32
 	Weight uint32
 	//Pos    uint32
 }
 
-//DocIdSort 按照docid进行排序
 type DocIdSort []DocIdNode
 
 func (a DocIdSort) Len() int      { return len(a) }
@@ -31,51 +36,32 @@ func (a DocIdSort) Less(i, j int) bool {
 	return a[i].Docid < a[j].Docid
 }
 
-//DocWeightSort 按照weight进行排序
 type DocWeightSort []DocIdNode
 
 func (a DocWeightSort) Len() int      { return len(a) }
 func (a DocWeightSort) Swap(i, j int) { a[i], a[j] = a[j], a[i] }
 func (a DocWeightSort) Less(i, j int) bool {
 	if a[i] == a[j] {
-		return a[i].Weight > a[j].Weight
+		return a[i].Weight < a[j].Weight
 	}
-	return a[i].Weight > a[j].Weight
-}
-
-//DocWeightHeap 按weight堆排序
-type DocWeightHeap []DocIdNode
-
-func (h DocWeightHeap) Len() int           { return len(h) }
-func (h DocWeightHeap) Less(i, j int) bool { return h[i].Weight < h[j].Weight }
-func (h DocWeightHeap) Swap(i, j int)      { h[i], h[j] = h[j], h[i] }
-
-func (h *DocWeightHeap) Push(x interface{}) {
-	// Push and Pop use pointer receivers because they modify the slice's length,
-	// not just its contents.
-	*h = append(*h, x.(DocIdNode))
-}
-
-func (h *DocWeightHeap) Pop() interface{} {
-	old := *h
-	n := len(old)
-	//x:=old[0]
-	//*h = old[1:n]
-	x := old[n-1]
-	*h = old[0 : n-1]
-	return x
+	return a[i].Weight < a[j].Weight
 }
 
 const DOCNODE_SIZE int = 8 //12
 
-// BASE_PREFIX_SEGMENT 段起始计数
 const BASE_PREFIX_SEGMENT uint64 = 1000
+
+const SIZE_OF_TRIE_NODE int = 10
+
+const UPDATE_TYPE_ADD uint64 = 1
+const UPDATE_TYPE_MODIFY uint64 = 2
 
 // 索引类型说明
 const (
-	IDX_TYPE_STRING      = 1 //字符型索引[全词匹配]
-	IDX_TYPE_STRING_SEG  = 2 //字符型索引[切词匹配，全文索引,hash存储倒排]
-	IDX_TYPE_STRING_LIST = 3 //字符型索引[列表类型，分号切词，直接切分,hash存储倒排]
+	IDX_TYPE_STRING        = 1 //字符型索引[全词匹配]
+	IDX_TYPE_STRING_SEG    = 2 //字符型索引[切词匹配，全文索引,hash存储倒排]
+	IDX_TYPE_STRING_LIST   = 3 //字符型索引[列表类型，分号切词，直接切分,hash存储倒排]
+	IDX_TYPE_STRING_SINGLE = 4 //字符型索引[单字切词]
 
 	IDX_TYPE_NUMBER = 11 //数字型索引，只支持整数，数字型索引只建立正排
 
@@ -89,10 +75,15 @@ const (
 
 // 过滤类型，对应filtertype
 const (
-	FILT_EQ    uint64 = 1 //等于
-	FILT_OVER  uint64 = 2 //大于
-	FILT_LESS  uint64 = 3 //小于
-	FILT_RANGE uint64 = 4 //范围内
+	FILT_EQ         uint64 = 1  //等于
+	FILT_OVER       uint64 = 2  //大于
+	FILT_LESS       uint64 = 3  //小于
+	FILT_RANGE      uint64 = 4  //范围内
+	FILT_NOT        uint64 = 5  //不等于
+	FILT_STR_PREFIX uint64 = 11 //前缀
+	FILT_STR_SUFFIX uint64 = 12 //后缀
+	FILT_STR_RANGE  uint64 = 13 //之内
+	FILT_STR_ALL    uint64 = 14 //全词
 )
 
 // SimpleFieldInfo description: 字段的描述信息
@@ -106,10 +97,11 @@ type SimpleFieldInfo struct {
 // IndexStrct 索引构造结构，包含字段信息
 type IndexStrct struct {
 	IndexName    string            `json:"indexname"`
+	ShardNum     uint64            `json:"shardnum"`
+	ShardField   string            `json:"shardfield"`
 	IndexMapping []SimpleFieldInfo `json:"indexmapping"`
 }
 
-//Term分词信息
 type TermInfo struct {
 	Term string
 	Tf   int
@@ -121,6 +113,7 @@ type TermInfo struct {
 查询：倒排索引匹配
 过滤：正排索引过滤
 统计：汇总某个字段，然后进行统计计算
+子查询：必须是有父子
 ************************************************************************/
 // FSSearchQuery function description : 查询接口数据结构[用于倒排索引查询]，内部都是求交集
 type FSSearchQuery struct {
@@ -129,24 +122,52 @@ type FSSearchQuery struct {
 	Type      uint64 `json:"_type"`
 }
 
-// FSSearchCrossFieldsQuery description : 跨字段搜索，满足一个就返回
-type FSSearchCrossFieldsQuery struct {
-	FieldNames []string `json:"_fields"`
-	Value      string   `json:"_value"`
-	Type       uint64   `json:"_type"`
-}
-
 // FSSearchFilted function description : 过滤接口数据结构，内部都是求交集
 type FSSearchFilted struct {
-	FieldName string `json:"_field"`
-	Start     int64  `json:"_start"`
-	End       int64  `json:"_end"`
-	Type      uint64 `json:"_type"`
+	FieldName string   `json:"_field"`
+	Start     int64    `json:"_start"`
+	End       int64    `json:"_end"`
+	Range     []int64  `json:"_range"`
+	Type      uint64   `json:"_type"`
+	MatchStr  string   `json:"_matchstr"`
+	RangeStr  []string `json:"_rangestr"`
+}
+
+//FSSearchSort description : 排序
+type FSSearchSort struct {
+	FieldName string `json:"_sortfield"`
+	SortType  string `json:"_sorttype"`
 }
 
 // FSSearchGather description : 汇总
 type FSSearchGather struct {
 	FieldNames []string `json:"_gatherfields"`
+}
+
+type FSSearchConfig struct {
+	ShowFields []string `json:"_showfields"`
+	PageSize   int      `json:"_pagesize"`
+	PageNumber int      `json:"_pagenum"`
+}
+
+type FSSearchQueryUnit struct {
+	Querys []FSSearchQuery `json:"_querys"`
+}
+
+type FSSearchUnit struct {
+	QueryUnits []FSSearchQueryUnit `json:"_queryunit"`
+	Filters    []FSSearchFilted    `json:"_filters"`
+	Gather     FSSearchGather      `json:"_gather"`
+	Sort       FSSearchSort        `json:"_sort"`
+	Config     FSSearchConfig      `json:"_config"`
+}
+
+type FSSearchFrontend struct {
+	Query   string           `json:"query"`
+	Filters []FSSearchFilted `json:"_filters"`
+	Gather  FSSearchGather   `json:"_gather"`
+	Sort    FSSearchSort     `json:"_sort"`
+	Config  FSSearchConfig   `json:"_config"`
 }
 
 //统计类型
@@ -160,12 +181,14 @@ const (
 
 // FSStatistics function description : 汇总统计接口数据结构
 type FSStatistics struct {
-	Gather string `json:"_gather"` //汇总字段
-	Op     uint64 `json:"_op"`     //统计字段的操作
-	Field  string `json:"_field"`  //统计字段
-	Type   uint64 `json:"_type"`   //统计后操作的类型
-	Start  int64  `json:"_start"`  //统计后操作的起始范围
-	End    int64  `json:"_end"`    //统计后操作的结束范围
+	Gather   string `json:"_gather"`    //汇总字段
+	Op       uint64 `json:"_op"`        //统计字段的操作
+	Field    string `json:"_field"`     //统计字段
+	Type     uint64 `json:"_type"`      //统计后操作的类型
+	Start    int64  `json:"_start"`     //统计后操作的起始范围
+	End      int64  `json:"_end"`       //统计后操作的结束范围
+	StartStr string `json:"_start_str"` //统计后操作的起始范围
+	EndStr   string `json:"_end_str"`   //统计后操作的结束范围
 }
 
 /*************************************************************************
@@ -215,13 +238,30 @@ type FSLoadStruct struct {
 	IsMerge   bool     `json:"_ismerge"`
 }
 
-// Engine 引擎接口，自己实现的引擎必须实现以下接口
 type Engine interface {
 	Search(method string, parms map[string]string, body []byte) (string, error)
 	CreateIndex(method string, parms map[string]string, body []byte) error
 	UpdateDocument(method string, parms map[string]string, body []byte) (string, error)
-	DeleteDocument(method string, parms map[string]string, body []byte) (string, error)
 	LoadData(method string, parms map[string]string, body []byte) (string, error)
+	PullDetail(method string, parms map[string]string, body []byte) ([]string, uint64)
+	JoinNode(method string, parms map[string]string, body []byte) (string, error)
+	Heart(method string, parms map[string]string, body []byte) (map[string]string, error)
+	InitEngine() error
+}
+
+type NodeIndex struct {
+	IndexName    string              `json:"indexname"`
+	ShardNum     uint64              `json:"shardnum"`
+	Shard        []uint64            `json:"shard"`
+	IndexMapping []SimpleFieldInfo   `json:"indexmapping"`
+	ShardNodes   map[uint64][]string `json:"shardnodes"`
+}
+
+type NodeNetInfo struct {
+	Addr    string         `json:"addr"`
+	MPort   string         `json:"mport"`
+	CPort   string         `json:"cport"`
+	IdxChan chan NodeIndex `json:"-"`
 }
 
 /*****************************************************************************
@@ -232,6 +272,7 @@ type Engine interface {
 *  description : 求并集
 *
 ******************************************************************************/
+
 func Merge(a []DocIdNode, b []DocIdNode) ([]DocIdNode, bool) {
 	lena := len(a)
 	lenb := len(b)
@@ -246,7 +287,7 @@ func Merge(a []DocIdNode, b []DocIdNode) ([]DocIdNode, bool) {
 
 	for ia < lena && ib < lenb {
 
-		if a[ia].Docid == b[ib].Docid {
+		if a[ia] == b[ib] {
 			//c = append(c, a[ia])
 			c[lenc] = a[ia]
 			lenc++
@@ -288,9 +329,6 @@ func Merge(a []DocIdNode, b []DocIdNode) ([]DocIdNode, bool) {
 
 }
 
-// ComputeWeight function description : 计算权重
-// params :
-// return :
 func ComputeWeight(res []DocIdNode, df int, maxdoc uint32) []DocIdNode {
 	idf := math.Log10(float64(maxdoc) / float64(df))
 	for ia := 0; ia < len(res); ia++ {
@@ -300,9 +338,6 @@ func ComputeWeight(res []DocIdNode, df int, maxdoc uint32) []DocIdNode {
 
 }
 
-// ComputeTfIdf function description : 计算TFIDF
-// params :
-// return :
 func ComputeTfIdf(res []DocIdNode, a []DocIdNode, df int, maxdoc uint32) []DocIdNode {
 
 	for ia := 0; ia < len(a); ia++ {
@@ -313,9 +348,6 @@ func ComputeTfIdf(res []DocIdNode, a []DocIdNode, df int, maxdoc uint32) []DocId
 	return res
 }
 
-// InteractionWithStartAndDf function description : 求交集的同时进行TFIDF的计算
-// params :
-// return :
 func InteractionWithStartAndDf(a []DocIdNode, b []DocIdNode, start int, df int, maxdoc uint32) ([]DocIdNode, bool) {
 
 	if a == nil || b == nil {
@@ -395,6 +427,7 @@ func InteractionWithStart(a []DocIdNode, b []DocIdNode, start int) ([]DocIdNode,
 *  description : 求交集
 *
 ******************************************************************************/
+
 func Interaction(a []DocIdNode, b []DocIdNode) ([]DocIdNode, bool) {
 
 	if a == nil || b == nil {
@@ -439,9 +472,6 @@ func Interaction(a []DocIdNode, b []DocIdNode) ([]DocIdNode, bool) {
 
 }
 
-// BinSearch function description : 二分查找
-// params :
-// return :
 func BinSearch(docids []DocIdNode, item DocIdNode) int {
 
 	low := 0
@@ -467,17 +497,11 @@ func BinSearch(docids []DocIdNode, item DocIdNode) int {
 
 }
 
-// Exist function description : 判断文件是否存在
-// params :
-// return :
 func Exist(filename string) bool {
 	_, err := os.Stat(filename)
 	return err == nil || os.IsExist(err)
 }
 
-/*****************************
-内存池使用
-******************************/
 type queued struct {
 	when  time.Time
 	slice []DocIdNode
@@ -491,48 +515,29 @@ type docqueued struct {
 const MAX_DOCID_LEN = 1000
 
 func makeDocIdSlice() []DocIdNode {
+
+	//fmt.Printf("[WARN] ========Malloc Buffer...\n")
 	return make([]DocIdNode, 0, MAX_DOCID_LEN)
+
 }
 
 var GetDocIDsChan chan []DocIdNode
 var GiveDocIDsChan chan []DocIdNode
 
+//var GetDocInfoChan chan []DocIdNode
+//var GiveDocInfoChan chan []DocIdNode
+
+// DocIdsMaker function description : DocId的内存池
+// params :
+// return :
 func DocIdsMaker() (get, give chan []DocIdNode) {
 	get = make(chan []DocIdNode)
 	give = make(chan []DocIdNode)
+
 	go func() {
-		//q := new(list.List)
-        q := make([][]DocIdNode,0)
+		q := new(list.List)
+
 		for {
-            
-            if len(q) == 0 {
-                q=append(q,makeDocIdSlice())
-            }
-            e:=q[0]
-            timeout := time.NewTimer(time.Second)
-            select {
-			case b := <-give:
-				timeout.Stop()
-				//fmt.Printf("Recive Buffer...\n")
-				//b=b[:MAX_DOCID_LEN]
-                q=append(q,b)
-				//q.PushFront(queued{when: time.Now(), slice: b})
-
-			case get <- e:
-				timeout.Stop()
-                q=q[1:]
-				//fmt.Printf("Sent Buffer...\n")
-				//q.Remove(e)
-
-			case <-timeout.C:
-                for i:=len(q)/2;i<len(q);i++{
-                    q[i]=nil
-                }
-                q=q[len(q)/2:]
-				
-
-			}
-            /*
 			if q.Len() == 0 {
 				q.PushFront(queued{when: time.Now(), slice: makeDocIdSlice()})
 			}
@@ -564,7 +569,6 @@ func DocIdsMaker() (get, give chan []DocIdNode) {
 				}
 
 			}
-            */
 		}
 
 	}()
@@ -596,9 +600,6 @@ func IsDateTime(datetime string) (int64, error) {
 
 }
 
-// FormatDateTime function description : 将时间戳变化成日期时间格式
-// params :
-// return :
 func FormatDateTime(timestamp int64) (string, bool) {
 
 	if timestamp == 0 {
@@ -606,5 +607,67 @@ func FormatDateTime(timestamp int64) (string, bool) {
 	}
 	tm := time.Unix(timestamp, 0)
 	return tm.Format("2006-01-02 15:04:05"), true
+
+}
+
+func RequestUrl(url string) ([]byte, error) {
+
+	client := &http.Client{
+		Transport: &http.Transport{
+			Dial: func(netw, addr string) (net.Conn, error) {
+				conn, err := net.DialTimeout(netw, addr, time.Second*2)
+				if err != nil {
+					return nil, err
+				}
+				conn.SetDeadline(time.Now().Add(time.Second * 2))
+				return conn, nil
+			},
+			ResponseHeaderTimeout: time.Second * 2,
+		},
+	}
+	rsp, err := client.Get(url)
+	if err != nil {
+		return nil, err
+	}
+	defer rsp.Body.Close()
+	body, err := ioutil.ReadAll(rsp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	return body, nil
+
+}
+
+func PostRequest(url string, b []byte) ([]byte, error) {
+
+	client := &http.Client{
+		Transport: &http.Transport{
+			Dial: func(netw, addr string) (net.Conn, error) {
+				conn, err := net.DialTimeout(netw, addr, time.Second*2)
+				if err != nil {
+					return nil, err
+				}
+				conn.SetDeadline(time.Now().Add(time.Second * 2))
+				return conn, nil
+			},
+			ResponseHeaderTimeout: time.Second * 2,
+		},
+	}
+
+	body := bytes.NewBuffer([]byte(b))
+	res, err := client.Post(url, "application/json;charset=utf-8", body)
+	if err != nil {
+
+		return nil, err
+	}
+	result, err := ioutil.ReadAll(res.Body)
+	res.Body.Close()
+	if err != nil {
+
+		return nil, err
+	}
+
+	return result, nil
 
 }
