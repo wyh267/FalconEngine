@@ -1,4 +1,4 @@
-package index
+package invert
 
 import (
 	"testing"
