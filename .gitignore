@@ -3,7 +3,6 @@
 *github.com*
 *bin/
 *pkg/
-index/
 *data/
 *.log*
 *.json*
@@ -20,4 +19,10 @@ t.go
 *index_*/
 _index.path
 *.txt
-index
+*.dic
+*.ivt
+main
+*.iml
+misc.xml
+modules.xml
+vcs.xml
