@@ -51,8 +51,10 @@ func NewInvertSet(name string,path string) FalconInvertSetService {
 	if tools.Exists(metaFile) && tools.Exists(ivtFile) && tools.Exists(dicFile) {
 		is.invertListStoreReader = store.NewFalconFileStoreReadService(ivtFile)
 		is.dictStoreReader = store.NewFalconFileStoreReadService(dicFile)
-		metaReader := store.NewFalconFileStoreReadService(metaFile)
-		metaReader.ReadMessage(0,is)
+		if err:=is.init(metaFile);err!=nil{
+			return nil
+		}
+		mlog.Info("Load InvertSetService with read mode success ...")
 		return is
 	}
 
@@ -60,13 +62,23 @@ func NewInvertSet(name string,path string) FalconInvertSetService {
 	is.mode = tools.TWriteMode
 	is.invertListStoreWriter = store.NewFalconFileStoreWriteService(ivtFile)
 	is.dictStoreWriter = store.NewFalconFileStoreWriteService(dicFile)
+	mlog.Info("Start InvertSetService with write mode success ...")
+
 	return is
 
 
 
 }
 
+func (is *InvertSet) init(metaFile string) error {
 
+	metaReader := store.NewFalconFileStoreReadService(metaFile)
+	if _,err:=metaReader.ReadMessage(0,is);err!=nil{
+		return err
+	}
+	is.mode = tools.TReadMode
+	return metaReader.Close()
+}
 
 
 func (is *InvertSet) AddField(field string, fieldType tools.FalconFieldType) error {
@@ -191,17 +203,9 @@ func (is *InvertSet) FalconDecoding(bytes []byte) error {
 
 	json.Unmarshal(bytes[8:],&is.fieldInformations)
 
-
-	for _,fi:=range is.fieldInformations {//pos:=8;pos<len(bytes);{
-		//unitLen := binary.LittleEndian.Uint64(bytes[pos:pos+8])
-		//fi := &tools.FalconFieldInfo{}
-		//end := pos+int(unitLen)+8
-		//fi.FalconDecoding(bytes[pos:end])
-		//pos = end
-		//is.fieldInformations[fi.Name] = fi
+	for _,fi:=range is.fieldInformations {
 		is.stringInvertReadServices[fi.Name] = NewStringInvertReader(fi.Name,fi.Offset,is.dictStoreReader,is.invertListStoreReader)
 	}
-	is.mode = tools.TReadMode
 
 	return nil
 
