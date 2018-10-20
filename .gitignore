@@ -21,6 +21,7 @@ _index.path
 *.txt
 *.dic
 *.ivt
+*.mt
 main
 *.iml
 misc.xml

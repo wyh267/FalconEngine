@@ -17,16 +17,16 @@ type InvertReader struct {
 
 
 
-func NewStringInvertReader(name string, path string) FalconStringInvertReadService {
+func NewStringInvertReader(name string,offset int64,dicStore,ivtReader store.FalconSearchStoreReadService) FalconStringInvertReadService {
 
-	reader := &InvertReader{name: name, path: path}
+	reader := &InvertReader{name: name}
 	reader.dicReader = dict.NewFalconReadMap()
-	dicStore := store.NewFalconFileStoreReadService(path + "/" + name + ".dic")
-	if err:=reader.dicReader.LoadDic(dicStore);err!=nil{
+	if err:=reader.dicReader.LoadDic(dicStore,offset);err!=nil{
 		mlog.Error("Load Error : %v",err)
 	}
+	reader.ivtReader = ivtReader
 
-	reader.ivtReader = store.NewFalconFileStoreReadService(path + "/" +name + ".ivt")
+	//reader.ivtReader = store.NewFalconFileStoreReadService(path + "/" +name + ".ivt")
 	return reader
 
 }

@@ -5,13 +5,17 @@ import (
 	"github.com/FalconEngine/mlog"
 	"github.com/FalconEngine/tools"
 	"fmt"
+	"github.com/FalconEngine/store"
 )
 
 func Test_InvertWriter(t *testing.T) {
 
 	mlog.Start(mlog.LevelInfo, "iw.log")
 
-	iw := NewStringInvertWriter("abc",".")
+	invertListStore := store.NewFalconFileStoreWriteService("./abc.ivt")
+	dictStore := store.NewFalconFileStoreWriteService("./abc.dic")
+
+	iw := NewStringInvertWriter("abc")
 
 	iw.Put("abc",&tools.DocId{DocID:0,Weight:10})
 	iw.Put("abc",&tools.DocId{DocID:2,Weight:12})
@@ -22,30 +26,41 @@ func Test_InvertWriter(t *testing.T) {
 	iw.Put("b",&tools.DocId{DocID:4,Weight:14})
 	iw.Put("b",&tools.DocId{DocID:9,Weight:19})
 
-	iw.Store()
+	iw.Store(invertListStore,dictStore)
+	invertListStore.Close()
+	dictStore.Close()
 	mlog.Info(" %s ",iw.ToString())
 
 }
 
 func Test_InvertReader(t *testing.T) {
 
-	ir := NewStringInvertReader("abc",".")
+	invertListStore := store.NewFalconFileStoreReadService("./abc.ivt")
+	dictStore := store.NewFalconFileStoreReadService("./abc.dic")
+
+	ir := NewStringInvertReader("abc",0,dictStore,invertListStore)
 	fetch(ir,"a")
 	fetch(ir,"abc")
 	fetch(ir,"c")
-
+	invertListStore.Close()
+	dictStore.Close()
 
 }
 
 
 func Test_InvertInsert(t *testing.T) {
 
-	iw := NewStringInvertWriter("ivt_insert",".")
+	invertListStore := store.NewFalconFileStoreWriteService("./ivt_insert.ivt")
+	dictStore := store.NewFalconFileStoreWriteService("./ivt_insert.dic")
+
+	iw := NewStringInvertWriter("ivt_insert")
 
 	for i:=uint32(0);i<1000;i++{
 		iw.Put(fmt.Sprintf("k%d",i),&tools.DocId{DocID:i,Weight:i+10})
 	}
-	iw.Store()
+	iw.Store(invertListStore,dictStore)
+	invertListStore.Close()
+	dictStore.Close()
 	mlog.Info("%s",iw.ToString())
 
 }
@@ -61,4 +76,60 @@ func fetch(ir FalconStringInvertReadService,key string) {
 		return
 	}
 	mlog.Warning("Key [ %s ] not found",key)
+}
+
+
+func Test_InvertSetTest(t *testing.T) {
+
+	invertSetService := NewInvertSet("segment",".")
+	invertSetService.AddField("testfield1",tools.TFalconString)
+	invertSetService.AddField("testfield2",tools.TFalconString)
+
+	for i:=uint32(0);i<1000;i++{
+		invertSetService.PutString("testfield1",fmt.Sprintf("k%d",i),&tools.DocId{DocID:i,Weight:i+10})
+		invertSetService.PutString("testfield2",fmt.Sprintf("key%d",i),&tools.DocId{DocID:i,Weight:i+10})
+
+	}
+
+	invertSetService.Persistence()
+
+	doclist,found,err:=invertSetService.FetchString("testfield2","key88")
+
+	if err!=nil{
+		mlog.Error("Test_InvertSetTest Key [ k88 ] fatch error : %v" ,err)
+		return
+	}
+	if found {
+		mlog.Info("Test_InvertSetTest Key [ k88 ] >>> %s",doclist.ToString())
+		return
+	}
+	mlog.Warning("Test_InvertSetTest Key [ k88 ] not found")
+
+
+}
+
+func fetchField(field,key string,invertSetService FalconInvertSetService) error {
+	doclist,found,err:=invertSetService.FetchString(field,key)
+
+	if err!=nil{
+		mlog.Error("Test_InvertSetTest Field [ %s ] Key [ %s ] fatch error : %v" ,field,key,err)
+		return err
+	}
+	if found {
+		mlog.Info("Test_InvertSetTest Field [ %s ] Key [ %s ] >>> %s",field,key,doclist.ToString())
+		return nil
+	}
+	mlog.Warning("Test_InvertSetTest Field [ %s ] Key [ %s ] not found",field,key)
+	return nil
+}
+
+func Test_InvertSetReadTest(t *testing.T) {
+
+	invertSetService := NewInvertSet("segment",".")
+
+	fetchField("testfield1","k876",invertSetService)
+	fetchField("testfield2","key876",invertSetService)
+	fetchField("testfield1","fdet",invertSetService)
+	fetchField("fieldddd1","k876",invertSetService)
+
 }

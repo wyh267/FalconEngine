@@ -42,8 +42,8 @@ func NewFalconMap() FalconStringDictService {
 	return &FalconMap{dic:make(map[string]*tools.DictValue),locker:new(sync.RWMutex)}
 }
 
-func (fm *FalconMap) LoadDic(storeService store.FalconSearchStoreReadService) error{
-	_,err:=storeService.ReadMessage(0,fm)
+func (fm *FalconMap) LoadDic(storeService store.FalconSearchStoreReadService,offset int64) error{
+	_,err:=storeService.ReadMessage(offset,fm)
 	return err
 }
 

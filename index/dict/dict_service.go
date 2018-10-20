@@ -21,6 +21,6 @@ type FalconStringDictWriteService interface {
 
 type FalconStringDictReadService interface {
 	Get(key string) (*tools.DictValue,bool)
-	LoadDic(storeService store.FalconSearchStoreReadService) error
+	LoadDic(storeService store.FalconSearchStoreReadService,offset int64) error
 	tools.FalconSearchDecoder
 }
