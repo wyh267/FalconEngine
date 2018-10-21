@@ -6,6 +6,7 @@ import (
 	"github.com/FalconEngine/tools"
 	"fmt"
 	"github.com/FalconEngine/store"
+	"github.com/FalconEngine/message"
 )
 
 func Test_InvertWriter(t *testing.T) {
@@ -17,14 +18,14 @@ func Test_InvertWriter(t *testing.T) {
 
 	iw := NewStringInvertWriter("abc")
 
-	iw.Put("abc",&tools.DocId{DocID:0,Weight:10})
-	iw.Put("abc",&tools.DocId{DocID:2,Weight:12})
-	iw.Put("abc",&tools.DocId{DocID:3,Weight:13})
-	iw.Put("a",&tools.DocId{DocID:2,Weight:14})
-	iw.Put("a",&tools.DocId{DocID:9,Weight:19})
+	iw.Put("abc",&message.DocId{DocID:0,Weight:10})
+	iw.Put("abc",&message.DocId{DocID:2,Weight:12})
+	iw.Put("abc",&message.DocId{DocID:3,Weight:13})
+	iw.Put("a",&message.DocId{DocID:2,Weight:14})
+	iw.Put("a",&message.DocId{DocID:9,Weight:19})
 
-	iw.Put("b",&tools.DocId{DocID:4,Weight:14})
-	iw.Put("b",&tools.DocId{DocID:9,Weight:19})
+	iw.Put("b",&message.DocId{DocID:4,Weight:14})
+	iw.Put("b",&message.DocId{DocID:9,Weight:19})
 
 	iw.Store(invertListStore,dictStore)
 	invertListStore.Close()
@@ -56,7 +57,7 @@ func Test_InvertInsert(t *testing.T) {
 	iw := NewStringInvertWriter("ivt_insert")
 
 	for i:=uint32(0);i<1000;i++{
-		iw.Put(fmt.Sprintf("k%d",i),&tools.DocId{DocID:i,Weight:i+10})
+		iw.Put(fmt.Sprintf("k%d",i),&message.DocId{DocID:i,Weight:i+10})
 	}
 	iw.Store(invertListStore,dictStore)
 	invertListStore.Close()
@@ -86,8 +87,8 @@ func Test_InvertSetTest(t *testing.T) {
 	invertSetService.AddField("testfield2",tools.TFalconString)
 
 	for i:=uint32(0);i<1000;i++{
-		invertSetService.PutString("testfield1",fmt.Sprintf("k%d",i),&tools.DocId{DocID:i,Weight:i+10})
-		invertSetService.PutString("testfield2",fmt.Sprintf("key%d",i),&tools.DocId{DocID:i,Weight:i+10})
+		invertSetService.PutString("testfield1",fmt.Sprintf("k%d",i),&message.DocId{DocID:i,Weight:i+10})
+		invertSetService.PutString("testfield2",fmt.Sprintf("key%d",i),&message.DocId{DocID:i,Weight:i+10})
 
 	}
 

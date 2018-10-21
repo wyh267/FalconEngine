@@ -1,12 +1,12 @@
 package invert
 
 import (
-	"github.com/FalconEngine/tools"
 	"sync"
 	"github.com/FalconEngine/store"
 	"github.com/FalconEngine/mlog"
 	"github.com/FalconEngine/index/dict"
 	"fmt"
+	"github.com/FalconEngine/message"
 )
 
 type InvertWriter struct {
@@ -22,7 +22,7 @@ func NewStringInvertWriter(name string) FalconStringInvertWriteService {
 	return writer
 }
 
-func (iw *InvertWriter) Put(key string, docid *tools.DocId) error {
+func (iw *InvertWriter) Put(key string, docid *message.DocId) error {
 	iw.invertLocker.Lock()
 	defer iw.invertLocker.Unlock()
 	if _, ok := iw.tmpInvert[key]; !ok {
@@ -45,7 +45,7 @@ func (iw *InvertWriter) Store(invertListStore,dictStore store.FalconSearchStoreW
 			mlog.Error("Write Error : %v",err)
 			return -1,err
 		}
-		dictMap.Put(key,&tools.DictValue{Val:uint64(pos)})
+		dictMap.Put(key,&message.DictValue{Val:uint64(pos)})
 	}
 
 	return dictStore.AppendMessage(dictMap)

@@ -4,21 +4,22 @@ import (
 	"github.com/FalconEngine/tools"
 	"github.com/FalconEngine/store"
 	"io"
+	"github.com/FalconEngine/message"
 )
 
 
 // 倒排链
 type FalconDocList interface {
 	GetLength() int
-	GetDoc(idx int) (*tools.DocId,error)
-	Push(docid *tools.DocId) error
+	GetDoc(idx int) (*message.DocId,error)
+	Push(docid *message.DocId) error
 	tools.FalconCoder
 }
 
 
 // 字符型倒排索引写服务
 type FalconStringInvertWriteService interface {
-	Put(key string,docid *tools.DocId) error
+	Put(key string,docid *message.DocId) error
 	//Store() error
 	Store(invertListStore,dictStore store.FalconSearchStoreWriteService) (int64,error)
 	ToString() string
@@ -35,7 +36,7 @@ type FalconInvertSetService interface {
 	// 新增一个字段
 	AddField(field string,fieldType tools.FalconFieldType) error
 	// 写入
-	PutString(field,key string,docid *tools.DocId) error
+	PutString(field,key string,docid *message.DocId) error
 	// 搜索
 	FetchString(field,key string) (FalconDocList,bool,error)
 	// 持久化

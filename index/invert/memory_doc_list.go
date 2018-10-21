@@ -3,18 +3,18 @@ package invert
 import (
 	"encoding/binary"
 	"fmt"
-	"github.com/FalconEngine/tools"
 	"strings"
 	"github.com/FalconEngine/mlog"
+	"github.com/FalconEngine/message"
 )
 
 type MemoryFalconDocList struct {
-	docList []*tools.DocId
+	docList []*message.DocId
 	length  uint32
 }
 
 func NewMemoryFalconDocList() FalconDocList {
-	return &MemoryFalconDocList{docList: make([]*tools.DocId, 0), length: 0}
+	return &MemoryFalconDocList{docList: make([]*message.DocId, 0), length: 0}
 }
 
 func (mfd *MemoryFalconDocList) GetLength() int {
@@ -23,7 +23,7 @@ func (mfd *MemoryFalconDocList) GetLength() int {
 
 }
 
-func (mfd *MemoryFalconDocList) GetDoc(idx int) (*tools.DocId, error) {
+func (mfd *MemoryFalconDocList) GetDoc(idx int) (*message.DocId, error) {
 	if idx >= len(mfd.docList) || idx < 0 {
 		return nil, fmt.Errorf("Outof ...")
 	}
@@ -32,7 +32,7 @@ func (mfd *MemoryFalconDocList) GetDoc(idx int) (*tools.DocId, error) {
 
 }
 
-func (mfd *MemoryFalconDocList) Push(docid *tools.DocId) error {
+func (mfd *MemoryFalconDocList) Push(docid *message.DocId) error {
 
 	if mfd.length>0 && docid.DocID <= mfd.docList[mfd.length-1].DocID {
 		mlog.Error("Doc Id [ %d ] is wrong,max id is : [ %d ]", docid.DocID, mfd.docList[mfd.length-1].DocID)
@@ -61,9 +61,9 @@ func (mfd *MemoryFalconDocList) FalconEncoding() ([]byte, error) {
 
 func (mfd *MemoryFalconDocList) FalconDecoding(bytes []byte) error {
 
-	mfd.docList = make([]*tools.DocId, 0)
+	mfd.docList = make([]*message.DocId, 0)
 	for pos := 8; pos < len(bytes); pos += 8 {
-		docid := &tools.DocId{DocID: binary.LittleEndian.Uint32(bytes[pos : pos+4]), Weight: binary.LittleEndian.Uint32(bytes[pos+4 : pos+8])}
+		docid := &message.DocId{DocID: binary.LittleEndian.Uint32(bytes[pos : pos+4]), Weight: binary.LittleEndian.Uint32(bytes[pos+4 : pos+8])}
 		mfd.docList = append(mfd.docList, docid)
 	}
 	mfd.length = uint32(len(mfd.docList))

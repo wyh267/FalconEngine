@@ -2,9 +2,9 @@ package dict
 
 import (
 	"testing"
-	"github.com/FalconEngine/tools"
 	"github.com/FalconEngine/store"
 	"github.com/FalconEngine/mlog"
+	"github.com/FalconEngine/message"
 )
 
 func Test_DictMap(t *testing.T) {
@@ -12,9 +12,9 @@ func Test_DictMap(t *testing.T) {
 	mlog.Start(mlog.LevelInfo, "dictmap.log")
 
 	mapWriter := NewFalconWriteMap()
-	mapWriter.Put("hello",&tools.DictValue{Val:100,ExtVal:200})
-	mapWriter.Put("hello2",&tools.DictValue{Val:200,ExtVal:202})
-	mapWriter.Put("hello3",&tools.DictValue{Val:300,ExtVal:203})
+	mapWriter.Put("hello",&message.DictValue{Val:100,ExtVal:200})
+	mapWriter.Put("hello2",&message.DictValue{Val:200,ExtVal:202})
+	mapWriter.Put("hello3",&message.DictValue{Val:300,ExtVal:203})
 	mlog.Info("%s",mapWriter.ToString())
 	mlog.Info("Write to file ...")
 	fmapWriter := store.NewFalconFileStoreWriteService("./map.dic")

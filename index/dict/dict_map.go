@@ -2,11 +2,11 @@ package dict
 
 import (
 	"fmt"
-	"github.com/FalconEngine/tools"
 	"encoding/binary"
 	"sync"
 	"github.com/FalconEngine/store"
 	"github.com/FalconEngine/mlog"
+	"github.com/FalconEngine/message"
 )
 
 type FalconString string
@@ -26,20 +26,20 @@ func (fs FalconString) FalconDecoding(bytes []byte) error {
 
 
 type FalconMap struct {
-	dic map[string]*tools.DictValue
+	dic map[string]*message.DictValue
 	locker *sync.RWMutex
 }
 
 func NewFalconWriteMap() FalconStringDictWriteService {
-	return &FalconMap{dic:make(map[string]*tools.DictValue),locker:new(sync.RWMutex)}
+	return &FalconMap{dic:make(map[string]*message.DictValue),locker:new(sync.RWMutex)}
 }
 
 func NewFalconReadMap() FalconStringDictReadService {
-	return &FalconMap{dic:make(map[string]*tools.DictValue),locker:new(sync.RWMutex)}
+	return &FalconMap{dic:make(map[string]*message.DictValue),locker:new(sync.RWMutex)}
 }
 
 func NewFalconMap() FalconStringDictService {
-	return &FalconMap{dic:make(map[string]*tools.DictValue),locker:new(sync.RWMutex)}
+	return &FalconMap{dic:make(map[string]*message.DictValue),locker:new(sync.RWMutex)}
 }
 
 func (fm *FalconMap) LoadDic(storeService store.FalconSearchStoreReadService,offset int64) error{
@@ -78,7 +78,7 @@ func (fm *FalconMap) FalconDecoding(bytes []byte) error {
 		keyLen := int(binary.LittleEndian.Uint64(bytes[pos:pos+8]))
 		key := string(bytes[pos+8:pos+8+keyLen])
 		valLen := int(binary.LittleEndian.Uint64(bytes[pos+8+keyLen:pos+8+keyLen+8]))
-		val := tools.NewDicValue()
+		val := message.NewDicValue()
 		val.FalconDecoding(bytes[pos+8+keyLen:pos+8+keyLen+8+valLen])
 		fm.dic[key] = val
 		pos = pos + (8+keyLen+8+valLen)
@@ -96,14 +96,14 @@ func (fm *FalconMap) ToString() string {
 	return result
 }
 
-func (fm *FalconMap) Put(key string, dv *tools.DictValue) error {
+func (fm *FalconMap) Put(key string, dv *message.DictValue) error {
 	fm.locker.Lock()
 	defer fm.locker.Unlock()
 	fm.dic[key] = dv
 	return nil
 }
 
-func (fm *FalconMap) Get(key string) (*tools.DictValue, bool) {
+func (fm *FalconMap) Get(key string) (*message.DictValue, bool) {
 	fm.locker.RLock()
 	defer fm.locker.RUnlock()
 	v,ok:=fm.dic[key]

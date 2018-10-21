@@ -13,3 +13,15 @@ message BinlogMessage {
     int64 LogTimestamp = 2;
     bytes LogDetail = 3;
 }
+
+
+message DictValue {
+    uint64 Val = 1;
+    uint64 ExtVal = 2;
+}
+
+
+message DocId {
+	 uint32 DocID = 1;
+	 uint32 Weight =2;
+}

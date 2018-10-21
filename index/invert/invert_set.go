@@ -8,6 +8,7 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"strings"
+	"github.com/FalconEngine/message"
 )
 
 
@@ -25,8 +26,8 @@ type InvertSet struct {
 
 
 
-	invertListStoreWriter store.FalconSearchStoreWriteService
-	dictStoreWriter store.FalconSearchStoreWriteService
+	//invertListStoreWriter store.FalconSearchStoreWriteService
+	//dictStoreWriter store.FalconSearchStoreWriteService
 
 
 	invertListStoreReader store.FalconSearchStoreReadService
@@ -61,8 +62,7 @@ func NewInvertSet(name string,path string) FalconInvertSetService {
 
 
 	is.mode = tools.TWriteMode
-	is.invertListStoreWriter = store.NewFalconFileStoreWriteService(ivtFile)
-	is.dictStoreWriter = store.NewFalconFileStoreWriteService(dicFile)
+
 	mlog.Info("Start InvertSetService with write mode success ...")
 
 	return is
@@ -103,7 +103,7 @@ func (is *InvertSet) AddField(field string, fieldType tools.FalconFieldType) err
 
 }
 
-func (is *InvertSet) PutString(field, key string, docid *tools.DocId) error {
+func (is *InvertSet) PutString(field, key string, docid *message.DocId) error {
 
 	if is.mode & tools.TWriteMode != tools.TWriteMode {
 		mlog.Error("not write mode ...")
@@ -142,20 +142,28 @@ func (is *InvertSet) Persistence() error {
 		return fmt.Errorf("not write mode")
 	}
 
+	metaFile := is.path + "/" + is.name + ".mt"
+	ivtFile := is.path + "/" + is.name + ".ivt"
+	dicFile := is.path + "/" + is.name + ".dic"
+
+
+	invertListStoreWriter := store.NewFalconFileStoreWriteService(ivtFile)
+	dictStoreWriter := store.NewFalconFileStoreWriteService(dicFile)
+
 	// 持久化数据
 	for fieldName,ivtWriter := range is.stringInvertWriteServices {
-		offset,err:=ivtWriter.Store(is.invertListStoreWriter,is.dictStoreWriter)
+		offset,err:=ivtWriter.Store(invertListStoreWriter,dictStoreWriter)
 		if err != nil {
 			mlog.Error("Persistence [ %s ] failure : %v",fieldName,err)
 			return err
 		}
 		is.fieldInformations[fieldName].Offset = offset
 	}
-	is.invertListStoreWriter.Close()
-	is.dictStoreWriter.Close()
+	invertListStoreWriter.Close()
+	dictStoreWriter.Close()
 
 	// 持久化元数据
-	metaStoreWriter := store.NewFalconFileStoreWriteService(is.path + "/" + is.name + ".mt")
+	metaStoreWriter := store.NewFalconFileStoreWriteService(metaFile)
 	metaStoreWriter.AppendMessage(is)
 	metaStoreWriter.Close()
 
