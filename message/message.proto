@@ -1,0 +1,27 @@
+syntax = "proto3";
+package message;
+
+
+
+message FalconSearchStoreInfo {
+    string StoreName = 1;
+    int64 StoreLength = 2;
+}
+
+message BinlogMessage {
+    int64 LogId = 1;
+    int64 LogTimestamp = 2;
+    bytes LogDetail = 3;
+}
+
+
+message DictValue {
+    uint64 Val = 1;
+    uint64 ExtVal = 2;
+}
+
+
+message DocId {
+	 uint32 DocID = 1;
+	 uint32 Weight =2;
+}
