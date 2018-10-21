@@ -7,6 +7,7 @@ import (
 	"github.com/FalconEngine/store"
 	"encoding/binary"
 	"encoding/json"
+	"strings"
 )
 
 
@@ -175,9 +176,24 @@ func (is *InvertSet) Persistence() error {
 
 }
 
+func (is *InvertSet) Close() error {
+
+	// TODO 判断
+	is.dictStoreReader.Close()
+	is.invertListStoreReader.Close()
+
+	return nil
+}
+
 func (is *InvertSet) ToString() string {
 
-	return fmt.Sprintf("no things")
+	info := make([]string,0)
+	for _,fi:=range is.fieldInformations {
+		info = append(info,fi.ToString())
+	}
+
+
+	return fmt.Sprintf("[[\n%s\n]]",strings.Join(info,"\n"))
 }
 
 func (is *InvertSet) FalconEncoding() ([]byte, error) {
@@ -189,10 +205,6 @@ func (is *InvertSet) FalconEncoding() ([]byte, error) {
 		return nil,err
 	}
 	encBytes = append(encBytes,bj...)
-	//for _, fi := range is.fieldInformations {
-	//	by,_:=fi.FalconEncoding()
-	//	encBytes = append(encBytes,by...)
-	//}
 	binary.LittleEndian.PutUint64(encBytes[:8],uint64(len(encBytes)))
 
 	return encBytes,nil

@@ -3,6 +3,7 @@ package invert
 import (
 	"github.com/FalconEngine/tools"
 	"github.com/FalconEngine/store"
+	"io"
 )
 
 
@@ -39,6 +40,8 @@ type FalconInvertSetService interface {
 	FetchString(field,key string) (FalconDocList,bool,error)
 	// 持久化
 	Persistence() error
+	// 关闭
+	io.Closer
 
 	ToString() string
 }

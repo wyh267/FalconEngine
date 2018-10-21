@@ -132,4 +132,8 @@ func Test_InvertSetReadTest(t *testing.T) {
 	fetchField("testfield1","fdet",invertSetService)
 	fetchField("fieldddd1","k876",invertSetService)
 
+	invertSetService.Close()
+
+	mlog.Info("set info : %s ",invertSetService.ToString())
+
 }
