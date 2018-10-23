@@ -25,3 +25,13 @@ message DocId {
 	 uint32 DocID = 1;
 	 uint32 Weight =2;
 }
+
+
+message FieldValue {
+    string field = 1;
+    bytes value = 2;
+}
+
+message Document {
+    repeated FieldValue val = 1;
+}

@@ -95,3 +95,31 @@ const (
 	TReadMode FalconMode = 0x0002
 	TRWMode FalconMode = 0x0003
 )
+
+
+const (
+	TKeywordType string = "keyword"
+	TTextType string = "text"
+)
+
+
+type FalconMapping struct{
+	FieldName string
+	FieldType string
+}
+
+func (fm *FalconMapping) GetFieldInfo() (*FalconFieldInfo,error) {
+
+	switch fm.FieldType {
+	case TKeywordType:
+		fallthrough
+	case TTextType:
+		return &FalconFieldInfo{Name:fm.FieldName,Type:TFalconString},nil
+	default:
+		return nil,fmt.Errorf("Mapping is not right [ %s ]",fm.FieldType)
+	}
+
+}
+
+
+
