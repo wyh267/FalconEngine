@@ -16,7 +16,12 @@ type FalconSegmentService interface {
 	io.Closer
 	ToString() string
 
+	Number() uint32
+	DocumentCount() uint32
+	Name() string
 
 	SimpleSearch(field,keyword string) (invert.FalconDocList,bool,error)
+
+
 
 }

@@ -11,13 +11,12 @@ func Test_Segment(t *testing.T) {
 
 	mlog.Start(mlog.LevelInfo, "iw.log")
 
-	mappings:=make(map[string]*tools.FalconMapping)
+	mappings:=tools.NewFalconIndexMappings()
+	mappings.AddFieldMapping(&tools.FalconMapping{FieldName:"field1",FieldType:tools.TKeywordType})
+	mappings.AddFieldMapping(&tools.FalconMapping{FieldName:"field2",FieldType:tools.TKeywordType})
 
-	mappings["field1"] = &tools.FalconMapping{FieldName:"field1",FieldType:tools.TKeywordType}
-	mappings["field2"] = &tools.FalconMapping{FieldName:"field2",FieldType:tools.TKeywordType}
 
-
-	sg := NewFalconSegment(uint32(0),"test_index",".",&mappings)
+	sg := NewFalconSegment(uint32(0),"test_index","./test_segment",mappings)
 
 	for i:=0;i<100;i++{
 		doc := make(map[string]interface{})
@@ -31,4 +30,19 @@ func Test_Segment(t *testing.T) {
 	sg.Persistence()
 	l,_,_:=sg.SimpleSearch("field2","1112")
 	mlog.Info("%s",l.ToString())
+	sg.Close()
+}
+
+func Test_LoadSegment(t *testing.T) {
+
+
+	mappings:=tools.NewFalconIndexMappings()
+	mappings.AddFieldMapping(&tools.FalconMapping{FieldName:"field1",FieldType:tools.TKeywordType})
+	mappings.AddFieldMapping(&tools.FalconMapping{FieldName:"field2",FieldType:tools.TKeywordType})
+
+	sg := LoadFalconSegment(uint32(0),"test_index","./test_segment",mappings)
+
+	l,_,_:=sg.SimpleSearch("field2","1112")
+	mlog.Info("%s",l.ToString())
+	sg.Close()
 }

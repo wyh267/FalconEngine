@@ -25,25 +25,24 @@ func NewDicValue() *DictValue{
 }
 
 func (dv *DictValue) FalconEncoding() ([]byte,error) {
-	b:=make([]byte,24)
-	binary.LittleEndian.PutUint64(b[:8],uint64(16))
-	binary.LittleEndian.PutUint64(b[8:16],dv.Val)
-	binary.LittleEndian.PutUint64(b[16:],dv.ExtVal)
+	b:=make([]byte,16)
+	binary.LittleEndian.PutUint64(b[:8],dv.Offset)
+	binary.LittleEndian.PutUint64(b[8:],dv.Length)
 	return b,nil
 
 }
 
 func (dv *DictValue) FalconDecoding(src []byte) error {
-	if len(src)!=24{
+	if len(src)!=16{
 		return fmt.Errorf("Length is not 24 byte")
 	}
-	dv.Val=binary.LittleEndian.Uint64(src[8:16])
-	dv.ExtVal=binary.LittleEndian.Uint64(src[16:])
+	dv.Offset=binary.LittleEndian.Uint64(src[:8])
+	dv.Length=binary.LittleEndian.Uint64(src[8:])
 	return nil
 }
 
 func (dv *DictValue) ToString() string {
-	return fmt.Sprintf(`{ "Val": %d , "ExtVal"：%d }`,dv.Val,dv.ExtVal)
+	return fmt.Sprintf(`{ "offset": %d , "length"：%d }`,dv.Offset,dv.Length)
 }
 
 

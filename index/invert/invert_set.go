@@ -1,16 +1,16 @@
 package invert
 
+
 import (
 	"github.com/FalconEngine/tools"
-	"fmt"
-	"github.com/FalconEngine/mlog"
 	"github.com/FalconEngine/store"
-	"encoding/binary"
-	"encoding/json"
-	"strings"
+	"github.com/FalconEngine/mlog"
+	"fmt"
 	"github.com/FalconEngine/message"
+	"strings"
+	"encoding/json"
+	"encoding/binary"
 )
-
 
 // 倒排索引集合
 type InvertSet struct {
@@ -53,7 +53,7 @@ func NewInvertSet(name string,path string) FalconInvertSetService {
 	if tools.Exists(metaFile) && tools.Exists(ivtFile) && tools.Exists(dicFile) {
 		is.invertListStoreReader = store.NewFalconFileStoreReadService(ivtFile)
 		is.dictStoreReader = store.NewFalconFileStoreReadService(dicFile)
-		if err:=is.init(metaFile);err!=nil{
+		if err:=is.init();err!=nil{
 			return nil
 		}
 		mlog.Info("Load InvertSetService with read mode success ...")
@@ -71,14 +71,14 @@ func NewInvertSet(name string,path string) FalconInvertSetService {
 
 }
 
-func (is *InvertSet) init(metaFile string) error {
+func (is *InvertSet) init() error {
 
-	metaReader := store.NewFalconFileStoreReadService(metaFile)
-	if _,err:=metaReader.ReadMessage(0,is);err!=nil{
+	if err:=is.loadMeta();err!=nil{
+		mlog.Error("load meta error : %v",err)
 		return err
 	}
 	is.mode = tools.TReadMode
-	return metaReader.Close()
+	return nil
 }
 
 
@@ -142,7 +142,6 @@ func (is *InvertSet) Persistence() error {
 		return fmt.Errorf("not write mode")
 	}
 
-	metaFile := is.path + "/" + is.name + ".mt"
 	ivtFile := is.path + "/" + is.name + ".ivt"
 	dicFile := is.path + "/" + is.name + ".dic"
 
@@ -152,20 +151,19 @@ func (is *InvertSet) Persistence() error {
 
 	// 持久化数据
 	for fieldName,ivtWriter := range is.stringInvertWriteServices {
-		offset,err:=ivtWriter.Store(invertListStoreWriter,dictStoreWriter)
+		offset,err:=ivtWriter.Persistence(invertListStoreWriter,dictStoreWriter)
 		if err != nil {
 			mlog.Error("Persistence [ %s ] failure : %v",fieldName,err)
 			return err
 		}
+		//mlog.Info("field : %s dic offset : %d",fieldName,offset)
 		is.fieldInformations[fieldName].Offset = offset
 	}
 	invertListStoreWriter.Close()
 	dictStoreWriter.Close()
 
 	// 持久化元数据
-	metaStoreWriter := store.NewFalconFileStoreWriteService(metaFile)
-	metaStoreWriter.AppendMessage(is)
-	metaStoreWriter.Close()
+	is.storeMeta()
 
 
 	// 重新以只读方式读取所有数据
@@ -174,7 +172,7 @@ func (is *InvertSet) Persistence() error {
 
 
 	for _,fi := range is.fieldInformations {
-		mlog.Info("Field Information : %s",fi.ToString())
+		//mlog.Info("Field Information : %s",fi.ToString())
 		is.stringInvertReadServices[fi.Name] = NewStringInvertReader(fi.Name,fi.Offset,is.dictStoreReader,is.invertListStoreReader)
 	}
 	is.mode = tools.TReadMode
@@ -205,23 +203,23 @@ func (is *InvertSet) ToString() string {
 }
 
 func (is *InvertSet) FalconEncoding() ([]byte, error) {
-	encBytes := make([]byte, 8)
+	//encBytes := make([]byte, 0)
 
 	bj,err:=json.Marshal(is.fieldInformations)
 	if err!=nil {
 		mlog.Error("json : %v",err)
 		return nil,err
 	}
-	encBytes = append(encBytes,bj...)
-	binary.LittleEndian.PutUint64(encBytes[:8],uint64(len(encBytes)))
+	//encBytes = append(encBytes,bj...)
+	//binary.LittleEndian.PutUint64(encBytes[:8],uint64(len(encBytes)))
 
-	return encBytes,nil
+	return bj,nil
 
 }
 
 func (is *InvertSet) FalconDecoding(bytes []byte) error {
 
-	json.Unmarshal(bytes[8:],&is.fieldInformations)
+	json.Unmarshal(bytes,&is.fieldInformations)
 
 	for _,fi:=range is.fieldInformations {
 		is.stringInvertReadServices[fi.Name] = NewStringInvertReader(fi.Name,fi.Offset,is.dictStoreReader,is.invertListStoreReader)
@@ -229,5 +227,51 @@ func (is *InvertSet) FalconDecoding(bytes []byte) error {
 
 	return nil
 
+
+}
+
+
+func (is *InvertSet) loadMeta() error {
+
+	metaFile := is.path + "/" + is.name + ".mt"
+
+	metaReader := store.NewFalconFileStoreReadService(metaFile)
+	lensBytes := make([]byte,8)
+	if err:=metaReader.ReadFullBytesAt(0,lensBytes);err!=nil{
+		return err
+	}
+	metaBytes := make([]byte,binary.LittleEndian.Uint64(lensBytes))
+	if err:=metaReader.ReadFullBytesAt(8,metaBytes);err!=nil{
+		mlog.Error("read meta bytes error : %v",err)
+		return err
+	}
+	if err:=is.FalconDecoding(metaBytes);err!=nil{
+		mlog.Error("decoding error : %v",err)
+		return err
+	}
+
+	return metaReader.Close()
+
+}
+
+func (is *InvertSet) storeMeta() error {
+
+	metaFile := is.path + "/" + is.name + ".mt"
+
+	// 持久化元数据
+	metaStoreWriter := store.NewFalconFileStoreWriteService(metaFile)
+	metaBytes,err:=is.FalconEncoding()
+	if err != nil {
+		mlog.Error(" encoding meta error : %v",err)
+		return err
+	}
+	// 写入长度
+	metaLensBytes := make([]byte,8)
+	binary.LittleEndian.PutUint64(metaLensBytes,uint64(len(metaBytes)))
+	metaStoreWriter.AppendBytes(metaLensBytes)
+	metaStoreWriter.AppendBytes(metaBytes)
+	metaStoreWriter.Close()
+
+	return nil
 
 }

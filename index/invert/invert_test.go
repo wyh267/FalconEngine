@@ -3,10 +3,10 @@ package invert
 import (
 	"testing"
 	"github.com/FalconEngine/mlog"
-	"github.com/FalconEngine/tools"
 	"fmt"
 	"github.com/FalconEngine/store"
 	"github.com/FalconEngine/message"
+	"github.com/FalconEngine/tools"
 )
 
 func Test_InvertWriter(t *testing.T) {
@@ -27,7 +27,7 @@ func Test_InvertWriter(t *testing.T) {
 	iw.Put("b",&message.DocId{DocID:4,Weight:14})
 	iw.Put("b",&message.DocId{DocID:9,Weight:19})
 
-	iw.Store(invertListStore,dictStore)
+	iw.Persistence(invertListStore,dictStore)
 	invertListStore.Close()
 	dictStore.Close()
 	mlog.Info(" %s ",iw.ToString())
@@ -59,12 +59,29 @@ func Test_InvertInsert(t *testing.T) {
 	for i:=uint32(0);i<1000;i++{
 		iw.Put(fmt.Sprintf("k%d",i),&message.DocId{DocID:i,Weight:i+10})
 	}
-	iw.Store(invertListStore,dictStore)
+	iw.Persistence(invertListStore,dictStore)
 	invertListStore.Close()
 	dictStore.Close()
-	mlog.Info("%s",iw.ToString())
+	//mlog.Info("%s",iw.ToString())
 
 }
+
+
+func Test_InvertReader2(t *testing.T) {
+
+	invertListStore := store.NewFalconFileStoreReadService("./ivt_insert.ivt")
+	dictStore := store.NewFalconFileStoreReadService("./ivt_insert.dic")
+
+	ir := NewStringInvertReader("ivt_insert",0,dictStore,invertListStore)
+	fetch(ir,"a")
+	fetch(ir,"abc")
+	fetch(ir,"k50")
+	invertListStore.Close()
+	dictStore.Close()
+
+}
+
+
 
 func fetch(ir FalconStringInvertReadService,key string) {
 	doclist,found,err:=ir.Fetch(key)

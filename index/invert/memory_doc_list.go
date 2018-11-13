@@ -8,6 +8,8 @@ import (
 	"github.com/FalconEngine/message"
 )
 
+
+
 type MemoryFalconDocList struct {
 	docList []*message.DocId
 	length  uint32
@@ -47,10 +49,9 @@ func (mfd *MemoryFalconDocList) Push(docid *message.DocId) error {
 
 func (mfd *MemoryFalconDocList) FalconEncoding() ([]byte, error) {
 
-	lens := mfd.length*8 + 8
+	lens := mfd.length*8
 	bytes := make([]byte, lens)
-	binary.LittleEndian.PutUint64(bytes[:8], uint64(len(bytes)))
-	pos := 8
+	pos:=0
 	for _, docid := range mfd.docList {
 		binary.LittleEndian.PutUint32(bytes[pos:pos+4], docid.DocID)
 		binary.LittleEndian.PutUint32(bytes[pos+4:pos+8], docid.Weight)
@@ -62,7 +63,7 @@ func (mfd *MemoryFalconDocList) FalconEncoding() ([]byte, error) {
 func (mfd *MemoryFalconDocList) FalconDecoding(bytes []byte) error {
 
 	mfd.docList = make([]*message.DocId, 0)
-	for pos := 8; pos < len(bytes); pos += 8 {
+	for pos := 0; pos < len(bytes); pos += 8 {
 		docid := &message.DocId{DocID: binary.LittleEndian.Uint32(bytes[pos : pos+4]), Weight: binary.LittleEndian.Uint32(bytes[pos+4 : pos+8])}
 		mfd.docList = append(mfd.docList, docid)
 	}

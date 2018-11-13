@@ -39,7 +39,14 @@ func (ir *InvertReader) Fetch(key string) (FalconDocList, bool, error) {
 		return nil,false,nil
 	}
 	docList := NewMemoryFalconDocList()
-	_,err:=ir.ivtReader.ReadMessage(int64(dv.Val),docList)
-	return docList,found,err
+	by:=make([]byte,dv.Length*8)
+	if err:=ir.ivtReader.ReadFullBytesAt(int64(dv.Offset),by);err!=nil{
+		return nil,false,err
+	}
+	if err:=docList.FalconDecoding(by);err!=nil{
+		return nil,false,err
+	}
+	//_,err:=ir.ivtReader.ReadMessage(int64(dv.Offset),docList)
+	return docList,found,nil
 
 }

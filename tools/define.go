@@ -2,6 +2,7 @@ package tools
 
 import (
 	"fmt"
+	"sync"
 )
 
 type FalconSearchEncoder interface {
@@ -103,6 +104,8 @@ const (
 )
 
 
+
+
 type FalconMapping struct{
 	FieldName string
 	FieldType string
@@ -122,4 +125,42 @@ func (fm *FalconMapping) GetFieldInfo() (*FalconFieldInfo,error) {
 }
 
 
+type FalconIndexMappings struct {
 
+	mappingLocker *sync.RWMutex
+	Mappings map[string]*FalconMapping
+}
+
+func NewFalconIndexMappings() *FalconIndexMappings {
+	return &FalconIndexMappings{mappingLocker:new(sync.RWMutex),Mappings:make(map[string]*FalconMapping)}
+}
+
+func (fim *FalconIndexMappings) GetMappings() []*FalconMapping {
+	mappings := make([]*FalconMapping,0)
+	fim.mappingLocker.RLock()
+	defer fim.mappingLocker.RUnlock()
+	for _,v:=range fim.Mappings {
+		mappings=append(mappings,v)
+	}
+	return mappings
+
+}
+
+func (fim *FalconIndexMappings) GetFieldMapping(name string) (*FalconMapping,bool) {
+	fim.mappingLocker.RLock()
+	defer fim.mappingLocker.RUnlock()
+	v,ok:= fim.Mappings[name]
+	return v,ok
+}
+
+func (fim *FalconIndexMappings) AddFieldMapping(fieldMapping *FalconMapping) error {
+	fim.mappingLocker.Lock()
+	defer fim.mappingLocker.Unlock()
+	if _,ok:=fim.Mappings[fieldMapping.FieldName];!ok {
+		fim.Mappings[fieldMapping.FieldName] = fieldMapping
+		return nil
+	}
+
+	return fmt.Errorf("mapping [ %s ] is already exist",fieldMapping.FieldName)
+
+}

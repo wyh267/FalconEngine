@@ -21,7 +21,7 @@ type FalconDocList interface {
 type FalconStringInvertWriteService interface {
 	Put(key string,docid *message.DocId) error
 	//Store() error
-	Store(invertListStore,dictStore store.FalconSearchStoreWriteService) (int64,error)
+	Persistence(invertListStore,dictStore store.FalconSearchStoreWriteService) (int64,error)
 	ToString() string
 }
 

@@ -16,8 +16,8 @@ message BinlogMessage {
 
 
 message DictValue {
-    uint64 Val = 1;
-    uint64 ExtVal = 2;
+    uint64 Offset = 1;
+    uint64 Length = 2;
 }
 
 

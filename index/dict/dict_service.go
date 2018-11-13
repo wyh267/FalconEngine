@@ -8,15 +8,16 @@ import (
 
 // 字典服务
 type FalconStringDictService interface {
+
 	Put(key string,dv *message.DictValue) error
 	Get(key string) (*message.DictValue,bool)
-	WriteDic(storeService store.FalconSearchStoreWriteService) (int64,error)
+	Persistence(storeService store.FalconSearchStoreWriteService) (int64,error)
 	tools.FalconSearchEncoder
 }
 
 type FalconStringDictWriteService interface {
 	Put(key string,dv *message.DictValue) error
-	WriteDic(storeService store.FalconSearchStoreWriteService) (int64,error)
+	Persistence(storeService store.FalconSearchStoreWriteService) (int64,error)
 	tools.FalconSearchEncoder
 }
 
