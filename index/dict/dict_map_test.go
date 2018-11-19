@@ -26,7 +26,7 @@ func Test_DictMap(t *testing.T) {
 	fmapWriter.Close()
 
 
-	fmapReader := store.NewFalconFileStoreReadService("./map.dic")
+	fmapReader := store.NewFalconSearchStoreReadService("./map.dic")
 	mapReader := NewFalconReadMap()
 	if err:=mapReader.LoadDic(fmapReader,0);err!=nil{
 		mlog.Error("load error %v",err)

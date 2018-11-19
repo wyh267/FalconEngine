@@ -63,6 +63,13 @@ func NewFalconFileStoreReadService(name string) FalconSearchStoreReadService {
 //
 //}
 
+
+func (fms *FalconSearchFileStore) ReadFullBytes(offset int64,lens int64) ([]byte,error){
+
+
+	return nil,fmt.Errorf("FalconSearchFileStore length is out of range")
+}
+
 func (sw *FalconSearchFileStore) ReadFullBytesAt(offset int64, details []byte) error {
 
 	sw.storer.Seek(offset,0)

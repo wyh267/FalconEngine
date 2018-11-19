@@ -36,8 +36,8 @@ func Test_InvertWriter(t *testing.T) {
 
 func Test_InvertReader(t *testing.T) {
 
-	invertListStore := store.NewFalconFileStoreReadService("./abc.ivt")
-	dictStore := store.NewFalconFileStoreReadService("./abc.dic")
+	invertListStore := store.NewFalconSearchStoreReadService("./abc.ivt")
+	dictStore := store.NewFalconSearchStoreReadService("./abc.dic")
 
 	ir := NewStringInvertReader("abc",0,dictStore,invertListStore)
 	fetch(ir,"a")
@@ -69,8 +69,8 @@ func Test_InvertInsert(t *testing.T) {
 
 func Test_InvertReader2(t *testing.T) {
 
-	invertListStore := store.NewFalconFileStoreReadService("./ivt_insert.ivt")
-	dictStore := store.NewFalconFileStoreReadService("./ivt_insert.dic")
+	invertListStore := store.NewFalconSearchStoreReadService("./ivt_insert.ivt")
+	dictStore := store.NewFalconSearchStoreReadService("./ivt_insert.dic")
 
 	ir := NewStringInvertReader("ivt_insert",0,dictStore,invertListStore)
 	fetch(ir,"a")

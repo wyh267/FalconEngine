@@ -51,8 +51,8 @@ func NewInvertSet(name string,path string) FalconInvertSetService {
 	dicFile := path + "/" + name + ".dic"
 
 	if tools.Exists(metaFile) && tools.Exists(ivtFile) && tools.Exists(dicFile) {
-		is.invertListStoreReader = store.NewFalconFileStoreReadService(ivtFile)
-		is.dictStoreReader = store.NewFalconFileStoreReadService(dicFile)
+		is.invertListStoreReader = store.NewFalconSearchStoreReadService(ivtFile)
+		is.dictStoreReader = store.NewFalconSearchStoreReadService(dicFile)
 		if err:=is.init();err!=nil{
 			return nil
 		}
@@ -167,8 +167,8 @@ func (is *InvertSet) Persistence() error {
 
 
 	// 重新以只读方式读取所有数据
-	is.invertListStoreReader = store.NewFalconFileStoreReadService(is.path + "/" + is.name + ".ivt")
-	is.dictStoreReader = store.NewFalconFileStoreReadService(is.path + "/" + is.name + ".dic")
+	is.invertListStoreReader = store.NewFalconSearchStoreReadService(is.path + "/" + is.name + ".ivt")
+	is.dictStoreReader = store.NewFalconSearchStoreReadService(is.path + "/" + is.name + ".dic")
 
 
 	for _,fi := range is.fieldInformations {
@@ -235,16 +235,29 @@ func (is *InvertSet) loadMeta() error {
 
 	metaFile := is.path + "/" + is.name + ".mt"
 
-	metaReader := store.NewFalconFileStoreReadService(metaFile)
-	lensBytes := make([]byte,8)
-	if err:=metaReader.ReadFullBytesAt(0,lensBytes);err!=nil{
+	metaReader := store.NewFalconSearchStoreReadService(metaFile)
+	// delete by wuyinghao
+	//lensBytes := make([]byte,8)
+	//if err:=metaReader.ReadFullBytesAt(0,lensBytes);err!=nil{
+	//	return err
+	//}
+	//metaBytes := make([]byte,binary.LittleEndian.Uint64(lensBytes))
+	//if err:=metaReader.ReadFullBytesAt(8,metaBytes);err!=nil{
+	//	mlog.Error("read meta bytes error : %v",err)
+	//	return err
+	//}
+
+	lensBytes,err:=metaReader.ReadFullBytes(0,8)
+	if err!=nil{
 		return err
 	}
-	metaBytes := make([]byte,binary.LittleEndian.Uint64(lensBytes))
-	if err:=metaReader.ReadFullBytesAt(8,metaBytes);err!=nil{
+	metaBytes,err:=metaReader.ReadFullBytes(8,int64(binary.LittleEndian.Uint64(lensBytes)))
+	if err!=nil{
 		mlog.Error("read meta bytes error : %v",err)
 		return err
 	}
+
+
 	if err:=is.FalconDecoding(metaBytes);err!=nil{
 		mlog.Error("decoding error : %v",err)
 		return err

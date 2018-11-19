@@ -39,10 +39,16 @@ func (ir *InvertReader) Fetch(key string) (FalconDocList, bool, error) {
 		return nil,false,nil
 	}
 	docList := NewMemoryFalconDocList()
-	by:=make([]byte,dv.Length*8)
-	if err:=ir.ivtReader.ReadFullBytesAt(int64(dv.Offset),by);err!=nil{
+	// delete by wuyinghao
+	//by:=make([]byte,dv.Length*8)
+	//if err:=ir.ivtReader.ReadFullBytesAt(int64(dv.Offset),by);err!=nil{
+	//	return nil,false,err
+	//}
+	by,err:=ir.ivtReader.ReadFullBytes(int64(dv.Offset),int64(dv.Length*8))
+	if err!=nil{
 		return nil,false,err
 	}
+
 	if err:=docList.FalconDecoding(by);err!=nil{
 		return nil,false,err
 	}

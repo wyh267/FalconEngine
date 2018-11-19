@@ -54,13 +54,20 @@ func (fm *FalconMap) storeHeader(storeService store.FalconSearchStoreWriteServic
 
 func (fm *FalconMap) loadHeader(storeService store.FalconSearchStoreReadService) error {
 
-	blength := make([]byte,8)
-	if err:=storeService.ReadFullBytesAt(fm.startOffset,blength);err!=nil{
+	// delete by wuyinghao
+	//blength := make([]byte,8)
+	//if err:=storeService.ReadFullBytesAt(fm.startOffset,blength);err!=nil{
+	//	return err
+	//}
+
+	//blength := make([]byte,8)
+	if blength,err:=storeService.ReadFullBytes(fm.startOffset,8);err!=nil{
 		return err
+	}else{
+		fm.storeBodyLength = binary.LittleEndian.Uint64(blength)
+		return nil
 	}
 
-	fm.storeBodyLength = binary.LittleEndian.Uint64(blength)
-	return nil
 
 }
 
@@ -68,12 +75,22 @@ func (fm *FalconMap) LoadDic(storeService store.FalconSearchStoreReadService,off
 
 	fm.startOffset = offset
 	fm.loadHeader(storeService)
-	mapStoreBody := make([]byte,fm.storeBodyLength)
-	if err:=storeService.ReadFullBytesAt(offset+8,mapStoreBody);err!=nil{
+
+	// delete by wuyinghao
+	//mapStoreBody := make([]byte,fm.storeBodyLength)
+	//if err:=storeService.ReadFullBytesAt(offset+8,mapStoreBody);err!=nil{
+	//	return err
+	//}
+	//
+	//return fm.FalconDecoding(mapStoreBody)
+
+	if mapStoreBody,err:=storeService.ReadFullBytes(offset+8,int64(fm.storeBodyLength));err!=nil{
 		return err
+	}else{
+		return fm.FalconDecoding(mapStoreBody)
 	}
 
-	return fm.FalconDecoding(mapStoreBody)
+
 
 }
 

@@ -32,6 +32,8 @@ type FalconSearchStoreReadService interface {
 
 	ReadFullBytesAt(offset int64,details []byte) error
 
+	ReadFullBytes(offset int64,lens int64) ([]byte,error)
+
 	//ReadVInt64() (int64,error)
 	//ReadVUint64() (uint64,error)
 
@@ -39,4 +41,8 @@ type FalconSearchStoreReadService interface {
 	Close() error
 	Destroy() error
 
+}
+
+func NewFalconSearchStoreReadService(name string) FalconSearchStoreReadService {
+	return NewFalconSearchFileMMapStore(name)
 }
