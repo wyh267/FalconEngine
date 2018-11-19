@@ -56,14 +56,14 @@ func NewInvertSet(name string,path string) FalconInvertSetService {
 		if err:=is.init();err!=nil{
 			return nil
 		}
-		mlog.Info("Load InvertSetService with read mode success ...")
+		mlog.Trace("Load InvertSetService with read mode success ...")
 		return is
 	}
 
 
 	is.mode = tools.TWriteMode
 
-	mlog.Info("Start InvertSetService with write mode success ...")
+	mlog.Trace("Start InvertSetService with write mode success ...")
 
 	return is
 

@@ -5,7 +5,6 @@ import (
 	"encoding/binary"
 	"sync"
 	"github.com/FalconEngine/store"
-	"github.com/FalconEngine/mlog"
 	"github.com/FalconEngine/message"
 )
 
@@ -100,7 +99,7 @@ func (fm *FalconMap) LoadDic(storeService store.FalconSearchStoreReadService,off
 
 // 写入文件
 func (fm *FalconMap) Persistence(storeService store.FalconSearchStoreWriteService) (int64,error) {
-	mlog.Info("Persistence dict to store service ...")
+	//mlog.Info("Persistence dict to store service ...")
 	// 编码
 	encodeBytes,_:=fm.FalconEncoding()
 	fm.storeBodyLength = uint64(len(encodeBytes))

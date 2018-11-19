@@ -26,10 +26,11 @@ func Test_Index(t *testing.T) {
 		doc["field2"]=[]string{fmt.Sprintf("1112"),fmt.Sprintf("2222f%d",i),fmt.Sprintf("3333%d",i)}
 
 		idx.UpdateDocument("yyyhhh",doc)
-		time.Sleep(time.Millisecond*200)
+		//time.Sleep(time.Millisecond*200)
 
 	}
 
+	time.Sleep(time.Second * 100 )
 	return
 
 }

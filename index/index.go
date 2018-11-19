@@ -49,8 +49,9 @@ func NewIndex(indexName,path string) FalconIndexService {
 	os.MkdirAll(idx.Path,0777)
 	// 载入索引
 	idx.loadIndexMetaData()
+	//mlog.Info("segments %v",idx.SegmentNumbers)
 	for _,num := range idx.SegmentNumbers {
-		activeSegment:=segment.NewFalconSegment(num,indexName,idx.Path,idx.Mappings)
+		activeSegment:=segment.LoadFalconSegment(num,indexName,idx.Path,idx.Mappings)
 		idx.activeSegments = append(idx.activeSegments,activeSegment)
 	}
 
@@ -115,18 +116,18 @@ func (idx *Index) UpdateDocument(documentID string, document map[string]interfac
 		return err
 	}
 
-	select {
-	case <-idx.persistenceSingle:
-		mlog.Info("persistence Segment ... ")
-		persistenceSegment:=idx.writeSegment
-		idx.persistenceSegmentChan <- persistenceSegment
-		idx.WriteSegmentNumber++
-		mlog.Info("make new write segment [ %d ] ...",idx.WriteSegmentNumber)
-		idx.writeSegment = segment.NewFalconSegment(idx.WriteSegmentNumber,idx.Name,idx.Path,idx.Mappings)
-		idx.storeIndexMetaData()
-	default:
-
-	}
+	//select {
+	//case <-idx.persistenceSingle:
+	//	mlog.Info("persistence Segment ... ")
+	//	persistenceSegment:=idx.writeSegment
+	//	idx.persistenceSegmentChan <- persistenceSegment
+	//	idx.WriteSegmentNumber++
+	//	mlog.Info("make new write segment [ %d ] ...",idx.WriteSegmentNumber)
+	//	idx.writeSegment = segment.NewFalconSegment(idx.WriteSegmentNumber,idx.Name,idx.Path,idx.Mappings)
+	//	idx.storeIndexMetaData()
+	//default:
+	//
+	//}
 
 
 
@@ -148,10 +149,10 @@ func (idx *Index) startIndexProcessGoroutine() error {
 		for {
 
 			time.Sleep(time.Second*5)
-			mlog.Info(" running index process goroutine ")
+			mlog.Trace(" running index process goroutine ")
 			select {
 			case idx.persistenceSingle <- true:
-				mlog.Info("persistenceSingle....!!!")
+				//mlog.Info("persistenceSingle....!!!")
 			default:
 			}
 		}
@@ -170,6 +171,8 @@ func (idx *Index) startIndexProcessGoroutine() error {
 				writeSegment.Persistence()
 				idx.segmentLocker.Lock()
 				idx.activeSegments=append(idx.activeSegments,writeSegment)
+				idx.SegmentNumbers = append(idx.SegmentNumbers,writeSegment.Number())
+				idx.storeIndexMetaData()
 				//mlog.Info("add to segments ...")
 				idx.segmentLocker.Unlock()
 			default:
@@ -181,6 +184,27 @@ func (idx *Index) startIndexProcessGoroutine() error {
 
 	}()
 
+
+	go func() {
+
+		for single := range idx.persistenceSingle{
+			idx.documentLocker.Lock()
+			if idx.writeSegment.DocumentCount() == 0 {
+				idx.documentLocker.Unlock()
+				continue
+			}
+			mlog.Trace("persistence Segment Number [ %d ] ... %v ",idx.writeSegment.Number(),single)
+			persistenceSegment:=idx.writeSegment
+			idx.persistenceSegmentChan <- persistenceSegment
+			idx.WriteSegmentNumber++
+			mlog.Trace("make new write segment [ %d ] ...",idx.WriteSegmentNumber)
+			idx.writeSegment = segment.NewFalconSegment(idx.WriteSegmentNumber,idx.Name,idx.Path,idx.Mappings)
+			idx.storeIndexMetaData()
+			idx.documentLocker.Unlock()
+
+		}
+
+	}()
 
 	return nil
 
