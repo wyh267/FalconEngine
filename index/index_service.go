@@ -12,7 +12,10 @@ type FalconIndexService interface {
 
 	// 删除文档
 	DeleteDocument(documentID string) error
-	// 查询
 
+	// 查询
+	//SearchDocuments(query string) error
+
+	//GetDocument(documentID string) (map[string]interface{},error)
 
 }

@@ -6,6 +6,10 @@ import (
 	"github.com/FalconEngine/message"
 )
 
+type FalconDictWriteService interface {
+	Put(key interface{},value interface{}) error
+}
+
 // 字典服务
 type FalconStringDictService interface {
 

@@ -34,9 +34,6 @@ type FalconSearchStoreReadService interface {
 
 	ReadFullBytes(offset int64,lens int64) ([]byte,error)
 
-	//ReadVInt64() (int64,error)
-	//ReadVUint64() (uint64,error)
-
 	GetStoreInfo() (*message.FalconSearchStoreInfo,error)
 	Close() error
 	Destroy() error

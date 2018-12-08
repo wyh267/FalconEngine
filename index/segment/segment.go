@@ -17,7 +17,7 @@ type FalconSegment struct{
 	docCount uint32
 	fieldMappings *tools.FalconIndexMappings
 
-	invterService invert.FalconInvertSetService
+	invertService invert.FalconInvertSetService
 
 }
 
@@ -29,7 +29,7 @@ func LoadFalconSegment(num uint32,indexName string,path string,mappings *tools.F
 		segmentNumber:num}
 	os.MkdirAll(path,0777)
 
-	fs.invterService = invert.NewInvertSet(fs.name,path)
+	fs.invertService = invert.NewInvertSet(fs.name,path)
 
 	mlog.Info("Load [ %s ] Segment [ %s ] success ...",fs.indexName,fs.name)
 	return fs
@@ -46,7 +46,7 @@ func NewFalconSegment(num uint32,indexName string,path string,mappings *tools.Fa
 
 	os.MkdirAll(path,0777)
 
-	fs.invterService = invert.NewInvertSet(fs.name,path)
+	fs.invertService = invert.NewInvertSet(fs.name,path)
 
 	for _,v := range fs.fieldMappings.GetMappings() {
 
@@ -54,7 +54,7 @@ func NewFalconSegment(num uint32,indexName string,path string,mappings *tools.Fa
 		if err != nil {
 			return nil
 		}
-		fs.invterService.AddField(v.FieldName,finfo.Type)
+		fs.invertService.AddField(v.FieldName,finfo.Type)
 	}
 	mlog.Info("Create [ %s ] Segment [ %s ] success ...",fs.indexName,fs.name)
 	return fs
@@ -81,7 +81,7 @@ func (fs *FalconSegment) AddField(mapping *tools.FalconMapping) error {
 	//}
 
 	finfo,_:=mapping.GetFieldInfo()
-	err:= fs.invterService.AddField(finfo.Name,finfo.Type)
+	err:= fs.invertService.AddField(finfo.Name,finfo.Type)
 	if err != nil {
 		return err
 	}
@@ -105,7 +105,7 @@ func (fs *FalconSegment) UpdateDocument(document map[string]interface{}) error {
 		case string:
 			if fieldMapping.FieldType == tools.TKeywordType {
 				realValue,_ := value.(string)
-				if err:=fs.invterService.PutString(field,realValue,docId);err!=nil{
+				if err:=fs.invertService.PutString(field,realValue,docId);err!=nil{
 					return err
 				}
 				continue
@@ -116,7 +116,7 @@ func (fs *FalconSegment) UpdateDocument(document map[string]interface{}) error {
 			if fieldMapping.FieldType == tools.TKeywordType {
 				realValues,_ := value.([]string)
 				for _,realValue:=range realValues {
-					if err:=fs.invterService.PutString(field,realValue,docId);err!=nil{
+					if err:=fs.invertService.PutString(field,realValue,docId);err!=nil{
 						return err
 					}
 				}
@@ -140,19 +140,19 @@ func (fs *FalconSegment) UpdateDocument(document map[string]interface{}) error {
 
 func (fs *FalconSegment)SimpleSearch(field,keyword string) (invert.FalconDocList,bool,error){
 
-	return fs.invterService.FetchString(field,keyword)
+	return fs.invertService.FetchString(field,keyword)
 }
 
 func (fs *FalconSegment) Persistence() error {
 
-	return fs.invterService.Persistence()
+	return fs.invertService.Persistence()
 
 
 }
 
 func (fs *FalconSegment) Close() error {
 
-	return fs.invterService.Close()
+	return fs.invertService.Close()
 
 }
 
