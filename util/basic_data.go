@@ -8,6 +8,9 @@ import "errors"
 var (
 	ERR_NOT_ENCODER = errors.New("val is not encoder")
 	ERR_NOT_DECODER = errors.New("val is not decoder")
+
+
+	TFileStore string = "file_store"
 )
 
 type UInt32 uint32

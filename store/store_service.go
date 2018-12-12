@@ -9,36 +9,41 @@
 package store
 
 import (
-	"github.com/FalconEngine/message"
+	"github.com/FalconEngine/util"
 )
+
+
+// 存储setting接口
+type FalconSearchStoreSetting struct {
+	Location string
+	Name string
+	Type string
+}
+
 
 // 二进制写入
 type FalconSearchStoreWriteService interface {
-
-	AppendBytes(details []byte) (int64, error)
-	AppendUint64(val uint64) error
-	AppendInt64(val int64) error
-
-
-	GetStoreInfo() (*message.FalconSearchStoreInfo,error)
-	Close() error
-	Sync() error
-	Destroy() error
+	util.FalconWriter
+	Name() string
 }
 
 // 二进制读取
 type FalconSearchStoreReadService interface {
+	util.FalconRandomReader
+}
 
 
-	ReadFullBytesAt(offset int64,details []byte) error
+func CreateFalconSearchStoreWriteService(setting *FalconSearchStoreSetting) FalconSearchStoreWriteService {
 
-	ReadFullBytes(offset int64,lens int64) ([]byte,error)
-
-	GetStoreInfo() (*message.FalconSearchStoreInfo,error)
-	Close() error
-	Destroy() error
+	switch setting.Type {
+	case util.TFileStore:
+		return NewFalconSearchFileStoreWriter(setting)
+	default:
+		return nil
+	}
 
 }
+
 
 func NewFalconSearchStoreReadService(name string) FalconSearchStoreReadService {
 	return NewFalconSearchFileMMapStore(name)

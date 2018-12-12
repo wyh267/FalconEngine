@@ -169,4 +169,5 @@ func (sw *FalconSearchFileStore) AppendInt64(val int64) error{
 	bytes := make([]byte,binary.MaxVarintLen64)
 	n:=binary.PutVarint(bytes,val)
 	sw.AppendBytes(bytes[:n+1])
-	return nil}
+	return nil
+	}
