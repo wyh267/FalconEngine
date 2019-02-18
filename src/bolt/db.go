@@ -781,7 +781,7 @@ func (db *DB) Stats() Stats {
 	return db.stats
 }
 
-// This is for internal access to the raw data bytes from the C cursor, use
+// Info is for internal access to the raw data bytes from the C cursor, use
 // carefully, or not at all.
 func (db *DB) Info() *Info {
 	return &Info{uintptr(unsafe.Pointer(&db.data[0])), db.pageSize}
