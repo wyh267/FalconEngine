@@ -1,30 +1,19 @@
+# 构建产物
+bin/
+
+# 运行数据与日志
+data/
+*.log
+
+# 临时文件
 *.o
 *.swp
-*github.com*
-*bin/
-*pkg/
-*data/
-*.log*
-*.json*
-*.dat*
-*.sql*
-*jzlservice/
-.DS_Store
 nohup.out
-*.lst
-*.tgz
-t.go
-*detail/
-*deploy/
-*index_*/
-_index.path
-*.txt
-*.dic
-*.ivt
-*.mt
-main
-*.iml
+
+# 系统与 IDE
+.DS_Store
+.idea/
 misc.xml
 modules.xml
 vcs.xml
-.idea/
+*.iml

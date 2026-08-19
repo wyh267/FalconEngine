@@ -1,0 +1,123 @@
+// falcon 节点间通信协议（IDL，权威定义）。
+//
+// 当前实现说明：本机无 protoc 工具链，Go 侧采用手写的等价定义
+// （transport/types.go 的结构体 + 手写 ServiceDesc + JSON codec），
+// 与本 proto 文件保持字段一致。安装 protoc 后可执行 `make proto`
+// 切换为代码生成链路。
+syntax = "proto3";
+
+package falcon.transport;
+
+option go_package = "github.com/FalconEngine/falcon/transport/proto";
+
+// 节点间传输服务
+service Transport {
+  // 节点握手：探活与元信息交换
+  rpc Ping(PingRequest) returns (PingResponse);
+  rpc NodeInfo(NodeInfoRequest) returns (NodeInfoResponse);
+
+  // 远端分片查询（dsl 为查询 DSL JSON，partial=true 时聚合返回中间结果）
+  rpc ShardSearch(ShardSearchRequest) returns (ShardSearchResponse);
+
+  // 远端取文档原文
+  rpc ShardDoc(ShardDocRequest) returns (ShardDocResponse);
+
+  // 复制写入（5b）：把 translog 操作应用到本节点的指定分片，返回分配的 LSN
+  rpc ApplyOp(ApplyOpRequest) returns (ApplyOpResponse);
+
+  // raft 消息传输（data 为 raftpb.Message 的 Marshal 结果）
+  rpc RaftMessage(RaftMessageRequest) returns (RaftMessageResponse);
+
+  // 节点加入集群（data-only 节点向 master leader 注册）
+  rpc JoinNode(JoinNodeRequest) returns (JoinNodeResponse);
+
+  // 写入转发（协调节点 -> primary）
+  rpc ForwardWrite(ForwardWriteRequest) returns (ForwardWriteResponse);
+
+  // 副本追赶（replica -> primary 拉取 translog）
+  rpc FetchTranslog(FetchTranslogRequest) returns (FetchTranslogResponse);
+
+  // 心跳与分片状态上报（data 节点 -> master leader）
+  rpc ShardStatusReport(ShardStatusRequest) returns (ShardStatusResponse);
+
+  // 拉取集群状态（路由表等，5b  scatter-gather 寻址用）
+  rpc GetClusterState(GetClusterStateRequest) returns (GetClusterStateResponse);
+}
+
+message NodeMeta {
+  uint64 id = 1;      // 节点身份（重启不变；路由表/心跳用）
+  uint64 raft_id = 7; // raft 成员 ID（每次启动唯一）
+  string name = 2;
+  string grpc_addr = 3;
+  string http_addr = 4;
+  bool master = 5;
+  bool data = 6;
+}
+
+message PingRequest { NodeMeta from = 1; }
+message PingResponse { NodeMeta node = 1; string error = 2; }
+
+message NodeInfoRequest {}
+message NodeInfoResponse { NodeMeta node = 1; }
+
+message ShardSearchRequest {
+  string index = 1;
+  int32 shard = 2;
+  bytes dsl = 3;
+  bool partial = 4;
+}
+message ShardSearchResponse { bytes result = 1; string error = 2; }
+
+message ShardDocRequest { string index = 1; string id = 2; }
+message ShardDocResponse { bytes source = 1; bool found = 2; string error = 3; }
+
+message ApplyOpRequest {
+  string index = 1;
+  int32 shard = 2;
+  int64 lsn = 3;  // primary 侧的操作 LSN，replica 按它对齐/判缺口
+  bytes op = 4;   // translog Op 的 JSON 编码
+}
+message ApplyOpResponse { int64 lsn = 1; string error = 2; }
+
+// 协调节点转发给 primary 的写请求
+message ForwardWriteRequest {
+  string index = 1;
+  int32 shard = 2;
+  bytes op = 3;
+  bool wait_all = 4;
+}
+message ForwardWriteResponse { int64 lsn = 1; string error = 2; }
+
+// 副本按 LSN 批量拉取 primary 的 translog
+message FetchTranslogRequest {
+  string index = 1;
+  int32 shard = 2;
+  int64 from_lsn = 3;
+  int32 limit = 4;
+}
+message FetchTranslogResponse {
+  repeated bytes ops = 1;
+  int64 from_lsn = 2;
+  int64 next_lsn = 3;
+  string error = 4;
+}
+
+// 心跳 + 分片状态上报
+message ShardStatusItem {
+  string index = 1;
+  int32 shard = 2;
+  bool primary = 3;
+  int64 lsn = 4;
+  int64 docs = 5;
+}
+message ShardStatusRequest { NodeMeta node = 1; repeated ShardStatusItem shards = 2; }
+message ShardStatusResponse { string error = 1; }
+
+message RaftMessageRequest { bytes data = 1; }
+message RaftMessageResponse { string error = 1; }
+
+message JoinNodeRequest { NodeMeta node = 1; }
+message JoinNodeResponse { string error = 1; NodeMeta leader = 2; }
+
+message GetClusterStateRequest {}
+message GetClusterStateResponse { bytes state = 1; string error = 2; }
