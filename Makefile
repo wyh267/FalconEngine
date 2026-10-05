@@ -1,7 +1,7 @@
 BINARY := bin/falcon
 MODULE := github.com/FalconEngine/falcon
 
-.PHONY: build test bench vet clean run demo cluster-demo chaos proto
+.PHONY: build test bench vet clean run demo cluster-demo chaos restart-test recovery-test proto
 
 build:
 	go build -o $(BINARY) ./cmd/falcon
@@ -29,6 +29,12 @@ cluster-demo:
 
 chaos:
 	bash scripts/chaos-test.sh
+
+restart-test:
+	bash scripts/cluster-restart-test.sh
+
+recovery-test:
+	bash scripts/recovery-test.sh
 
 # proto 代码生成（需安装 protoc 与 protoc-gen-go/protoc-gen-go-grpc）。
 # 当前 Go 侧为手写等价实现（transport/server.go + JSON codec），

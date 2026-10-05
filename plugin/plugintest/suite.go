@@ -12,24 +12,95 @@ import (
 )
 
 // RunAnalyzerSuite 验证分词器契约：
-// 空输入安全、确定性（同输入同输出）、不产出空 token
+// 空输入安全、确定性（同输入同输出）、不产出空 Term、Position 单调不减
 func RunAnalyzerSuite(t *testing.T, a plugin.Analyzer) {
 	t.Helper()
 
-	if got := a.Tokenize(""); len(got) != 0 {
+	if got := a.Analyze(""); len(got) != 0 {
 		t.Errorf("空输入应产出空结果, got %v", got)
 	}
 
 	in := "Hello 世界 foo-bar"
-	first := a.Tokenize(in)
-	second := a.Tokenize(in)
+	first := a.Analyze(in)
+	second := a.Analyze(in)
 	if !reflect.DeepEqual(first, second) {
-		t.Errorf("分词不确定: %v vs %v", first, second)
+		t.Errorf("分析不确定: %v vs %v", first, second)
 	}
-	for _, tok := range first {
-		if tok == "" {
-			t.Errorf("不允许产出空 token, 全部结果: %v", first)
+	checkTokens(t, first)
+}
+
+// RunTokenizerSuite 验证切词器契约：
+// Name 非空、空输入安全、确定性、不产出空 Term、Position 单调不减
+func RunTokenizerSuite(t *testing.T, tk plugin.Tokenizer) {
+	t.Helper()
+
+	if tk.Name() == "" {
+		t.Error("Name() 不能为空")
+	}
+	if got := tk.Tokenize(""); len(got) != 0 {
+		t.Errorf("空输入应产出空结果, got %v", got)
+	}
+	first := tk.Tokenize("Hello 世界 foo-bar")
+	if second := tk.Tokenize("Hello 世界 foo-bar"); !reflect.DeepEqual(first, second) {
+		t.Errorf("切词不确定: %v vs %v", first, second)
+	}
+	checkTokens(t, first)
+}
+
+// RunTokenFilterSuite 验证词元过滤器契约：
+// Name 非空、空输入安全、确定性、不产出空 Term、Position 单调不减
+func RunTokenFilterSuite(t *testing.T, f plugin.TokenFilter) {
+	t.Helper()
+
+	if f.Name() == "" {
+		t.Error("Name() 不能为空")
+	}
+	if got := f.Filter(nil); len(got) != 0 {
+		t.Errorf("空输入应产出空结果, got %v", got)
+	}
+	mkIn := func() []plugin.Token { // 每次构造新切片，避免过滤器原地修改干扰确定性校验
+		return []plugin.Token{
+			{Term: "the", Position: 0},
+			{Term: "Quick", Position: 1},
+			{Term: "fox", Position: 2},
 		}
+	}
+	first := f.Filter(mkIn())
+	if second := f.Filter(mkIn()); !reflect.DeepEqual(first, second) {
+		t.Errorf("过滤不确定: %v vs %v", first, second)
+	}
+	checkTokens(t, first)
+}
+
+// RunCharFilterSuite 验证字符过滤器契约：Name 非空、空输入安全、确定性
+func RunCharFilterSuite(t *testing.T, cf plugin.CharFilter) {
+	t.Helper()
+
+	if cf.Name() == "" {
+		t.Error("Name() 不能为空")
+	}
+	if got := cf.Filter(""); got != "" {
+		t.Errorf("空输入应产出空串, got %q", got)
+	}
+	if a, b := cf.Filter("Hello ph世界"), cf.Filter("Hello ph世界"); a != b {
+		t.Errorf("过滤不确定: %q vs %q", a, b)
+	}
+}
+
+// checkTokens 校验 token 序列共性约束：Term 非空、Position 单调不减
+// （允许相邻等值：同义词类过滤器可在同一位置产出多个词元）
+func checkTokens(t *testing.T, toks []plugin.Token) {
+	t.Helper()
+	prev := 0
+	for i, tok := range toks {
+		if tok.Term == "" {
+			t.Errorf("不允许产出空 Term, 全部结果: %v", toks)
+		}
+		if i > 0 && tok.Position < prev {
+			t.Errorf("Position 应单调不减: 第 %d 个 token 位置 %d < 前一个 %d, 全部结果: %v",
+				i, tok.Position, prev, toks)
+		}
+		prev = tok.Position
 	}
 }
 

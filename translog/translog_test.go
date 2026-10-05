@@ -313,3 +313,40 @@ func TestFileName(t *testing.T) {
 		t.Fatalf("日志文件命名不符约定: %v", err)
 	}
 }
+
+// TestManifestRoundTrip 代际保留清单写读回环；不存在时返回 (nil, nil)
+func TestManifestRoundTrip(t *testing.T) {
+	dir := t.TempDir()
+	gens, err := ReadManifest(dir)
+	if err != nil || gens != nil {
+		t.Fatalf("缺失清单应返回 (nil, nil), got %v, %v", gens, err)
+	}
+	want := []GenInfo{
+		{Gen: 1, BaseLSN: 0, Count: 10},
+		{Gen: 2, BaseLSN: 10, Count: 5},
+		{Gen: 3, BaseLSN: 15, Count: 0},
+	}
+	if err := WriteManifest(dir, want); err != nil {
+		t.Fatalf("WriteManifest 失败: %v", err)
+	}
+	got, err := ReadManifest(dir)
+	if err != nil {
+		t.Fatalf("ReadManifest 失败: %v", err)
+	}
+	if len(got) != len(want) {
+		t.Fatalf("清单条数 got %d want %d", len(got), len(want))
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("第 %d 条 got %+v want %+v", i, got[i], want[i])
+		}
+	}
+	// 全量重写语义：再写一份更短的清单应整体覆盖
+	if err := WriteManifest(dir, want[2:]); err != nil {
+		t.Fatalf("重写 WriteManifest 失败: %v", err)
+	}
+	got, _ = ReadManifest(dir)
+	if len(got) != 1 || got[0] != want[2] {
+		t.Fatalf("重写后清单不对: %+v", got)
+	}
+}

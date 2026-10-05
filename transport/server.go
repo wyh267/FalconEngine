@@ -20,9 +20,18 @@ type Handler interface {
 	// ForwardWrite 协调节点转发来的写请求（本节点应为该分片 primary）
 	ForwardWrite(indexName string, shard int32, op []byte, waitAll bool) (int64, error)
 	// FetchTranslog 副本按 LSN 批量拉取本地 primary 分片的 translog
-	FetchTranslog(indexName string, shard int32, fromLSN int64, limit int32) (ops [][]byte, nextLSN int64, err error)
+	// （nodeID 为拉取方节点：primary 按 fromLSN-1 刷新其副本 ack 并推进保留窗口）
+	FetchTranslog(indexName string, shard int32, fromLSN int64, limit int32, nodeID uint64) (ops [][]byte, nextLSN int64, oldestLSN int64, err error)
+	// PrepareShardRecovery 开始分片恢复源会话：冻结 Flush 并返回一致视图
+	PrepareShardRecovery(indexName string, shard int32) (lsnBase int64, schemaJSON []byte, files []RecoveryFileInfo, err error)
+	// FetchShardFile 按恢复点分块读取段文件
+	FetchShardFile(indexName string, shard int32, segDir, name string, off, limit int64) ([]byte, error)
+	// FinishShardRecovery 结束分片恢复源会话（解冻）
+	FinishShardRecovery(indexName string, shard int32) error
 	// ShardStatusReport 心跳与分片状态上报（master leader 处理）
 	ShardStatusReport(from NodeMeta, shards []ShardStatusItem) error
+	// ProposeMapping mapping 更新提案（master leader 处理；mapping 为增量 schema JSON）
+	ProposeMapping(indexName string, mapping []byte) error
 	// RaftMessage 投递一条 raftpb.Message（Marshal 后的字节）
 	RaftMessage(data []byte) error
 	// JoinNode 节点注册（master leader 处理），返回 leader 元信息
@@ -42,7 +51,11 @@ type transportServer interface {
 	RaftMessage(context.Context, *RaftMessageRequest) (*RaftMessageResponse, error)
 	ForwardWrite(context.Context, *ForwardWriteRequest) (*ForwardWriteResponse, error)
 	FetchTranslog(context.Context, *FetchTranslogRequest) (*FetchTranslogResponse, error)
+	PrepareShardRecovery(context.Context, *PrepareShardRecoveryRequest) (*PrepareShardRecoveryResponse, error)
+	FetchShardFile(context.Context, *FetchShardFileRequest) (*FetchShardFileResponse, error)
+	FinishShardRecovery(context.Context, *FinishShardRecoveryRequest) (*FinishShardRecoveryResponse, error)
 	ShardStatusReport(context.Context, *ShardStatusRequest) (*ShardStatusResponse, error)
+	UpdateMapping(context.Context, *UpdateMappingRequest) (*UpdateMappingResponse, error)
 	JoinNode(context.Context, *JoinNodeRequest) (*JoinNodeResponse, error)
 	GetClusterState(context.Context, *GetClusterStateRequest) (*GetClusterStateResponse, error)
 }
@@ -116,12 +129,30 @@ func (s *Server) ForwardWrite(ctx context.Context, req *ForwardWriteRequest) (*F
 }
 
 func (s *Server) FetchTranslog(ctx context.Context, req *FetchTranslogRequest) (*FetchTranslogResponse, error) {
-	ops, next, err := s.handler.FetchTranslog(req.Index, req.Shard, req.FromLsn, req.Limit)
-	return &FetchTranslogResponse{Ops: ops, FromLsn: req.FromLsn, NextLsn: next, Error: errStr(err)}, nil
+	ops, next, oldest, err := s.handler.FetchTranslog(req.Index, req.Shard, req.FromLsn, req.Limit, req.NodeId)
+	return &FetchTranslogResponse{Ops: ops, FromLsn: req.FromLsn, NextLsn: next, OldestLsn: oldest, Error: errStr(err)}, nil
+}
+
+func (s *Server) PrepareShardRecovery(ctx context.Context, req *PrepareShardRecoveryRequest) (*PrepareShardRecoveryResponse, error) {
+	lsnBase, schemaJSON, files, err := s.handler.PrepareShardRecovery(req.Index, req.Shard)
+	return &PrepareShardRecoveryResponse{LsnBase: lsnBase, SchemaJson: schemaJSON, Files: files, Error: errStr(err)}, nil
+}
+
+func (s *Server) FetchShardFile(ctx context.Context, req *FetchShardFileRequest) (*FetchShardFileResponse, error) {
+	data, err := s.handler.FetchShardFile(req.Index, req.Shard, req.SegDir, req.Name, req.Off, req.Limit)
+	return &FetchShardFileResponse{Data: data, Error: errStr(err)}, nil
+}
+
+func (s *Server) FinishShardRecovery(ctx context.Context, req *FinishShardRecoveryRequest) (*FinishShardRecoveryResponse, error) {
+	return &FinishShardRecoveryResponse{Error: errStr(s.handler.FinishShardRecovery(req.Index, req.Shard))}, nil
 }
 
 func (s *Server) ShardStatusReport(ctx context.Context, req *ShardStatusRequest) (*ShardStatusResponse, error) {
 	return &ShardStatusResponse{Error: errStr(s.handler.ShardStatusReport(req.Node, req.Shards))}, nil
+}
+
+func (s *Server) UpdateMapping(ctx context.Context, req *UpdateMappingRequest) (*UpdateMappingResponse, error) {
+	return &UpdateMappingResponse{Error: errStr(s.handler.ProposeMapping(req.Index, req.Mapping))}, nil
 }
 
 func (s *Server) RaftMessage(ctx context.Context, req *RaftMessageRequest) (*RaftMessageResponse, error) {
@@ -184,7 +215,11 @@ var transportServiceDesc = grpc.ServiceDesc{
 		unaryHandler("JoinNode", (*Server).JoinNode),
 		unaryHandler("ForwardWrite", (*Server).ForwardWrite),
 		unaryHandler("FetchTranslog", (*Server).FetchTranslog),
+		unaryHandler("PrepareShardRecovery", (*Server).PrepareShardRecovery),
+		unaryHandler("FetchShardFile", (*Server).FetchShardFile),
+		unaryHandler("FinishShardRecovery", (*Server).FinishShardRecovery),
 		unaryHandler("ShardStatusReport", (*Server).ShardStatusReport),
+		unaryHandler("UpdateMapping", (*Server).UpdateMapping),
 		unaryHandler("GetClusterState", (*Server).GetClusterState),
 	},
 	Streams:  []grpc.StreamDesc{},

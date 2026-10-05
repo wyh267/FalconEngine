@@ -18,12 +18,13 @@ type Reader struct {
 	dir string
 	m   meta
 
-	id2loc map[string]uint32                  // 外部 ID -> 段内 docID（由 meta.IDs 构建）
-	inv    map[string]*posting.FieldReader    // 倒排字段
-	stored *stored.Reader                     // 原文存储
-	nums   map[string]*docvalues.NumberReader // number 类正排列
-	has    map[string][]byte                  // number 类字段存在性标记（常驻内存，1B/文档）
-	norms  map[string]*docvalues.NumberReader // text 字段文档长度（BM25 用）
+	id2loc map[string]uint32                   // 外部 ID -> 段内 docID（由 meta.IDs 构建）
+	inv    map[string]*posting.FieldReader     // 倒排字段
+	stored *stored.Reader                      // 原文存储
+	nums   map[string]*docvalues.NumberReader  // number 类正排列
+	kws    map[string]*docvalues.KeywordReader // keyword ord 列（v2 起）
+	has    map[string][]byte                   // 字段存在性标记（常驻内存，1B/文档；v1 仅 number 类，v2 覆盖全部字段）
+	norms  map[string]*docvalues.NumberReader  // text 字段文档长度（BM25 用）
 
 	deleted map[uint32]bool // 删除标记（del.bin + 运行时新增）
 
@@ -57,7 +58,11 @@ func Open(dir string) (*Reader, error) {
 		return mr, nil
 	}
 
-	// 倒排索引
+	// 倒排索引（按段格式版本分派头部解析：v1 无 positions，v2 携带 positions）
+	postingVersion := posting.FormatV1
+	if r.m.Version >= segmentFormatV2 {
+		postingVersion = posting.FormatV2
+	}
 	r.inv = make(map[string]*posting.FieldReader, len(r.m.InvFields))
 	for _, field := range r.m.InvFields {
 		dicR, err := mmap("inv." + field + ".dic")
@@ -68,7 +73,7 @@ func Open(dir string) (*Reader, error) {
 		if err != nil {
 			return nil, fmt.Errorf("segment: 打开 inv.%s.pst 失败: %w", field, err)
 		}
-		fr, err := posting.OpenFieldReader(dicR, pstR)
+		fr, err := posting.OpenFieldReader(dicR, pstR, postingVersion)
 		if err != nil {
 			return nil, fmt.Errorf("segment: 打开字段 %q 倒排失败: %w", field, err)
 		}
@@ -91,9 +96,8 @@ func Open(dir string) (*Reader, error) {
 		return nil, fmt.Errorf("segment: 原文数 %d 与 meta 文档数 %d 不匹配", r.stored.Len(), r.m.Docs)
 	}
 
-	// number 正排列 + 存在性标记
+	// number 正排列
 	r.nums = make(map[string]*docvalues.NumberReader, len(r.m.NumFields))
-	r.has = make(map[string][]byte, len(r.m.NumFields))
 	for _, field := range r.m.NumFields {
 		mr, err := mmap("num." + field)
 		if err != nil {
@@ -104,6 +108,32 @@ func Open(dir string) (*Reader, error) {
 			return nil, err
 		}
 		r.nums[field] = nr
+	}
+
+	// keyword ord 列（v1 段 meta 无 KwFields，天然为空）
+	r.kws = make(map[string]*docvalues.KeywordReader, len(r.m.KwFields))
+	for _, field := range r.m.KwFields {
+		mr, err := mmap("kw." + field)
+		if err != nil {
+			return nil, fmt.Errorf("segment: 打开 kw.%s 失败: %w", field, err)
+		}
+		kr, err := docvalues.OpenKeywordReader(mr)
+		if err != nil {
+			return nil, fmt.Errorf("segment: 解析 kw.%s 失败: %w", field, err)
+		}
+		if kr.Len() != r.m.Docs {
+			return nil, fmt.Errorf("segment: kw.%s 文档数 %d 与 meta 文档数 %d 不匹配", field, kr.Len(), r.m.Docs)
+		}
+		r.kws[field] = kr
+	}
+
+	// 存在性标记：v1 仅 number 类字段；v2 覆盖全部字段（倒排/正排/keyword 并集）
+	hasFields := r.m.NumFields
+	if r.m.Version >= segmentFormatV2 {
+		hasFields = unionFields(r.m.InvFields, r.m.NumFields, r.m.KwFields)
+	}
+	r.has = make(map[string][]byte, len(hasFields))
+	for _, field := range hasFields {
 		hb, err := os.ReadFile(filepath.Join(dir, "has."+field))
 		if err != nil {
 			return nil, fmt.Errorf("segment: 读取 has.%s 失败: %w", field, err)
@@ -167,6 +197,9 @@ func (r *Reader) Seq() int { return r.m.Seq }
 // Dir 返回段目录路径
 func (r *Reader) Dir() string { return r.dir }
 
+// Version 返回段格式版本（0/1 为历史 v1 段：无 positions、无 kw 列；2 为当前）
+func (r *Reader) Version() int { return r.m.Version }
+
 // LiveCount 返回未删除的文档数
 func (r *Reader) LiveCount() int { return r.m.Docs - len(r.deleted) }
 
@@ -217,6 +250,16 @@ func (r *Reader) DocFreq(field, term string) int {
 	return fr.DocFreq(term)
 }
 
+// Terms 枚举 field 词典中满足 match 的 term（见 posting.FieldReader.Terms）；
+// 字段无倒排返回 nil。prefix/wildcard/fuzzy 查询的词典展开用。
+func (r *Reader) Terms(field, prefix string, match func(string) bool, maxExpansions int) []string {
+	fr, ok := r.inv[field]
+	if !ok {
+		return nil
+	}
+	return fr.Terms(prefix, match, maxExpansions)
+}
+
 // Stored 读取段内 docID 对应的原文
 func (r *Reader) Stored(docID uint32) ([]byte, error) {
 	return r.stored.Get(docID)
@@ -232,6 +275,26 @@ func (r *Reader) Num(field string, docID uint32) (int64, bool) {
 		return 0, false
 	}
 	return nr.Get(docID), true
+}
+
+// Kw 返回 keyword 字段的 ord 列读取器；字段无 kw 列（非 keyword dv 字段或 v1 段）返回 false
+func (r *Reader) Kw(field string) (*docvalues.KeywordReader, bool) {
+	kr, ok := r.kws[field]
+	return kr, ok
+}
+
+// Has 判断 docID 是否含有字段值（存在性标记）；字段无 has 标记返回 false。
+// v1 段仅 number 类字段有标记，其余字段恒为 false。
+func (r *Reader) Has(field string, docID uint32) bool {
+	hb, ok := r.has[field]
+	return ok && int(docID) < len(hb) && hb[docID] != 0
+}
+
+// HasField 返回段是否持有该字段的存在性标记（v2 覆盖全部字段，v1 仅 number 类）；
+// false 时 Has 不可信，调用方需回落原文判断（exists 查询用）
+func (r *Reader) HasField(field string) bool {
+	_, ok := r.has[field]
+	return ok
 }
 
 // Deleted 判断 docID 是否已被删除

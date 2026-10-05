@@ -89,12 +89,12 @@ say "删除文档 1 并验证"
 curl -s -X DELETE "${BASE}/weibo/_doc/1" | jq .
 curl -s "${BASE}/weibo/_doc/1" | jq -c .
 
-say "refresh（落盘）"
-curl -s -X POST "${BASE}/weibo/_refresh" | jq .
+say "flush（缓冲落盘为段；refresh 语义已轻量化，落盘走 _flush）"
+curl -s -X POST "${BASE}/weibo/_flush" | jq .
 
 TOTAL_BEFORE=$(curl -s -X POST "${BASE}/weibo/_search" -d '{}' | jq .total)
 
-say "kill -9 模拟崩溃（文档 2、3 不 refresh，仅靠 translog 恢复）"
+say "kill -9 模拟崩溃（文档 999 不 flush，仅靠 translog 恢复）"
 curl -s -X PUT "${BASE}/weibo/_doc/999" -d '{"datetime":"2015-12-01 00:00:00","name":"崩溃恢复测试","level":"达人","content":"这条数据只进了 translog","likes":1}' > /dev/null
 kill -9 "$PID"
 PID=""

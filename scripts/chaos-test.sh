@@ -8,7 +8,8 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
-BASE_PORT="${FALCON_CHAOS_PORT:-19200}"
+# 默认端口段避开常见占用（如本机 kubectl port-forward 的 19200），可用环境变量覆盖
+BASE_PORT="${FALCON_CHAOS_PORT:-19400}"
 WORK="$(mktemp -d /tmp/falcon-chaos.XXXXXX)"
 BIN=bin/falcon
 PIDS=()
@@ -89,17 +90,19 @@ kill -9 "${PIDS[$((VICTIM-1))]}" 2>/dev/null || true
 
 say "等待集群恢复可写（RTO 预算 15s）"
 T0=$(date +%s)
-RECOVERED_AT=0
+# 探测写入用独立 id 区间（31..200），与故障前已 ack 集合（1..30）隔离；
+# 只记录探测成功的那个 id，失败探测的 id 不属于已 ack 集合
+PROBE_OK_ID=""
 for i in $(seq 31 200); do
     if write_doc "$H1" "$i" "故障后文档 $i"; then
-        RECOVERED_AT=$(date +%s)
-        echo "第 $i 篇写入成功，RTO = $((RECOVERED_AT - T0))s"
+        PROBE_OK_ID=$i
+        echo "第 $i 篇写入成功，RTO = $(( $(date +%s) - T0 ))s"
         break
     fi
     sleep 0.5
 done
-[ "$RECOVERED_AT" != "0" ] || { echo "RTO 超时（>15s+）" >&2; exit 1; }
-if [ $((RECOVERED_AT - T0)) -ge 15 ]; then echo "RTO 超预算" >&2; exit 1; fi
+[ -n "$PROBE_OK_ID" ] || { echo "RTO 超时（>15s+）" >&2; exit 1; }
+if [ $(( $(date +%s) - T0 )) -ge 15 ]; then echo "RTO 超预算" >&2; exit 1; fi
 
 say "继续写入 20 篇"
 for i in $(seq 201 220); do
@@ -114,7 +117,6 @@ for i in $(seq 201 220); do
         printf '{"content":"故障后文档 %s","level":%s}' "$i" "$i" | curl -s -X PUT "http://127.0.0.1:$H1/logs/_doc/$i" --data-binary @- >&2
         echo >&2; exit 1
     fi
-    ACKED=$i
 done
 echo "已 ack 总计: $((30 + 20 + 1)) 篇附近（含探测成功的那篇）"
 
@@ -122,7 +124,8 @@ say "断言：已 ack 文档全部可查（数据不丢）"
 # 注：waitAll 下 primary 本地写成功后才可能因副本 ack 失败而报错，
 # 因此"报错"的写入也可能已落盘——总数可能 >= ack 数，语义同 ES。
 # 这里断言 ack 过的 ID 逐一可查（不丢），而不是精确总数。
-ACK_IDS="1 2 15 30 33 201 210 220"
+# 已 ack 集合 = 故障前快照（1..30，kill 时已固定）+ 探测成功 id + 故障后写入（201..220）
+ACK_IDS="1 2 15 30 $PROBE_OK_ID 201 210 220"
 for id in $ACK_IDS; do
     FOUND=""
     for _ in $(seq 1 40); do

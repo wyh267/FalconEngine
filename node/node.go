@@ -46,10 +46,22 @@ type Node struct {
 	raft     *cluster.RaftNode     // master 节点才有
 	sm       *cluster.StateMachine // 集群元数据视图（data-only 节点为轮询快照，整体替换）
 	seeds    []string
+	dataDir  string               // 数据目录（raft 元数据在 <dataDir>/.falcon/raft/）
 	lastSeen map[uint64]time.Time // leader 本地：各节点最近一次上报时间
 
 	pullers map[shardKey]chan struct{} // 副本拉取器：key -> 停止信号
 	pushQ   map[shardKey]chan replTask // primary 推送队列：key -> 顺序队列
+
+	// 副本恢复状态（P0-2）：
+	// replAcks 为 primary 侧各副本已确认到的 LSN（retention lease 最小形态，
+	// 用于推进 translog 保留窗口，见 replication.go updateRetentionLSN）；
+	// recovering 为正在段拷贝恢复的分片标记（见 recovery.go）
+	replAcks   map[shardKey]map[uint64]int64
+	recovering map[shardKey]bool
+
+	// mappingBcast 记录各索引最近一次广播 mapping 时的本地字段并集数量，
+	// 抑制动态推断新字段后的重复广播（见 mapping.go maybeBroadcastMapping）
+	mappingBcast map[string]int
 
 	stopc chan struct{}
 }
@@ -57,30 +69,51 @@ type Node struct {
 // New 创建节点（gRPC 服务由外部以本节点为 Handler 创建）
 func New(cfg *config.Config, mgr *index.Manager, client *transport.Client) *Node {
 	n := &Node{
-		Mgr:    mgr,
-		Client: client,
-		sm:     cluster.NewStateMachine(),
-		seeds:  cfg.Cluster.Seeds,
-		stopc:  make(chan struct{}),
+		Mgr:     mgr,
+		Client:  client,
+		sm:      cluster.NewStateMachine(),
+		seeds:   cfg.Cluster.Seeds,
+		dataDir: cfg.Data.Path,
+		stopc:   make(chan struct{}),
 
 		HeartbeatInterval: time.Second,
 		DeadTimeout:       6 * time.Second,
 		PullInterval:      time.Second,
 
-		lastSeen: map[uint64]time.Time{},
-		pullers:  map[shardKey]chan struct{}{},
-		pushQ:    map[shardKey]chan replTask{},
+		lastSeen:   map[uint64]time.Time{},
+		pullers:    map[shardKey]chan struct{}{},
+		pushQ:      map[shardKey]chan replTask{},
+		replAcks:   map[shardKey]map[uint64]int64{},
+		recovering: map[shardKey]bool{},
+
+		mappingBcast: map[string]int{},
 	}
 	grpcAddr := fmt.Sprintf("%s:%d", advertiseHost(), cfg.GRPC.Port)
 	httpAddr := fmt.Sprintf("%s:%d", advertiseHost(), cfg.HTTP.Port)
 	n.Meta = transport.NodeMeta{
 		ID:       NodeID(grpcAddr),
-		RaftID:   NodeID(fmt.Sprintf("%s#%d", grpcAddr, time.Now().UnixNano())), // 每次启动唯一
 		Name:     cfg.Node.Name,
 		GRPCAddr: grpcAddr,
 		HTTPAddr: httpAddr,
 		Master:   cfg.Node.Master,
 		Data:     cfg.Node.Data,
+	}
+	// RaftID 持久化复用（P0-1）：语义为"每数据目录唯一"。
+	// master 节点先读 <data>/.falcon/raft/node.json，有则复用，
+	// 无则生成后先落盘再启动 raft（重启后 raft 从磁盘恢复，成员身份不变）。
+	// data-only 节点不进 raft group，保持每次启动唯一即可。
+	if cfg.Node.Master {
+		raftID, err := cluster.LoadOrCreateRaftID(cfg.Data.Path, func() uint64 {
+			return NodeID(fmt.Sprintf("%s#%d", grpcAddr, time.Now().UnixNano()))
+		})
+		if err != nil {
+			mlog.Warn("node %s 持久化 RaftID 失败，退化为每次启动唯一: %v", cfg.Node.Name, err)
+			n.Meta.RaftID = NodeID(fmt.Sprintf("%s#%d", grpcAddr, time.Now().UnixNano()))
+		} else {
+			n.Meta.RaftID = raftID
+		}
+	} else {
+		n.Meta.RaftID = NodeID(fmt.Sprintf("%s#%d", grpcAddr, time.Now().UnixNano()))
 	}
 	return n
 }
@@ -106,19 +139,36 @@ func NodeID(grpcAddr string) uint64 {
 
 // Start 按角色启动集群控制面与数据面循环
 func (n *Node) Start() error {
+	raftDir := cluster.RaftDir(n.dataDir)
 	switch {
 	case n.Meta.Master && len(n.seeds) == 0:
-		// 单机模式：自举单 master 集群
-		n.raft = cluster.BootstrapMaster(n.Meta, n.sm, n.sendRaft, n.onApply)
-		mlog.Info("node %s bootstrap 单 master 集群 (id=%d)", n.Meta.Name, n.Meta.ID)
-		// raft 元数据不持久化（见 cluster 包简化决策）：
-		// 重启后把本地已有索引重新注册进 CSM
+		// 单机模式：自举单 master 集群（带持久化；已有状态时从磁盘恢复）
+		rn, err := cluster.BootstrapMasterPersistent(n.Meta, n.sm, raftDir, n.sendRaft, n.onApply)
+		if err != nil {
+			return err
+		}
+		n.raft = rn
+		rn.SetOnSnapshot(n.onRaftSnapshot)
+		mlog.Info("node %s bootstrap 单 master 集群 (id=%d, 从磁盘恢复=%v)", n.Meta.Name, n.Meta.ID, rn.RestoredFromStore())
+		// 兜底：CSM 恢复后本循环天然空转；raft 状态缺失（如目录被清）时
+		// 把本地已有索引重新注册进 CSM（索引数据本身在磁盘上完好）
 		go n.reRegisterLocalIndices()
 	case n.Meta.Master:
-		// 加入已有集群：空成员启动，等待 leader 的 ConfChange
-		n.raft = cluster.JoinRaft(cluster.RaftMemberID(n.Meta), n.sm, n.sendRaft, n.onApply)
-		if err := n.joinViaSeeds(); err != nil {
+		// master 且有 seeds：空成员启动（带持久化）
+		rn, err := cluster.JoinRaftPersistent(n.Meta, n.sm, raftDir, n.sendRaft, n.onApply)
+		if err != nil {
 			return err
+		}
+		n.raft = rn
+		rn.SetOnSnapshot(n.onRaftSnapshot)
+		if !rn.RestoredFromStore() {
+			// 无本地状态：向 seed 发 JoinNode，由 leader 经 ConfChange 加入
+			if err := n.joinViaSeeds(); err != nil {
+				return err
+			}
+		} else {
+			// 从磁盘恢复：仍是集群成员，地址表在恢复的 CSM 里，跳过重新加入
+			mlog.Info("node %s 从磁盘恢复 raft 状态，跳过 joinViaSeeds (id=%d)", n.Meta.Name, n.Meta.ID)
 		}
 	default:
 		// data-only：向 master leader 注册
@@ -139,8 +189,9 @@ func (n *Node) Start() error {
 	return nil
 }
 
-// reRegisterLocalIndices 单机重启后把本地已有索引重新注册进 CSM
-// （raft 状态不持久化，CSM 重启为空；索引数据本身在磁盘上完好）
+// reRegisterLocalIndices 单机重启后把本地已有索引重新注册进 CSM（兜底路径：
+// raft 元数据已持久化时 CSM 恢复自带索引表，本循环天然空转；
+// 仅在 raft 状态缺失（如元数据目录被清）而索引数据完好时真正生效）
 func (n *Node) reRegisterLocalIndices() {
 	if !n.raft.WaitLeader(30 * time.Second) {
 		return
@@ -266,7 +317,124 @@ func (n *Node) onApply(cmd cluster.Command) {
 			}
 		}
 		n.reconcile()
+	case cluster.CmdDeleteIndex:
+		// 删索引：清理本节点持有的该索引全部数据
+		n.deleteLocalIndex(cmd.IndexName)
+	case cluster.CmdRemoveNode:
+		// 陈旧节点摘除：路由表已重分配，本节点可能被补建了分片；
+		// 若本节点正是被摘除者（磁盘清空后重加入，历史日志重放期间曾按
+		// 旧路由建过分片），不再路由到本节点的分片一并清除
+		n.ensureAllLocalShards()
+		n.pruneUnroutedShards()
+	case cluster.CmdUpdateMapping:
+		// mapping 变更（动态推断广播/显式 PUT _mapping）：合并进本节点全部本地分片
+		n.applyLocalMapping(cmd.IndexName, cmd.Mapping)
 	}
+}
+
+// pruneUnroutedShards 删除"本地持有但路由表已不分配给本节点"的分片。
+// 仅在 CmdRemoveNode apply 后调用：存活节点的分片分配在 remove_node 中
+// 只增不减，不受影响；被摘除节点（磁盘清空重加入）的残留分片必须清除，
+// 否则本地优先的查询会读到空分片。
+func (n *Node) pruneUnroutedShards() {
+	if !n.Meta.Data {
+		return
+	}
+	for _, name := range n.Mgr.Names() {
+		ix, ok := n.Mgr.Get(name)
+		if !ok {
+			continue
+		}
+		routes, ok := n.state().Route(name)
+		if !ok {
+			continue // 索引已删由 deleteLocalIndex 路径处理
+		}
+		for _, shardID := range ix.LocalShards() {
+			if shardID >= len(routes) {
+				continue
+			}
+			r := routes[shardID]
+			if r.Primary == n.Meta.ID || containsNode(r.Replicas, n.Meta.ID) {
+				continue
+			}
+			// 先停拉取器/清推送队列，避免引擎关闭后后台 goroutine 访问
+			key := shardKey{index: name, shard: shardID}
+			n.stopPuller(key)
+			n.mu.Lock()
+			if ch, ok := n.pushQ[key]; ok {
+				delete(n.pushQ, key)
+				close(ch)
+			}
+			n.mu.Unlock()
+			if err := ix.DropShard(shardID); err != nil {
+				mlog.Error("node %s 摘除未路由分片 %s[%d] 失败: %v", n.Meta.Name, name, shardID, err)
+				continue
+			}
+			mlog.Info("node %s 摘除未路由分片 %s[%d]", n.Meta.Name, name, shardID)
+		}
+	}
+}
+
+// onRaftSnapshot raft 应用了 leader 快照（lagging follower 追赶快照）后的回调：
+// 快照可能跨过若干建索引/路由变更命令，遍历恢复的 CSM 幂等补齐本地分片
+func (n *Node) onRaftSnapshot() {
+	n.ensureAllLocalShards()
+}
+
+// ensureAllLocalShards 遍历 CSM 全部索引，落地本节点持有的分片（幂等）并对账角色
+func (n *Node) ensureAllLocalShards() {
+	sm := n.state()
+	raw, err := sm.Snapshot()
+	if err != nil {
+		return
+	}
+	var snap struct {
+		Indices map[string]cluster.IndexMeta    `json:"indices"`
+		Routes  map[string][]cluster.ShardRoute `json:"routes"`
+	}
+	if err := json.Unmarshal(raw, &snap); err != nil {
+		return
+	}
+	for name, meta := range snap.Indices {
+		n.ensureLocalShards(meta, snap.Routes[name])
+	}
+}
+
+// deleteLocalIndex 删除本节点持有的索引：停该索引全部副本拉取器、
+// 清推送队列对应 entry（队列 goroutine 随 channel 关闭退出）、
+// 关闭引擎并移除数据目录。raft apply 回调与 data-only 轮询对账共用；
+// 索引不在本地时为空操作。
+func (n *Node) deleteLocalIndex(name string) {
+	var pullKeys []shardKey
+	n.mu.RLock()
+	for key := range n.pullers {
+		if key.index == name {
+			pullKeys = append(pullKeys, key)
+		}
+	}
+	n.mu.RUnlock()
+	for _, key := range pullKeys {
+		n.stopPuller(key)
+	}
+	n.mu.Lock()
+	for key, ch := range n.pushQ {
+		if key.index == name {
+			delete(n.pushQ, key)
+			close(ch)
+		}
+	}
+	// 副本 ack 记账一并清除（恢复中的分片由恢复 goroutine 自行清标记）
+	for key := range n.replAcks {
+		if key.index == name {
+			delete(n.replAcks, key)
+		}
+	}
+	n.mu.Unlock()
+	if _, err := n.Mgr.Delete(name); err != nil {
+		mlog.Error("node %s 删除本地索引 %s 失败: %v", n.Meta.Name, name, err)
+		return
+	}
+	mlog.Info("node %s 已删除本地索引 %s", n.Meta.Name, name)
 }
 
 // ensureLocalShards 对路由表中本节点持有的分片创建本地分片
@@ -287,8 +455,9 @@ func (n *Node) ensureLocalShards(meta cluster.IndexMeta, routes []cluster.ShardR
 			continue
 		}
 		err := n.Mgr.EnsureShard(meta.Name, index.IndexSettings{
-			NumShards:   meta.NumShards,
-			NumReplicas: meta.NumReplicas,
+			NumShards:     meta.NumShards,
+			NumReplicas:   meta.NumReplicas,
+			DateDetection: meta.DateDetection,
 		}, sch, shardID)
 		if err != nil {
 			mlog.Error("创建本地分片失败 %s[%d]: %v", meta.Name, shardID, err)
@@ -357,6 +526,14 @@ func (n *Node) syncClusterState() {
 		n.mu.Unlock()
 		for name, meta := range snap.Indices {
 			n.ensureLocalShards(meta, snap.Routes[name])
+			// mapping 对账：CSM 为权威，本地分片缺失的字段合并进去（幂等）
+			n.applyLocalMapping(name, meta.Mapping)
+		}
+		// 对账删除：本地有而集群快照中已不存在的索引（删索引命令的轮询侧落地）
+		for _, name := range n.Mgr.Names() {
+			if _, ok := snap.Indices[name]; !ok {
+				n.deleteLocalIndex(name)
+			}
 		}
 		n.reconcile()
 		return
@@ -411,11 +588,12 @@ func (n *Node) CreateIndex(name string, settings index.IndexSettings, sch *schem
 		mapping, _ = json.Marshal(sch)
 	}
 	meta := cluster.IndexMeta{
-		Name:        name,
-		NumShards:   settings.NumShards,
-		NumReplicas: settings.NumReplicas,
-		Mapping:     mapping,
-		WaitAll:     settings.WaitAll == "all",
+		Name:          name,
+		NumShards:     settings.NumShards,
+		NumReplicas:   settings.NumReplicas,
+		Mapping:       mapping,
+		WaitAll:       settings.WaitAll == "all",
+		DateDetection: settings.DateDetection,
 	}
 	routes, err := cluster.AllocateRoutes(n.state(), meta.NumShards, meta.NumReplicas)
 	if err != nil {
@@ -439,6 +617,47 @@ func (n *Node) CreateIndex(name string, settings index.IndexSettings, sch *schem
 		time.Sleep(50 * time.Millisecond)
 	}
 	return fmt.Errorf("node: 建索引 %q 等待落地超时", name)
+}
+
+// DeleteIndex 集群感知删索引：leader 提案 CmdDeleteIndex，
+// apply/轮询对账后各节点清理本地分片与数据目录；
+// 等待元数据清除与本节点数据删除完成后返回。
+// 索引不存在返回 found=false（供 REST 层映射 404）。
+func (n *Node) DeleteIndex(name string) (bool, error) {
+	rn := n.RaftNode()
+	if rn == nil {
+		return false, fmt.Errorf("node: data-only 节点不能删索引，请提交到 master 节点")
+	}
+	// 与 CreateIndex 同理：节点刚启动时选主可能尚未完成，先等待
+	if !rn.IsLeader() {
+		rn.WaitLeader(10 * time.Second)
+	}
+	if !rn.IsLeader() {
+		return false, fmt.Errorf("node: 本节点不是 leader，删索引请提交到 leader（当前 leader=%d）", rn.LeaderID())
+	}
+	if _, ok := n.state().Index(name); !ok {
+		return false, nil
+	}
+	if err := rn.Propose(cluster.Command{Type: cluster.CmdDeleteIndex, IndexName: name}); err != nil {
+		return false, err
+	}
+
+	// 等待 apply 落地：元数据清除 + （data 节点）本地索引删除完成
+	deadline := time.Now().Add(10 * time.Second)
+	for time.Now().Before(deadline) {
+		if _, ok := n.state().Index(name); ok {
+			time.Sleep(50 * time.Millisecond)
+			continue
+		}
+		if !n.Meta.Data {
+			return true, nil
+		}
+		if _, ok := n.Mgr.Get(name); !ok {
+			return true, nil
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+	return false, fmt.Errorf("node: 删索引 %q 等待落地超时", name)
 }
 
 // ---------- transport.Handler 实现 ----------
@@ -473,6 +692,10 @@ func (n *Node) ShardDoc(indexName, id string) ([]byte, bool, error) {
 
 // ApplyOp primary 推送来的复制操作：按 LSN 对齐应用到本地副本分片
 func (n *Node) ApplyOp(indexName string, shard int32, lsn int64, opData []byte) (int64, error) {
+	if n.isRecovering(shardKey{indexName, int(shard)}) {
+		// 恢复中副本对 waitAll 表现为"不存在"（语义同 ES initializing 分片）
+		return -1, fmt.Errorf("node: 分片 %s[%d] 恢复中，暂不可用", indexName, shard)
+	}
 	ix, ok := n.Mgr.Get(indexName)
 	if !ok {
 		return -1, fmt.Errorf("node: 索引 %q 不存在", indexName)
@@ -502,25 +725,69 @@ func (n *Node) ForwardWrite(indexName string, shard int32, opData []byte, waitAl
 	return n.primaryWrite(indexName, meta, int(shard), op, opData)
 }
 
-// FetchTranslog 副本按 LSN 拉取本地 primary 分片的 translog
-func (n *Node) FetchTranslog(indexName string, shard int32, fromLSN int64, limit int32) ([][]byte, int64, error) {
+// FetchTranslog 副本按 LSN 拉取本地 primary 分片的 translog。
+// 拉取位点（fromLSN-1）即副本真实 ack，刷新保留窗口记账（retention lease）。
+func (n *Node) FetchTranslog(indexName string, shard int32, fromLSN int64, limit int32, nodeID uint64) ([][]byte, int64, int64, error) {
 	ix, ok := n.Mgr.Get(indexName)
 	if !ok {
-		return nil, 0, fmt.Errorf("node: 索引 %q 不存在", indexName)
+		return nil, 0, 0, fmt.Errorf("node: 索引 %q 不存在", indexName)
+	}
+	if nodeID != 0 {
+		n.recordReplAck(shardKey{indexName, int(shard)}, nodeID, fromLSN-1, true)
 	}
 	ops, next, err := ix.ReadShardTranslog(int(shard), fromLSN, int(limit))
 	if err != nil {
-		return nil, 0, err
+		return nil, 0, 0, err
+	}
+	oldest, err := ix.ShardOldestLSN(int(shard))
+	if err != nil {
+		return nil, 0, 0, err
 	}
 	out := make([][]byte, 0, len(ops))
 	for _, op := range ops {
 		b, err := json.Marshal(op)
 		if err != nil {
-			return nil, 0, err
+			return nil, 0, 0, err
 		}
 		out = append(out, b)
 	}
-	return out, next, nil
+	return out, next, oldest, nil
+}
+
+// PrepareShardRecovery 副本恢复源：冻结本分片 Flush/轮替并返回一致视图
+func (n *Node) PrepareShardRecovery(indexName string, shard int32) (int64, []byte, []transport.RecoveryFileInfo, error) {
+	ix, ok := n.Mgr.Get(indexName)
+	if !ok {
+		return 0, nil, nil, fmt.Errorf("node: 索引 %q 不存在", indexName)
+	}
+	rp, err := ix.PrepareShardRecovery(int(shard))
+	if err != nil {
+		return 0, nil, nil, err
+	}
+	files := make([]transport.RecoveryFileInfo, 0, len(rp.Files))
+	for _, f := range rp.Files {
+		files = append(files, transport.RecoveryFileInfo{SegDir: f.SegDir, Name: f.Name, Size: f.Size})
+	}
+	return rp.LSNBase, rp.SchemaJSON, files, nil
+}
+
+// FetchShardFile 按恢复点分块读取本地段文件
+func (n *Node) FetchShardFile(indexName string, shard int32, segDir, name string, off, limit int64) ([]byte, error) {
+	ix, ok := n.Mgr.Get(indexName)
+	if !ok {
+		return nil, fmt.Errorf("node: 索引 %q 不存在", indexName)
+	}
+	return ix.ReadShardFile(int(shard), segDir, name, off, limit)
+}
+
+// FinishShardRecovery 结束本分片恢复源会话（解冻 Flush/轮替）
+func (n *Node) FinishShardRecovery(indexName string, shard int32) error {
+	ix, ok := n.Mgr.Get(indexName)
+	if !ok {
+		return fmt.Errorf("node: 索引 %q 不存在", indexName)
+	}
+	ix.FinishShardRecovery(int(shard))
+	return nil
 }
 
 // RaftMessage 投递 raft 消息
@@ -534,6 +801,12 @@ func (n *Node) RaftMessage(data []byte) error {
 
 // JoinNode 处理节点加入：master 经 ConfChange 加入 raft group，data-only 只入元数据。
 // 返回本节点（leader）元信息，供加入方预注册地址表。
+//
+// 陈旧成员清理（remove_node）：master 节点加入时若节点表已存在同 NodeID
+// （同 grpc 地址）但不同 RaftID 的记录，说明旧成员磁盘已清（RaftID 每数据目录
+// 唯一）——先提案 CmdRemoveNode 彻底摘除旧记录（节点表/路由表/分片状态），
+// 再以一条 joint 成员变更原子移除旧 raft 成员并加入新成员。
+// 仅清理非 leader 的陈旧成员：旧记录指向 leader 自身属运维误操作，直接报错。
 func (n *Node) JoinNode(meta transport.NodeMeta) (transport.NodeMeta, error) {
 	rn := n.RaftNode()
 	if rn == nil {
@@ -541,7 +814,19 @@ func (n *Node) JoinNode(meta transport.NodeMeta) (transport.NodeMeta, error) {
 	}
 	var err error
 	if meta.Master {
-		err = rn.AddMaster(meta)
+		if existing, ok := n.state().Node(meta.ID); ok && existing.Master &&
+			cluster.RaftMemberID(existing) != cluster.RaftMemberID(meta) {
+			oldRaftID := cluster.RaftMemberID(existing)
+			if oldRaftID == cluster.RaftMemberID(n.Meta) {
+				return transport.NodeMeta{}, fmt.Errorf(
+					"node: 加入节点 %s 与 leader 自身地址冲突（同 NodeID 不同 RaftID），请检查配置（疑似两个数据目录共用同一地址）", meta.GRPCAddr)
+			}
+			mlog.Warn("node %s 检测到陈旧成员：NodeID=%d 旧 RaftID=%d 新 RaftID=%d，执行 remove_node 清理后重新加入",
+				meta.Name, meta.ID, oldRaftID, cluster.RaftMemberID(meta))
+			err = n.replaceStaleMember(rn, oldRaftID, meta)
+		} else {
+			err = rn.AddMaster(meta)
+		}
 	} else {
 		err = rn.Propose(cluster.Command{Type: cluster.CmdAddNode, Node: &meta})
 	}
@@ -549,6 +834,29 @@ func (n *Node) JoinNode(meta transport.NodeMeta) (transport.NodeMeta, error) {
 		return transport.NodeMeta{}, err
 	}
 	return n.Meta, nil
+}
+
+// replaceStaleMember 清理陈旧 master 成员并完成替换：先提案 CmdRemoveNode
+// 并等待旧记录从 CSM 摘除（保证先于新节点注册应用），再以一条 joint 成员
+// 变更原子移除旧 raft 成员并加入新成员。
+func (n *Node) replaceStaleMember(rn *cluster.RaftNode, oldRaftID uint64, meta transport.NodeMeta) error {
+	if !rn.IsLeader() {
+		return cluster.ErrNotLeader
+	}
+	if err := rn.Propose(cluster.Command{Type: cluster.CmdRemoveNode, NodeID: meta.ID}); err != nil {
+		return err
+	}
+	deadline := time.Now().Add(10 * time.Second)
+	for time.Now().Before(deadline) {
+		if _, ok := n.state().Node(meta.ID); !ok {
+			break
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+	if _, ok := n.state().Node(meta.ID); ok {
+		return fmt.Errorf("node: 陈旧成员 %d 摘除超时", meta.ID)
+	}
+	return rn.ReplaceMaster(oldRaftID, meta)
 }
 
 // ClusterState 返回集群状态快照

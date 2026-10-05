@@ -1,5 +1,6 @@
 // Package query 内置查询子句解析器插件：
-// match / term / terms / range / bool / match_all / ids。
+// match / term / terms / range / bool / match_all / ids /
+// match_phrase / multi_match / prefix / wildcard / fuzzy / exists。
 //
 // 解析产物是 plugin.QNode 查询树，由 index 引擎执行。
 package query
@@ -7,6 +8,8 @@ package query
 import (
 	"encoding/json"
 	"fmt"
+	"strconv"
+	"strings"
 
 	"github.com/FalconEngine/falcon/plugin"
 )
@@ -95,7 +98,7 @@ func parseTermValue(field string, raw json.RawMessage, ctx *plugin.ParseContext)
 	switch {
 	case fp.Inverted():
 		return plugin.TermNode{Field: field, Term: pv.Text}, nil
-	case fp.DocValues():
+	case fp.DocValuesKind() == plugin.DVNum:
 		return plugin.RangeNode{Field: field, Min: pv.Num, Max: pv.Num, HasMin: true, HasMax: true}, nil
 	default:
 		return nil, fmt.Errorf("字段 %q 类型 %q 不支持 term 查询", field, fp.Name())
@@ -152,7 +155,7 @@ func (rangeParser) Parse(body json.RawMessage, ctx *plugin.ParseContext) (plugin
 	if err != nil {
 		return nil, fmt.Errorf("range: %w", err)
 	}
-	if !fp.DocValues() {
+	if fp.DocValuesKind() != plugin.DVNum {
 		return nil, fmt.Errorf("range: 字段 %q 不是正排字段", field)
 	}
 	var bounds map[string]json.RawMessage
@@ -228,6 +231,132 @@ func (boolParser) Parse(body json.RawMessage, ctx *plugin.ParseContext) (plugin.
 	return node, nil
 }
 
+// ---------- match_phrase ----------
+
+type matchPhraseParser struct{}
+
+func (matchPhraseParser) Name() string { return "match_phrase" }
+
+func (matchPhraseParser) Parse(body json.RawMessage, ctx *plugin.ParseContext) (plugin.QNode, error) {
+	field, v, err := oneField(body)
+	if err != nil {
+		return nil, fmt.Errorf("match_phrase: %w", err)
+	}
+	fp, err := fieldPlugin(ctx, field)
+	if err != nil {
+		return nil, fmt.Errorf("match_phrase: %w", err)
+	}
+	if !fp.Inverted() {
+		return nil, fmt.Errorf("match_phrase: 字段 %q 不是倒排字段", field)
+	}
+
+	node := plugin.PhraseNode{Field: field}
+	// 支持简写 {"content": "quick brown"} 与完整 {"content": {"query": "quick brown", "slop": 0}}
+	var text string
+	if err := json.Unmarshal(v, &text); err == nil {
+		node.Text = text
+	} else {
+		var opts struct {
+			Query string `json:"query"`
+			Slop  int    `json:"slop"`
+		}
+		if err := json.Unmarshal(v, &opts); err != nil {
+			return nil, fmt.Errorf("match_phrase: 字段 %q 的值应为字符串或对象: %w", field, err)
+		}
+		node.Text, node.Slop = opts.Query, opts.Slop
+	}
+	if node.Slop < 0 {
+		return nil, fmt.Errorf("match_phrase: slop 不能为负，got %d", node.Slop)
+	}
+	if node.Slop > 0 {
+		return nil, fmt.Errorf("match_phrase: slop>0 暂未支持")
+	}
+	return node, nil
+}
+
+// ---------- multi_match ----------
+
+type multiMatchParser struct{}
+
+func (multiMatchParser) Name() string { return "multi_match" }
+
+// Parse 把 {"multi_match": {"query": "...", "fields": ["title^3", "content"]}}
+// 展开为 BoolNode{Should: [MatchNode{...Boost}...]}：should 并集加分近似 ES 的
+// best_fields（ES 取各字段最高分即 dis_max，本实现为分数累加，差异见注释）；
+// type 参数（most_fields/cross_fields/phrase 等）暂不支持。
+func (multiMatchParser) Parse(body json.RawMessage, ctx *plugin.ParseContext) (plugin.QNode, error) {
+	var v struct {
+		Query    string   `json:"query"`
+		Fields   []string `json:"fields"`
+		Operator string   `json:"operator"`
+	}
+	if err := json.Unmarshal(body, &v); err != nil {
+		return nil, fmt.Errorf("multi_match: 解析失败: %w", err)
+	}
+	if v.Query == "" {
+		return nil, fmt.Errorf("multi_match: query 不能为空")
+	}
+	if len(v.Fields) == 0 {
+		return nil, fmt.Errorf("multi_match: fields 不能为空")
+	}
+	if v.Operator != "" && v.Operator != "or" && v.Operator != "and" {
+		return nil, fmt.Errorf("multi_match: operator %q 非法，仅支持 or/and", v.Operator)
+	}
+	node := plugin.BoolNode{}
+	for _, spec := range v.Fields {
+		field, boost, err := parseFieldBoost(spec)
+		if err != nil {
+			return nil, fmt.Errorf("multi_match: %w", err)
+		}
+		fp, err := fieldPlugin(ctx, field)
+		if err != nil {
+			return nil, fmt.Errorf("multi_match: %w", err)
+		}
+		if !fp.Inverted() {
+			return nil, fmt.Errorf("multi_match: 字段 %q 不是倒排字段", field)
+		}
+		node.Should = append(node.Should, plugin.MatchNode{
+			Field: field, Text: v.Query, Operator: v.Operator, Boost: boost,
+		})
+	}
+	return node, nil
+}
+
+// parseFieldBoost 解析 "title^3" 形式的字段加权；无 "^" 时 boost 为 1
+func parseFieldBoost(spec string) (string, float64, error) {
+	field, boostStr, found := strings.Cut(spec, "^")
+	if field == "" {
+		return "", 0, fmt.Errorf("fields 元素 %q 字段名为空", spec)
+	}
+	if !found {
+		return field, 1, nil
+	}
+	boost, err := strconv.ParseFloat(boostStr, 64)
+	if err != nil || boost <= 0 {
+		return "", 0, fmt.Errorf("fields 元素 %q 的 boost 应为正数, got %q", spec, boostStr)
+	}
+	return field, boost, nil
+}
+
+// ---------- exists ----------
+
+type existsParser struct{}
+
+func (existsParser) Name() string { return "exists" }
+
+func (existsParser) Parse(body json.RawMessage, ctx *plugin.ParseContext) (plugin.QNode, error) {
+	var v struct {
+		Field string `json:"field"`
+	}
+	if err := json.Unmarshal(body, &v); err != nil || v.Field == "" {
+		return nil, fmt.Errorf("exists: 子句体应形如 {\"field\": \"<字段名>\"}")
+	}
+	if _, err := fieldPlugin(ctx, v.Field); err != nil {
+		return nil, fmt.Errorf("exists: %w", err)
+	}
+	return plugin.ExistsNode{Field: v.Field}, nil
+}
+
 // ---------- match_all / ids ----------
 
 type matchAllParser struct{}
@@ -260,4 +389,10 @@ func init() {
 	plugin.RegisterQuery(boolParser{})
 	plugin.RegisterQuery(matchAllParser{})
 	plugin.RegisterQuery(idsParser{})
+	plugin.RegisterQuery(matchPhraseParser{})
+	plugin.RegisterQuery(multiMatchParser{})
+	plugin.RegisterQuery(existsParser{})
+	plugin.RegisterQuery(prefixParser{})
+	plugin.RegisterQuery(wildcardParser{})
+	plugin.RegisterQuery(fuzzyParser{})
 }

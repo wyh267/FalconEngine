@@ -3,7 +3,18 @@ package segment
 import (
 	"path/filepath"
 	"testing"
+
+	"github.com/FalconEngine/falcon/plugin"
 )
+
+// toks 便捷构造 token 序列（Position 取下标）
+func toks(terms ...string) []plugin.Token {
+	out := make([]plugin.Token, 0, len(terms))
+	for i, term := range terms {
+		out = append(out, plugin.Token{Term: term, Position: i})
+	}
+	return out
+}
 
 func buildTestSegment(t *testing.T) string {
 	t.Helper()
@@ -12,32 +23,35 @@ func buildTestSegment(t *testing.T) string {
 		{
 			ID:  "doc1",
 			Raw: []byte(`{"title":"go 语言 入门","level":3}`),
-			Terms: map[string][]string{
-				"title": {"go", "语", "言", "入", "门"},
-				"tag":   {"tech"},
+			Terms: map[string][]plugin.Token{
+				"title": toks("go", "语", "言", "入", "门"),
+				"tag":   toks("tech"),
 			},
 			Nums: map[string]int64{"level": 3},
+			Kws:  map[string]string{"tag": "tech"},
 		},
 		{
 			ID:  "doc2",
 			Raw: []byte(`{"title":"go 进阶","level":5}`),
-			Terms: map[string][]string{
-				"title": {"go", "进", "阶"},
-				"tag":   {"tech"},
+			Terms: map[string][]plugin.Token{
+				"title": toks("go", "进", "阶"),
+				"tag":   toks("tech"),
 			},
 			Nums: map[string]int64{"level": 5},
+			Kws:  map[string]string{"tag": "tech"},
 		},
 		{
 			ID:  "doc3",
 			Raw: []byte(`{"title":"烹饪 大全"}`),
-			Terms: map[string][]string{
-				"title": {"烹", "饪", "大", "全"},
-				"tag":   {"life"},
+			Terms: map[string][]plugin.Token{
+				"title": toks("烹", "饪", "大", "全"),
+				"tag":   toks("life"),
 			},
 			Nums: map[string]int64{"level": 0},
+			Kws:  map[string]string{"tag": "life"},
 		},
 	}
-	if err := Write(dir, 1, []string{"title", "tag"}, []string{"title"}, []string{"level"}, docs); err != nil {
+	if err := Write(dir, 1, []string{"title", "tag"}, []string{"title"}, []string{"level"}, []string{"tag"}, docs); err != nil {
 		t.Fatalf("Write error: %v", err)
 	}
 	return dir
@@ -56,6 +70,20 @@ func collect(t *testing.T, r *Reader, field, term string) ([]uint32, []uint32) {
 		freqs = append(freqs, it.Freq())
 	}
 	return docs, freqs
+}
+
+// collectPos 迭代完整条倒排，返回各 doc 的 positions
+func collectPos(t *testing.T, r *Reader, field, term string) [][]uint32 {
+	t.Helper()
+	it, ok := r.Postings(field, term)
+	if !ok {
+		return nil
+	}
+	var out [][]uint32
+	for it.Next() {
+		out = append(out, append([]uint32(nil), it.Positions()...))
+	}
+	return out
 }
 
 func TestWriteAndOpen(t *testing.T) {
@@ -143,7 +171,7 @@ func TestNumPresence(t *testing.T) {
 		{ID: "a", Raw: []byte(`{}`), Nums: map[string]int64{"level": 7}},
 		{ID: "b", Raw: []byte(`{}`)}, // 无 level 值
 	}
-	if err := Write(dir, 1, nil, nil, []string{"level"}, docs); err != nil {
+	if err := Write(dir, 1, nil, nil, []string{"level"}, nil, docs); err != nil {
 		t.Fatalf("Write error: %v", err)
 	}
 	r, err := Open(dir)
@@ -187,5 +215,102 @@ func TestDeletePersistence(t *testing.T) {
 	}
 	if r2.LiveCount() != 2 {
 		t.Fatalf("LiveCount = %d, want 2", r2.LiveCount())
+	}
+}
+
+// TestFormatV2Markers v2 段：meta 版本号、倒排 positions、全字段 has 位、keyword 列
+func TestFormatV2Markers(t *testing.T) {
+	dir := buildTestSegment(t)
+	r, err := Open(dir)
+	if err != nil {
+		t.Fatalf("Open error: %v", err)
+	}
+	defer r.Close()
+
+	// 版本号
+	if r.m.Version != segmentFormatV2 {
+		t.Fatalf("meta.Version = %d, want %d", r.m.Version, segmentFormatV2)
+	}
+
+	// positions：title "go" 在 doc0/doc1 的位置都是 0；"语" 在 doc0 的位置是 1
+	pos := collectPos(t, r, "title", "go")
+	if len(pos) != 2 || pos[0][0] != 0 || pos[1][0] != 0 {
+		t.Fatalf("positions(title, go) = %v, want [[0] [0]]", pos)
+	}
+	pos = collectPos(t, r, "title", "语")
+	if len(pos) != 1 || len(pos[0]) != 1 || pos[0][0] != 1 {
+		t.Fatalf("positions(title, 语) = %v, want [[1]]", pos)
+	}
+
+	// 全字段 has 位（v2 起覆盖倒排字段）
+	if !r.Has("title", 0) || !r.Has("tag", 2) || !r.Has("level", 0) {
+		t.Fatal("Has 应对有值字段返回 true")
+	}
+	// doc3 的 level 显式置 0（有值）；字段完全缺失的情形见 TestNumPresence/TestKeywordEmptyMeansAbsent
+	if !r.Has("level", 2) {
+		t.Fatal("Has(level, 2) 应为 true（doc3 显式置 0）")
+	}
+	if r.Has("不存在字段", 0) {
+		t.Fatal("Has(不存在字段) 应为 false")
+	}
+
+	// keyword 列
+	kr, ok := r.Kw("tag")
+	if !ok {
+		t.Fatal("Kw(tag) 应存在")
+	}
+	if kr.Len() != 3 || kr.NumOrds() != 2 {
+		t.Fatalf("kw Len=%d NumOrds=%d, want 3/2", kr.Len(), kr.NumOrds())
+	}
+	for docID, want := range []string{"tech", "tech", "life"} {
+		ord, ok := kr.Ord(uint32(docID))
+		if !ok {
+			t.Fatalf("kw doc %d 应有值", docID)
+		}
+		if got := kr.Term(ord); got != want {
+			t.Fatalf("kw doc %d = %q, want %q", docID, got, want)
+		}
+	}
+	if ord, ok := kr.Lookup("life"); !ok || kr.Term(ord) != "life" {
+		t.Fatal("kw Lookup(life) 失败")
+	}
+	if _, ok := r.Kw("title"); ok {
+		t.Fatal("Kw(title) 不应存在（text 字段无 kw 列）")
+	}
+}
+
+// TestKeywordEmptyMeansAbsent keyword 空串视为无值
+func TestKeywordEmptyMeansAbsent(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "seg-0")
+	docs := []Doc{
+		{ID: "a", Raw: []byte(`{}`), Kws: map[string]string{"tag": "x"}},
+		{ID: "b", Raw: []byte(`{}`), Kws: map[string]string{"tag": ""}}, // 空串 = 无值
+		{ID: "c", Raw: []byte(`{}`)},                                    // 无该字段
+	}
+	if err := Write(dir, 1, nil, nil, nil, []string{"tag"}, docs); err != nil {
+		t.Fatalf("Write error: %v", err)
+	}
+	r, err := Open(dir)
+	if err != nil {
+		t.Fatalf("Open error: %v", err)
+	}
+	defer r.Close()
+
+	kr, ok := r.Kw("tag")
+	if !ok {
+		t.Fatal("Kw(tag) 应存在")
+	}
+	if _, ok := kr.Ord(0); !ok {
+		t.Fatal("doc0 应有值")
+	}
+	if _, ok := kr.Ord(1); ok {
+		t.Fatal("doc1 空串应视为无值")
+	}
+	if _, ok := kr.Ord(2); ok {
+		t.Fatal("doc2 无字段应视为无值")
+	}
+	// has 位与 kw 列一致
+	if !r.Has("tag", 0) || r.Has("tag", 1) || r.Has("tag", 2) {
+		t.Fatal("has(tag) 应与 kw 列一致")
 	}
 }

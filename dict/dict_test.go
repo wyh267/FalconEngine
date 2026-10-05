@@ -168,3 +168,107 @@ func TestBlockBoundary(t *testing.T) {
 		}
 	}
 }
+
+// TestScan 全量枚举：字典序完整遍历 + visit 返回 false 提前终止
+func TestScan(t *testing.T) {
+	const n = 32*2 + 5 // 跨多块
+	kvs := make(map[string]uint64, n)
+	keys := make([]string, 0, n)
+	for i := 0; i < n; i++ {
+		k := fmt.Sprintf("scan-%06d", i)
+		kvs[k] = uint64(i)
+		keys = append(keys, k)
+	}
+	r := buildAndOpen(t, kvs, keys)
+
+	var got []string
+	r.Scan(func(k string, v uint64) bool {
+		got = append(got, k)
+		if kvs[k] != v {
+			t.Fatalf("Scan 枚举 %q 的 value = %d，期望 %d", k, v, kvs[k])
+		}
+		return true
+	})
+	if len(got) != n {
+		t.Fatalf("Scan 枚举条数 = %d，期望 %d", len(got), n)
+	}
+	for i, k := range got {
+		if k != keys[i] {
+			t.Fatalf("Scan 第 %d 条 = %q，期望 %q（字典序）", i, k, keys[i])
+		}
+	}
+
+	// 提前终止：第 40 条（第二块中部）停止
+	got = got[:0]
+	r.Scan(func(k string, _ uint64) bool {
+		got = append(got, k)
+		return len(got) < 40
+	})
+	if len(got) != 40 || got[39] != keys[39] {
+		t.Fatalf("Scan 提前终止枚举 = %v...，期望 40 条且末条 %q", got[:3], keys[39])
+	}
+}
+
+// TestScanPrefix 前缀枚举：稀疏索引定位起始块、跨块前缀、越界提前结束
+func TestScanPrefix(t *testing.T) {
+	kvs := map[string]uint64{}
+	var keys []string
+	add := func(k string) {
+		kvs[k] = uint64(len(keys))
+		keys = append(keys, k)
+	}
+	// 构造跨块前缀：err- 前缀 40 条（跨 2 块），另有前后邻接 key
+	add("abc")
+	for i := 0; i < 40; i++ {
+		add(fmt.Sprintf("err-%04d", i))
+	}
+	add("errx") // 不以 "err-" 开头但以 "err" 开头
+	add("warn")
+	add("zzz")
+	r := buildAndOpen(t, kvs, keys)
+
+	collect := func(prefix string) []string {
+		var got []string
+		r.ScanPrefix(prefix, func(k string, v uint64) bool {
+			if kvs[k] != v {
+				t.Fatalf("ScanPrefix(%q) 枚举 %q value = %d，期望 %d", prefix, k, v, kvs[k])
+			}
+			got = append(got, k)
+			return true
+		})
+		return got
+	}
+
+	// 跨块前缀
+	got := collect("err-")
+	if len(got) != 40 || got[0] != "err-0000" || got[39] != "err-0039" {
+		t.Fatalf("ScanPrefix(err-) 条数/边界错误: %d 条, got[0]=%v", len(got), got)
+	}
+	// 前缀本身是完整 key 且落在块首
+	if got := collect("abc"); len(got) != 1 || got[0] != "abc" {
+		t.Fatalf("ScanPrefix(abc) = %v，期望 [abc]", got)
+	}
+	// 前缀跨多个 key（err- 与 errx 都以 err 开头）
+	if got := collect("err"); len(got) != 41 {
+		t.Fatalf("ScanPrefix(err) 条数 = %d，期望 41", len(got))
+	}
+	// 无匹配：落在两 key 之间 / 前缀区间之后 / 比全部 key 大
+	for _, miss := range []string{"abq", "err-9999", "zzz1"} {
+		if got := collect(miss); len(got) != 0 {
+			t.Fatalf("ScanPrefix(%q) = %v，期望空", miss, got)
+		}
+	}
+	// 空前缀等价全量
+	if got := collect(""); len(got) != len(keys) {
+		t.Fatalf("ScanPrefix(空) 条数 = %d，期望 %d", len(got), len(keys))
+	}
+	// 提前终止
+	cnt := 0
+	r.ScanPrefix("err-", func(_ string, _ uint64) bool {
+		cnt++
+		return cnt < 3
+	})
+	if cnt != 3 {
+		t.Fatalf("ScanPrefix 提前终止条数 = %d，期望 3", cnt)
+	}
+}

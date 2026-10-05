@@ -140,23 +140,75 @@ func (c *Client) ForwardWrite(addr, indexName string, shard int32, op []byte, wa
 	return resp.Lsn, nil
 }
 
-// FetchTranslog 从远端 primary 批量拉取 translog
-func (c *Client) FetchTranslog(addr, indexName string, shard int32, fromLSN int64, limit int32) ([][]byte, int64, error) {
+// FetchTranslog 从远端 primary 批量拉取 translog（nodeID 用于 primary 侧副本 ack 记账）
+func (c *Client) FetchTranslog(addr, indexName string, shard int32, fromLSN int64, limit int32, nodeID uint64) ([][]byte, int64, int64, error) {
 	resp, err := invoke[FetchTranslogRequest, FetchTranslogResponse](c, addr, "FetchTranslog",
-		&FetchTranslogRequest{Index: indexName, Shard: shard, FromLsn: fromLSN, Limit: limit})
+		&FetchTranslogRequest{Index: indexName, Shard: shard, FromLsn: fromLSN, Limit: limit, NodeId: nodeID})
 	if err != nil {
-		return nil, 0, err
+		return nil, 0, 0, err
 	}
 	if resp.Error != "" {
-		return nil, 0, fmt.Errorf("%s", resp.Error)
+		return nil, 0, 0, fmt.Errorf("%s", resp.Error)
 	}
-	return resp.Ops, resp.NextLsn, nil
+	return resp.Ops, resp.NextLsn, resp.OldestLsn, nil
+}
+
+// PrepareShardRecovery 请求远端 primary 开始分片恢复源会话
+func (c *Client) PrepareShardRecovery(addr, indexName string, shard int32) (int64, []byte, []RecoveryFileInfo, error) {
+	resp, err := invoke[PrepareShardRecoveryRequest, PrepareShardRecoveryResponse](c, addr, "PrepareShardRecovery",
+		&PrepareShardRecoveryRequest{Index: indexName, Shard: shard})
+	if err != nil {
+		return 0, nil, nil, err
+	}
+	if resp.Error != "" {
+		return 0, nil, nil, fmt.Errorf("%s", resp.Error)
+	}
+	return resp.LsnBase, resp.SchemaJson, resp.Files, nil
+}
+
+// FetchShardFile 从远端 primary 分块拉取恢复文件
+func (c *Client) FetchShardFile(addr, indexName string, shard int32, segDir, name string, off, limit int64) ([]byte, error) {
+	resp, err := invoke[FetchShardFileRequest, FetchShardFileResponse](c, addr, "FetchShardFile",
+		&FetchShardFileRequest{Index: indexName, Shard: shard, SegDir: segDir, Name: name, Off: off, Limit: limit})
+	if err != nil {
+		return nil, err
+	}
+	if resp.Error != "" {
+		return nil, fmt.Errorf("%s", resp.Error)
+	}
+	return resp.Data, nil
+}
+
+// FinishShardRecovery 结束远端 primary 的分片恢复源会话
+func (c *Client) FinishShardRecovery(addr, indexName string, shard int32) error {
+	resp, err := invoke[FinishShardRecoveryRequest, FinishShardRecoveryResponse](c, addr, "FinishShardRecovery",
+		&FinishShardRecoveryRequest{Index: indexName, Shard: shard})
+	if err != nil {
+		return err
+	}
+	if resp.Error != "" {
+		return fmt.Errorf("%s", resp.Error)
+	}
+	return nil
 }
 
 // ShardStatusReport 上报心跳与分片状态
 func (c *Client) ShardStatusReport(addr string, node NodeMeta, shards []ShardStatusItem) error {
 	resp, err := invoke[ShardStatusRequest, ShardStatusResponse](c, addr, "ShardStatusReport",
 		&ShardStatusRequest{Node: node, Shards: shards})
+	if err != nil {
+		return err
+	}
+	if resp.Error != "" {
+		return fmt.Errorf("%s", resp.Error)
+	}
+	return nil
+}
+
+// UpdateMapping 请求 leader 校验并提案 mapping 更新（增量字段，CSM 只增合并广播）
+func (c *Client) UpdateMapping(addr, indexName string, mapping []byte) error {
+	resp, err := invoke[UpdateMappingRequest, UpdateMappingResponse](c, addr, "UpdateMapping",
+		&UpdateMappingRequest{Index: indexName, Mapping: mapping})
 	if err != nil {
 		return err
 	}

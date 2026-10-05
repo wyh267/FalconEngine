@@ -24,6 +24,14 @@ type IndexSettings struct {
 	// WaitAll 对应 write.wait_for_active_shards："all" 时写请求等全部
 	// 存活副本 ack 后才返回；默认 "1"（仅 primary）
 	WaitAll string `json:"write_wait_for_active_shards,omitempty"`
+	// DateDetection 动态 mapping 日期检测开关：字符串值可解析为日期时
+	// 推断为 date 字段（nil 表示默认 true，对齐 ES）
+	DateDetection *bool `json:"date_detection,omitempty"`
+}
+
+// DateDetectionOn 动态 mapping 日期检测是否开启（未设置时默认 true）
+func (s IndexSettings) DateDetectionOn() bool {
+	return s.DateDetection == nil || *s.DateDetection
 }
 
 // indexMeta 索引元信息文件（<data>/<index>/index.json）：
@@ -32,6 +40,13 @@ type indexMeta struct {
 	NumShards   int    `json:"number_of_shards"`
 	NumReplicas int    `json:"number_of_replicas"`
 	WaitAll     string `json:"write_wait_for_active_shards,omitempty"`
+	// DateDetection 动态 mapping 日期检测开关（nil 默认 true，见 IndexSettings）
+	DateDetection *bool `json:"date_detection,omitempty"`
+}
+
+// dateDetectionOn 同 IndexSettings.DateDetectionOn（元信息视图）
+func (m indexMeta) dateDetectionOn() bool {
+	return m.DateDetection == nil || *m.DateDetection
 }
 
 // IndexInfo 索引摘要信息
@@ -82,7 +97,7 @@ func OpenManager(dir string) (*Manager, error) {
 				}
 			}
 		}
-		ix, err := OpenIndex(sub, ent.Name(), meta.NumShards, meta.NumReplicas, nil, shardIDs)
+		ix, err := OpenIndex(sub, ent.Name(), meta.NumShards, meta.NumReplicas, meta.dateDetectionOn(), nil, shardIDs)
 		if err != nil {
 			return nil, fmt.Errorf("index: 加载索引 %q 失败: %w", ent.Name(), err)
 		}
@@ -131,11 +146,11 @@ func (m *Manager) Create(name string, settings IndexSettings, sch *schema.Schema
 		return nil, err
 	}
 	// 先写元信息，再建分片（元信息存在即视为索引存在）
-	mb, _ := json.Marshal(indexMeta{NumShards: settings.NumShards, NumReplicas: settings.NumReplicas, WaitAll: settings.WaitAll})
+	mb, _ := json.Marshal(indexMeta{NumShards: settings.NumShards, NumReplicas: settings.NumReplicas, WaitAll: settings.WaitAll, DateDetection: settings.DateDetection})
 	if err := os.WriteFile(filepath.Join(dir, "index.json"), mb, 0o644); err != nil {
 		return nil, err
 	}
-	ix, err := OpenIndex(dir, name, settings.NumShards, settings.NumReplicas, sch, nil)
+	ix, err := OpenIndex(dir, name, settings.NumShards, settings.NumReplicas, settings.DateDetectionOn(), sch, nil)
 	if err != nil {
 		os.RemoveAll(dir)
 		return nil, err
@@ -162,12 +177,12 @@ func (m *Manager) EnsureShard(name string, settings IndexSettings, sch *schema.S
 		if err := os.MkdirAll(dir, 0o755); err != nil {
 			return err
 		}
-		mb, _ := json.Marshal(indexMeta{NumShards: settings.NumShards, NumReplicas: settings.NumReplicas, WaitAll: settings.WaitAll})
+		mb, _ := json.Marshal(indexMeta{NumShards: settings.NumShards, NumReplicas: settings.NumReplicas, WaitAll: settings.WaitAll, DateDetection: settings.DateDetection})
 		if err := os.WriteFile(filepath.Join(dir, "index.json"), mb, 0o644); err != nil {
 			return err
 		}
 		var err error
-		ix, err = OpenIndex(dir, name, settings.NumShards, settings.NumReplicas, sch, []int{})
+		ix, err = OpenIndex(dir, name, settings.NumShards, settings.NumReplicas, settings.DateDetectionOn(), sch, []int{})
 		if err != nil {
 			return err
 		}

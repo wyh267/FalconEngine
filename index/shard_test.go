@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"path/filepath"
+	"reflect"
 	"testing"
 
 	"github.com/FalconEngine/falcon/schema"
@@ -142,6 +143,90 @@ func TestShardReopen(t *testing.T) {
 	res := mustSearchIndex(t, ix2, `{"query":{"match":{"title":"恢复"}},"size":100}`)
 	if res.Total != 10 {
 		t.Fatalf("重启后 Total = %d, want 10", res.Total)
+	}
+}
+
+// TestMultiShardSortMerge 多分片排序归并：date 与 keyword 字段的全局排序
+// 由协调层按分片侧上报的排序键归并（而非从 _source 猜测），缓冲/段混合态下
+// 顺序与单机语义一致（缺失恒排最后，同值按 ID 升序兜底）
+func TestMultiShardSortMerge(t *testing.T) {
+	sch, _ := schema.New([]schema.Field{
+		{Name: "title", Type: "text"},
+		{Name: "tag", Type: "keyword"},
+		{Name: "ts", Type: "date"},
+	})
+	mgr, err := OpenManager(filepath.Join(t.TempDir(), "data"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mgr.Close()
+
+	ix, err := mgr.Create("sorted", IndexSettings{NumShards: 3}, sch)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// 跨分片写入：date 字段在原文里是字符串，旧实现协调层从 _source 按
+	// 数字猜测排序值会全部视为缺失（本用例在修复前失败）
+	type doc struct{ id, tag, ts string } // ts 为空表示该字段缺失
+	docs := []doc{
+		{"d1", "banana", "2024-03-01 00:00:00"},
+		{"d2", "apple", "2024-01-01 08:30:00"},
+		{"d3", "cherry", "2024-02-01"},
+		{"d4", "apple", "2024-05-01 12:00:00"},
+		{"d5", "banana", "2024-04-01 00:00:00"},
+		{"d6", "cherry", ""}, // 缺 ts，恒排最后
+	}
+	used := map[int]bool{}
+	for i, d := range docs {
+		raw := fmt.Sprintf(`{"title":"标题 %s","tag":%q`, d.id, d.tag)
+		if d.ts != "" {
+			raw += fmt.Sprintf(`,"ts":%q`, d.ts)
+		}
+		raw += `}`
+		mustIndexIndex(t, ix, d.id, raw)
+		used[ix.ShardOf(d.id)] = true
+		if i == 2 {
+			ix.Flush() // 一半落盘，制造 缓冲+段 混合态
+		}
+	}
+	if len(used) < 2 {
+		t.Fatalf("6 篇文档只路由到 %d 个分片，用例无效", len(used))
+	}
+
+	// date 升序：ts 缺失的 d6 最后；同值按 ID 升序兜底（本例无同值）
+	res := mustSearchIndex(t, ix, `{"query":{"match_all":{}},"sort":[{"ts":"asc"}],"size":10}`)
+	if got, want := hitIDs(res), []string{"d2", "d3", "d1", "d5", "d4", "d6"}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("date 升序归并 = %v, want %v", got, want)
+	}
+	// date 降序：缺失仍最后
+	res = mustSearchIndex(t, ix, `{"query":{"match_all":{}},"sort":[{"ts":"desc"}],"size":10}`)
+	if got, want := hitIDs(res), []string{"d4", "d5", "d1", "d3", "d2", "d6"}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("date 降序归并 = %v, want %v", got, want)
+	}
+	// keyword 升序：apple(d2,d4) → banana(d1,d5) → cherry(d3,d6)，同 tag 按 ID 升序
+	res = mustSearchIndex(t, ix, `{"query":{"match_all":{}},"sort":[{"tag":"asc"}],"size":10}`)
+	if got, want := hitIDs(res), []string{"d2", "d4", "d1", "d5", "d3", "d6"}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("keyword 升序归并 = %v, want %v", got, want)
+	}
+	// keyword 降序 + 分页：cherry(d3,d6) → banana(d1,d5)，from=2,size=2 → banana 两篇
+	res = mustSearchIndex(t, ix, `{"query":{"match_all":{}},"sort":[{"tag":"desc"}],"from":2,"size":2}`)
+	if got, want := hitIDs(res), []string{"d1", "d5"}; !reflect.DeepEqual(got, want) || res.Total != 6 {
+		t.Fatalf("keyword 降序分页 = %v total=%d, want %v total=6", got, res.Total, want)
+	}
+
+	// 排序键经 transport JSON 序列化往返不丢失（node 层跨节点 scatter-gather
+	// 的远端分片结果即按此编解码）
+	raw, err := json.Marshal(res)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var roundTrip Result
+	if err := json.Unmarshal(raw, &roundTrip); err != nil {
+		t.Fatal(err)
+	}
+	if got := string(roundTrip.Hits[0].Sort[0]); got != `"banana"` {
+		t.Fatalf("JSON 往返后排序键 = %s, want %q", got, `"banana"`)
 	}
 }
 

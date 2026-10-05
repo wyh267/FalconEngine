@@ -17,12 +17,16 @@ type dslRequest struct {
 	Aggs  map[string]json.RawMessage   `json:"aggs"` // {聚合名: {"<类型>": {...}}}
 }
 
-// parseContext 构建查询/聚合解析上下文（按字段名查其类型插件）
+// parseContext 构建本引擎的查询/聚合解析上下文：按字段名查类型插件，
+// 并提供词典展开能力（multi-term 查询解析期展开用，自持读锁见 expandTerms）
 func (e *Engine) parseContext() *plugin.ParseContext {
-	return parseContextOf(e.schema)
+	ctx := parseContextOf(e.schema)
+	ctx.ExpandTerms = e.expandTerms
+	return ctx
 }
 
-// parseContextOf 按 schema 构建解析上下文（协调层无本地引擎时直接用）
+// parseContextOf 按 schema 构建解析上下文（协调层无本地引擎时直接用；
+// 无词典数据，ExpandTerms 留空——multi-term 节点在分片侧重新解析时才展开）
 func parseContextOf(sch *schema.Schema) *plugin.ParseContext {
 	return &plugin.ParseContext{
 		FieldPlugin: func(field string) (plugin.FieldTypePlugin, bool) {
@@ -58,16 +62,20 @@ type dslParsed struct {
 
 // parseDSL 解析 DSL 顶层：查询子句 + 排序 + 分页 + 聚合规格
 func (e *Engine) parseDSL(body []byte) (*dslParsed, error) {
-	return parseDSLWithSchema(body, e.schema)
+	return parseDSLWithContext(body, e.parseContext())
 }
 
-// parseDSLWithSchema 用给定 schema 解析 DSL（协调层用）
+// parseDSLWithSchema 用给定 schema 解析 DSL（协调层用：无本地引擎，词典展开留空）
 func parseDSLWithSchema(body []byte, sch *schema.Schema) (*dslParsed, error) {
+	return parseDSLWithContext(body, parseContextOf(sch))
+}
+
+// parseDSLWithContext 用给定解析上下文解析 DSL 顶层
+func parseDSLWithContext(body []byte, ctx *plugin.ParseContext) (*dslParsed, error) {
 	var req dslRequest
 	if err := json.Unmarshal(body, &req); err != nil {
 		return nil, fmt.Errorf("index: DSL 解析失败: %w", err)
 	}
-	ctx := parseContextOf(sch)
 
 	// 查询子句
 	root := plugin.QNode(plugin.MatchAllNode{})

@@ -12,7 +12,7 @@ package transport
 // NodeMeta 节点元信息
 type NodeMeta struct {
 	ID       uint64 `json:"id"`                // 节点身份（由 grpc 地址派生，重启不变；路由表/心跳用）
-	RaftID   uint64 `json:"raft_id,omitempty"` // raft 成员 ID（每次启动唯一，重启即新成员重新加入）
+	RaftID   uint64 `json:"raft_id,omitempty"` // raft 成员 ID（master 节点每数据目录唯一并持久化，重启复用；data-only 节点每次启动唯一）
 	Name     string `json:"name"`
 	GRPCAddr string `json:"grpc_addr"`
 	HTTPAddr string `json:"http_addr"`
@@ -79,12 +79,57 @@ type FetchTranslogRequest struct {
 	Shard   int32  `json:"shard"`
 	FromLsn int64  `json:"from_lsn"`
 	Limit   int32  `json:"limit"`
+	NodeId  uint64 `json:"node_id"` // 拉取方节点 ID：primary 按它刷新副本 ack（retention lease）
 }
 type FetchTranslogResponse struct {
-	Ops     [][]byte `json:"ops"`      // 每个元素为 translog Op 的 JSON 编码
-	FromLsn int64    `json:"from_lsn"` // Ops[0] 对应的 LSN
-	NextLsn int64    `json:"next_lsn"` // 下一条可用 LSN
-	Error   string   `json:"error,omitempty"`
+	Ops       [][]byte `json:"ops"`        // 每个元素为 translog Op 的 JSON 编码
+	FromLsn   int64    `json:"from_lsn"`   // Ops[0] 对应的 LSN
+	NextLsn   int64    `json:"next_lsn"`   // 下一条可用 LSN
+	OldestLsn int64    `json:"oldest_lsn"` // 保留窗口内最老可用 LSN（from_lsn < oldest_lsn 表示落后出窗，需段拷贝恢复）
+	Error     string   `json:"error,omitempty"`
+}
+
+// 分片恢复（peer recovery）：段拷贝 + translog 补差两阶段。
+// 恢复点内的文件分块经 JSON codec 传输（[]byte 自动 base64），
+// 大段拷贝慢——后续可换流式 RPC（遗留优化，注释标记）。
+
+type RecoveryFileInfo struct {
+	SegDir string `json:"seg_dir"` // 段目录名（相对分片目录）
+	Name   string `json:"name"`
+	Size   int64  `json:"size"` // Prepare 时刻大小（按此前缀拷贝）
+}
+
+type PrepareShardRecoveryRequest struct {
+	Index string `json:"index"`
+	Shard int32  `json:"shard"`
+}
+type PrepareShardRecoveryResponse struct {
+	LsnBase    int64              `json:"lsn_base"` // 当前代际基线 LSN：副本重建后从此处拉取差量
+	SchemaJson []byte             `json:"schema_json"`
+	Files      []RecoveryFileInfo `json:"files"`
+	Error      string             `json:"error,omitempty"`
+}
+
+// FetchShardFileRequest 按恢复点分块拉取段文件（单块上限 1MB）
+type FetchShardFileRequest struct {
+	Index  string `json:"index"`
+	Shard  int32  `json:"shard"`
+	SegDir string `json:"seg_dir"`
+	Name   string `json:"name"`
+	Off    int64  `json:"off"`
+	Limit  int64  `json:"limit"`
+}
+type FetchShardFileResponse struct {
+	Data  []byte `json:"data"`
+	Error string `json:"error,omitempty"`
+}
+
+type FinishShardRecoveryRequest struct {
+	Index string `json:"index"`
+	Shard int32  `json:"shard"`
+}
+type FinishShardRecoveryResponse struct {
+	Error string `json:"error,omitempty"`
 }
 
 // ShardStatusItem 节点上报的单分片状态
@@ -102,6 +147,16 @@ type ShardStatusRequest struct {
 	Shards []ShardStatusItem `json:"shards"`
 }
 type ShardStatusResponse struct {
+	Error string `json:"error,omitempty"`
+}
+
+// UpdateMappingRequest mapping 更新（发给 master leader）：
+// Mapping 为 {"fields":[...]} 增量 schema JSON，leader 校验后提案 CmdUpdateMapping（CSM 只增合并）
+type UpdateMappingRequest struct {
+	Index   string `json:"index"`
+	Mapping []byte `json:"mapping"`
+}
+type UpdateMappingResponse struct {
 	Error string `json:"error,omitempty"`
 }
 type ApplyOpResponse struct {

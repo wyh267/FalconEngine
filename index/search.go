@@ -3,9 +3,13 @@ package index
 import (
 	"encoding/json"
 	"fmt"
+	"path/filepath"
 	"sort"
+	"strings"
 
 	"github.com/FalconEngine/falcon/plugin"
+	"github.com/FalconEngine/falcon/posting"
+	"github.com/FalconEngine/falcon/schema"
 )
 
 // defaultScorer 引擎默认打分器（可在 MatchNode.Scorer 中按查询覆盖）
@@ -23,6 +27,10 @@ type Hit struct {
 	ID     string          `json:"id"`
 	Score  float64         `json:"score"`
 	Source json.RawMessage `json:"_source"`
+	// Sort 分片侧填充的实际排序键序列（与请求 sort 一一对应）：
+	// number/date/bool→int64 JSON，keyword→字符串 JSON，_score→float JSON，缺失→null；
+	// 协调层据此跨分片归并（不再从 _source 猜测排序值），无排序字段时为 nil
+	Sort []json.RawMessage `json:"sort,omitempty"`
 }
 
 // SearchOptions 检索选项
@@ -62,7 +70,8 @@ func (e *Engine) Search(root plugin.QNode, opts *SearchOptions) (*Result, error)
 	if opts == nil {
 		opts = &SearchOptions{}
 	}
-	if err := e.validateSortLocked(opts.Sort); err != nil {
+	sortKinds, err := e.validateSortLocked(opts.Sort)
+	if err != nil {
 		return nil, err
 	}
 	if root == nil {
@@ -82,7 +91,7 @@ func (e *Engine) Search(root plugin.QNode, opts *SearchOptions) (*Result, error)
 		}
 	}
 
-	e.sortCandidatesLocked(out, opts.Sort)
+	e.sortCandidatesLocked(out, opts.Sort, sortKinds)
 
 	// 聚合作用于全部命中文档（分页之前）
 	aggRes, err := e.runAggsLocked(out, opts.Aggs, opts.AggPartial)
@@ -114,7 +123,10 @@ func (e *Engine) Search(root plugin.QNode, opts *SearchOptions) (*Result, error)
 		if err != nil {
 			return nil, err
 		}
-		res.Hits = append(res.Hits, Hit{ID: id, Score: c.score, Source: source})
+		res.Hits = append(res.Hits, Hit{
+			ID: id, Score: c.score, Source: source,
+			Sort: e.hitSortKeysLocked(c, opts.Sort, sortKinds),
+		})
 	}
 	return res, nil
 }
@@ -123,6 +135,14 @@ func (e *Engine) Search(root plugin.QNode, opts *SearchOptions) (*Result, error)
 func (e *Engine) runAggsLocked(out []*candidate, aggs map[string]plugin.Aggregator, partial bool) (map[string]json.RawMessage, error) {
 	if len(aggs) == 0 {
 		return nil, nil
+	}
+	// 预解析各字符串聚合的取值路径：DVKeyword 字段走 kw 列/Kws（免原文 JSON 解析），
+	// 无 kw 列的字段回落 stored 原文解析
+	kwField := make(map[string]bool, len(aggs))
+	for _, ag := range aggs {
+		if ag.Kind() == plugin.AggString {
+			kwField[ag.Field()] = e.dvKindOfLocked(ag.Field()) == plugin.DVKeyword
+		}
 	}
 	for _, c := range out {
 		for _, ag := range aggs {
@@ -133,9 +153,18 @@ func (e *Engine) runAggsLocked(out []*candidate, aggs map[string]plugin.Aggregat
 					ag.CollectNum(v)
 				}
 			case plugin.AggString:
-				if s, ok, err := e.stringValLocked(field, c.segIdx, c.loc); err != nil {
+				var s string
+				var ok bool
+				var err error
+				if kwField[field] {
+					s, ok, err = e.kwAggValLocked(field, c.segIdx, c.loc)
+				} else {
+					s, ok, err = e.stringValLocked(field, c.segIdx, c.loc)
+				}
+				if err != nil {
 					return nil, err
-				} else if ok {
+				}
+				if ok {
 					ag.CollectString(s)
 				}
 			}
@@ -157,8 +186,26 @@ func (e *Engine) runAggsLocked(out []*candidate, aggs map[string]plugin.Aggregat
 	return res, nil
 }
 
-// stringValLocked 从原文中提取字段的字符串值（keyword 聚合用）。
-// JSON 字符串去引号，其他类型取其 JSON 文本；字段缺失返回 false。
+// kwAggValLocked keyword dv 字段的聚合取值：优先走 kw 列/Kws（免原文解析）；
+// 段无 kw 列时（v1 老段、字段后加导致老段缺索引文件）回落原文 JSON 解析
+// （慢但语义一致，与 exists 查询的 v1 回落同一策略）。
+// 空串与 kw 列"空串即无值"语义一致，两条路径都视为缺失。
+func (e *Engine) kwAggValLocked(field string, segIdx int, loc uint32) (string, bool, error) {
+	if segIdx >= 0 {
+		if _, hasKw := e.segs[segIdx].Kw(field); !hasKw {
+			s, ok, err := e.stringValLocked(field, segIdx, loc)
+			if err != nil || !ok || s == "" {
+				return "", false, err
+			}
+			return s, true, nil
+		}
+	}
+	s, ok := e.kwValLocked(field, segIdx, loc)
+	return s, ok, nil
+}
+
+// stringValLocked 从原文中提取字段的字符串值（字符串聚合的回落取值路径：
+// 无 kw 列的字段或段）。JSON 字符串去引号，其他类型取其 JSON 文本；字段缺失返回 false。
 func (e *Engine) stringValLocked(field string, segIdx int, loc uint32) (string, bool, error) {
 	_, raw, err := e.loadDocLocked(segIdx, loc)
 	if err != nil {
@@ -179,47 +226,91 @@ func (e *Engine) stringValLocked(field string, segIdx int, loc uint32) (string, 
 	return string(fv), true, nil
 }
 
-// validateSortLocked 校验排序字段：必须是建了正排的字段或 "_score"
-func (e *Engine) validateSortLocked(sorts []SortField) error {
-	for _, s := range sorts {
+// validateSortLocked 校验排序字段并返回各字段的正排类型（"_score" 位为 DVNone）。
+// keyword dv 字段额外要求各段都有 kw 列可读：v1 老段无 kw 列且排序器无法回落
+// 原文解析，报带 _flush/merge 指引的错误（同 match_phrase 的 v1 处理策略）；
+// v2 段缺个别字段的 kw 文件（字段后加）按"字段缺失"处理，merge 后自愈。
+func (e *Engine) validateSortLocked(sorts []SortField) ([]plugin.DVKind, error) {
+	kinds, err := validateSortFields(e.schema, sorts)
+	if err != nil {
+		return nil, err
+	}
+	for i, s := range sorts {
+		if kinds[i] != plugin.DVKeyword {
+			continue
+		}
+		for _, seg := range e.segs {
+			if seg.Version() < 2 {
+				return nil, fmt.Errorf("index: 段 %s 为 v1 格式不含 kw 列，无法按 keyword 字段 %q 排序，请执行 _flush 或等待 merge 重建", filepath.Base(seg.Dir()), s.Field)
+			}
+		}
+	}
+	return kinds, nil
+}
+
+// validateSortFields 按 schema 校验排序字段（协调层无本地段时同样适用）：
+// 字段须存在且建了正排列（number 定长列或 keyword ord 列）或为 "_score"；
+// text 本体不支持排序——本引擎明确不做 fielddata，引导改用 keyword 子字段。
+// 返回各字段的正排类型（"_score" 位为 DVNone）。
+func validateSortFields(sch *schema.Schema, sorts []SortField) ([]plugin.DVKind, error) {
+	kinds := make([]plugin.DVKind, len(sorts))
+	for i, s := range sorts {
 		if s.Field == "_score" {
 			continue
 		}
-		f, ok := e.schema.Field(s.Field)
+		f, ok := sch.Field(s.Field)
 		if !ok {
-			return fmt.Errorf("index: 排序字段 %q 不存在", s.Field)
+			return nil, fmt.Errorf("index: 排序字段 %q 不存在", s.Field)
 		}
 		p, err := plugin.GetFieldType(f.Type)
 		if err != nil {
-			return err
+			return nil, err
 		}
-		if !p.DocValues() {
-			return fmt.Errorf("index: 字段 %q 类型 %s 不支持排序", s.Field, f.Type)
+		switch p.DocValuesKind() {
+		case plugin.DVNum, plugin.DVKeyword:
+			kinds[i] = p.DocValuesKind()
+		default:
+			if p.Inverted() {
+				return nil, fmt.Errorf("index: text 字段 %q 不支持排序，请使用其 keyword 子字段（如 %q）；本引擎不做 fielddata", s.Field, s.Field+".keyword")
+			}
+			return nil, fmt.Errorf("index: 字段 %q 类型 %s 不支持排序", s.Field, f.Type)
 		}
 	}
-	return nil
+	return kinds, nil
 }
 
 // sortCandidatesLocked 排序候选：按 Sort 依次比较，同分时按 _score desc、ID 升序兜底。
 // 以 ID 升序兜底是为了让结果顺序与段合并无关（合并前后对拍一致）。
-func (e *Engine) sortCandidatesLocked(out []*candidate, sorts []SortField) {
+// keyword dv 字段比较 term 字符串本身：kw 列的 ord 是每段局部的字典序号，
+// 跨段（段与段、段与缓冲）比 ord 无意义，只能比 term 字符串。
+func (e *Engine) sortCandidatesLocked(out []*candidate, sorts []SortField, kinds []plugin.DVKind) {
 	sort.Slice(out, func(i, j int) bool {
 		a, b := out[i], out[j]
-		for _, s := range sorts {
-			if s.Field == "_score" {
+		for k, s := range sorts {
+			switch kinds[k] {
+			case plugin.DVNum:
+				va, oka := e.numValLocked(s.Field, a.segIdx, a.loc)
+				vb, okb := e.numValLocked(s.Field, b.segIdx, b.loc)
+				// 字段缺失的恒排在最后
+				if oka != okb {
+					return oka
+				}
+				if oka && va != vb {
+					return (va > vb) == s.Desc
+				}
+			case plugin.DVKeyword:
+				sa, oka := e.kwValLocked(s.Field, a.segIdx, a.loc)
+				sb, okb := e.kwValLocked(s.Field, b.segIdx, b.loc)
+				if oka != okb {
+					return oka
+				}
+				if oka && sa != sb {
+					return (sa > sb) == s.Desc
+				}
+			default: // "_score"
 				if a.score != b.score {
 					return (a.score > b.score) == s.Desc
 				}
-				continue
-			}
-			va, oka := e.numValLocked(s.Field, a.segIdx, a.loc)
-			vb, okb := e.numValLocked(s.Field, b.segIdx, b.loc)
-			// 字段缺失的恒排在最后
-			if oka != okb {
-				return oka
-			}
-			if oka && va != vb {
-				return (va > vb) == s.Desc
 			}
 		}
 		// 未指定排序时默认 _score desc
@@ -236,6 +327,65 @@ func (e *Engine) numValLocked(field string, segIdx int, loc uint32) (int64, bool
 		return e.buf.num(field, loc)
 	}
 	return e.segs[segIdx].Num(field, loc)
+}
+
+// kwValLocked 读取候选的 keyword dv 值（term 字符串）；字段或值缺失返回 false
+func (e *Engine) kwValLocked(field string, segIdx int, loc uint32) (string, bool) {
+	if segIdx < 0 {
+		return e.buf.kw(field, loc)
+	}
+	kr, ok := e.segs[segIdx].Kw(field)
+	if !ok {
+		return "", false
+	}
+	ord, ok := kr.Ord(loc)
+	if !ok {
+		return "", false
+	}
+	return kr.Term(ord), true
+}
+
+// dvKindOfLocked 返回字段的正排类型；字段不存在或类型未注册返回 DVNone
+func (e *Engine) dvKindOfLocked(field string) plugin.DVKind {
+	f, ok := e.schema.Field(field)
+	if !ok {
+		return plugin.DVNone
+	}
+	p, err := plugin.GetFieldType(f.Type)
+	if err != nil {
+		return plugin.DVNone
+	}
+	return p.DocValuesKind()
+}
+
+// hitSortKeysLocked 生成命中的排序键序列（协调层跨分片归并用，见 Hit.Sort）；
+// 无排序字段时返回 nil
+func (e *Engine) hitSortKeysLocked(c *candidate, sorts []SortField, kinds []plugin.DVKind) []json.RawMessage {
+	if len(sorts) == 0 {
+		return nil
+	}
+	keys := make([]json.RawMessage, len(sorts))
+	for i, s := range sorts {
+		var v any
+		switch kinds[i] {
+		case plugin.DVNum:
+			if n, ok := e.numValLocked(s.Field, c.segIdx, c.loc); ok {
+				v = n
+			}
+		case plugin.DVKeyword:
+			if kw, ok := e.kwValLocked(s.Field, c.segIdx, c.loc); ok {
+				v = kw
+			}
+		default: // "_score"
+			v = c.score
+		}
+		if v == nil {
+			keys[i] = json.RawMessage("null")
+		} else {
+			keys[i], _ = json.Marshal(v)
+		}
+	}
+	return keys
 }
 
 // idOfLocked 读取候选的外部 ID（排序兜底用）
@@ -262,6 +412,12 @@ func (e *Engine) evalLocked(n plugin.QNode, scoring bool) (map[uint64]*candidate
 		return e.evalMatchLocked(node, scoring)
 	case plugin.TermNode:
 		return e.collectTermLocked(node.Field, node.Term, 1), nil
+	case plugin.MultiTermNode:
+		return e.evalMultiTermLocked(node), nil
+	case plugin.ExistsNode:
+		return e.evalExistsLocked(node)
+	case plugin.PhraseNode:
+		return e.evalPhraseLocked(node, scoring)
 	case plugin.RangeNode:
 		return e.evalRangeLocked(node), nil
 	case plugin.IDsNode:
@@ -290,13 +446,17 @@ func (e *Engine) evalMatchLocked(node plugin.MatchNode, scoring bool) (map[uint6
 	if node.Operator != "" && node.Operator != "or" && node.Operator != "and" {
 		return nil, fmt.Errorf("index: operator %q 非法，仅支持 or/and", node.Operator)
 	}
-	a, err := plugin.GetAnalyzer(fp.Analyzer())
+	a, err := analyzerOf(f)
 	if err != nil {
 		return nil, err
 	}
-	terms := a.Tokenize(node.Text)
-	if len(terms) == 0 {
+	toks := a.Analyze(node.Text)
+	if len(toks) == 0 {
 		return map[uint64]*candidate{}, nil
+	}
+	terms := make([]string, len(toks))
+	for i, t := range toks {
+		terms[i] = t.Term
 	}
 
 	// 打分器：有 norms 且需要打分时从注册表取
@@ -316,6 +476,11 @@ func (e *Engine) evalMatchLocked(node plugin.MatchNode, scoring bool) (map[uint6
 	}
 
 	merged := map[uint64]*candidate{}
+	// 查询时加权（multi_match 的 field^boost 展开用）；零值/负值兜底为 1
+	boost := node.Boost
+	if boost <= 0 {
+		boost = 1
+	}
 	for ti, term := range terms {
 		cur := map[uint64]*candidate{}
 		df := 0
@@ -327,12 +492,12 @@ func (e *Engine) evalMatchLocked(node plugin.MatchNode, scoring bool) (map[uint6
 			if scorer != nil {
 				score = scorer.Score(tf, dl, df, n, avgdl)
 			}
-			cur[srcKey(segIdx, docID)] = &candidate{segIdx: segIdx, loc: docID, score: score}
+			cur[srcKey(segIdx, docID)] = &candidate{segIdx: segIdx, loc: docID, score: score * boost}
 		}
 		// 缓冲
 		if plist, ok := e.buf.postings(node.Field, term); ok {
 			for _, p := range plist {
-				add(-1, p.docID, int64(p.tf), e.buf.docLen(node.Field, p.docID))
+				add(-1, p.docID, int64(len(p.positions)), e.buf.docLen(node.Field, p.docID))
 			}
 		}
 		// 各段
@@ -367,6 +532,221 @@ func (e *Engine) evalMatchLocked(node plugin.MatchNode, scoring bool) (map[uint6
 		}
 	}
 	return merged, nil
+}
+
+// evalPhraseLocked 短语匹配（match_phrase，本期仅 Slop=0）：
+// 查询串经字段分词器分析为带位置的 term 序列，各 term 取相对首个 term 的位置偏移
+// （token filter 删除停用词会造成跳号，索引侧与查询侧走同一分析链、偏移同构）；
+// 以全局 docFreq 最小的 term 为主驱动，其余 term 用 Advance 对齐 docID（缓冲侧直接
+// map 查）；共同命中的 doc 再验证存在起始位置 p 使第 i 个 term 出现在 p+offs[i]。
+// 打分简化为各 term BM25 得分之和，短语整体词频不参与——与 ES 的 phrase scorer
+// 有差异（ES 以短语出现次数计 tf），此处为简化实现。
+func (e *Engine) evalPhraseLocked(node plugin.PhraseNode, scoring bool) (map[uint64]*candidate, error) {
+	f, ok := e.schema.Field(node.Field)
+	if !ok {
+		return nil, fmt.Errorf("index: 字段 %q 不存在", node.Field)
+	}
+	fp, err := plugin.GetFieldType(f.Type)
+	if err != nil {
+		return nil, err
+	}
+	if !fp.Inverted() {
+		return nil, fmt.Errorf("index: 字段 %q 类型 %s 不支持倒排检索", node.Field, f.Type)
+	}
+	if node.Slop != 0 {
+		return nil, fmt.Errorf("index: match_phrase 的 slop>0 暂未支持")
+	}
+	a, err := analyzerOf(f)
+	if err != nil {
+		return nil, err
+	}
+	toks := a.Analyze(node.Text)
+	if len(toks) == 0 {
+		return map[uint64]*candidate{}, nil
+	}
+	terms := make([]string, len(toks))
+	// 各 term 相对首个 term 的位置偏移（停用词跳号两侧同构，见函数注释）
+	offs := make([]uint32, len(toks))
+	for i, t := range toks {
+		terms[i] = t.Term
+		offs[i] = uint32(t.Position - toks[0].Position)
+	}
+
+	// 打分器：有 norms 且需要打分时启用（同 match）
+	var scorer plugin.Scorer
+	var n int
+	var avgdl float64
+	if scoring && fp.HasNorms() {
+		scorer, err = plugin.GetScorer(defaultScorer)
+		if err != nil {
+			return nil, err
+		}
+		n, avgdl = e.bm25StatsLocked(node.Field)
+	}
+
+	// 各 term 的全局 df：既用于打分，也用于选主驱动
+	dfs := make([]int, len(terms))
+	for i, t := range terms {
+		dfs[i] = e.docFreqLocked(node.Field, t)
+	}
+	// 主驱动取 df 最小的 term；df=0 则全局无解
+	driver := 0
+	for i := 1; i < len(terms); i++ {
+		if dfs[i] < dfs[driver] {
+			driver = i
+		}
+	}
+	out := map[uint64]*candidate{}
+	if dfs[driver] == 0 {
+		return out, nil
+	}
+
+	// 命中后的得分：各 term BM25 之和；无打分器时恒 1
+	scoreOf := func(tfs []int64, dl int64) float64 {
+		if scorer == nil {
+			return 1
+		}
+		s := 0.0
+		for i := range terms {
+			s += scorer.Score(tfs[i], dl, dfs[i], n, avgdl)
+		}
+		return s
+	}
+
+	// 缓冲侧：直接 map 查，逐 doc 验证位置
+	bufLists := make([][]bufPosting, len(terms))
+	bufOK := true
+	for i, t := range terms {
+		l, ok := e.buf.postings(node.Field, t)
+		if !ok {
+			bufOK = false
+			break
+		}
+		bufLists[i] = l
+	}
+	if bufOK {
+		posLists := make([][]uint32, len(terms))
+		tfs := make([]int64, len(terms))
+		for _, dp := range bufLists[driver] {
+			posLists[driver] = dp.positions
+			tfs[driver] = int64(len(dp.positions))
+			aligned := true
+			for i := range terms {
+				if i == driver {
+					continue
+				}
+				bp, found := findBufPosting(bufLists[i], dp.docID)
+				if !found {
+					aligned = false
+					break
+				}
+				posLists[i] = bp.positions
+				tfs[i] = int64(len(bp.positions))
+			}
+			if !aligned || !phraseMatchAt(posLists, driver, offs) {
+				continue
+			}
+			out[srcKey(-1, dp.docID)] = &candidate{segIdx: -1, loc: dp.docID,
+				score: scoreOf(tfs, e.buf.docLen(node.Field, dp.docID))}
+		}
+	}
+
+	// 段侧：主驱动 Next 遍历，其余 term Advance 对齐
+	for si, seg := range e.segs {
+		its := make([]posting.Iterator, len(terms))
+		segOK := true
+		for i, t := range terms {
+			it, ok := seg.Postings(node.Field, t)
+			if !ok { // 某 term 整段缺失 → 该段不可能有短语命中
+				segOK = false
+				break
+			}
+			its[i] = it
+		}
+		if !segOK {
+			continue
+		}
+		alignedDoc := make([]uint32, len(terms)) // 各 term 迭代器当前所在的 docID
+		hasCur := make([]bool, len(terms))
+		posLists := make([][]uint32, len(terms))
+		tfs := make([]int64, len(terms))
+		for its[driver].Next() {
+			docID := its[driver].DocID()
+			posLists[driver] = its[driver].Positions()
+			if posLists[driver] == nil {
+				return nil, fmt.Errorf("index: 段 %s 为 v1 格式不含 positions，无法执行 match_phrase，请执行 _flush 或等待 merge 重建", filepath.Base(seg.Dir()))
+			}
+			tfs[driver] = int64(its[driver].Freq())
+			aligned := true
+			for i := range terms {
+				if i == driver {
+					continue
+				}
+				// Advance 语义是严格越过当前 doc：已停在 docID 上时不能再 Advance
+				if hasCur[i] && alignedDoc[i] >= docID {
+					if alignedDoc[i] != docID {
+						aligned = false
+						break
+					}
+				} else {
+					if !its[i].Advance(docID) || its[i].DocID() != docID {
+						aligned = false
+						break
+					}
+					alignedDoc[i], hasCur[i] = docID, true
+				}
+				posLists[i] = its[i].Positions() // 与 driver 同段同版本，必然非 nil
+				tfs[i] = int64(its[i].Freq())
+			}
+			if !aligned || !phraseMatchAt(posLists, driver, offs) {
+				continue
+			}
+			out[srcKey(si, docID)] = &candidate{segIdx: si, loc: docID,
+				score: scoreOf(tfs, seg.Norm(node.Field, docID))}
+		}
+	}
+	return out, nil
+}
+
+// findBufPosting 在缓冲倒排链（docID 递增）中二分定位 docID
+func findBufPosting(list []bufPosting, docID uint32) (bufPosting, bool) {
+	i := sort.Search(len(list), func(k int) bool { return list[k].docID >= docID })
+	if i < len(list) && list[i].docID == docID {
+		return list[i], true
+	}
+	return bufPosting{}, false
+}
+
+// phraseMatchAt 验证 posLists（各 term 在同一 doc 内的位置序列）是否构成短语：
+// 存在起始位置 p 使第 i 个 term 出现在 p+offs[i]（p 取主驱动 term 的出现位置；
+// offs 为查询侧各 term 相对偏移，停用词跳号时相邻 term 偏移可大于 1）
+func phraseMatchAt(posLists [][]uint32, driver int, offs []uint32) bool {
+	for _, p0 := range posLists[driver] {
+		base := int64(p0) - int64(offs[driver])
+		if base < 0 {
+			continue
+		}
+		okAll := true
+		for i, ps := range posLists {
+			if i == driver {
+				continue
+			}
+			if !containsPos(ps, uint32(base+int64(offs[i]))) {
+				okAll = false
+				break
+			}
+		}
+		if okAll {
+			return true
+		}
+	}
+	return false
+}
+
+// containsPos 判断升序位置序列中是否含有 p
+func containsPos(ps []uint32, p uint32) bool {
+	i := sort.Search(len(ps), func(k int) bool { return ps[k] >= p })
+	return i < len(ps) && ps[i] == p
 }
 
 // evalRangeLocked 范围过滤：扫描全部文档的正排值（字段缺失的文档不匹配，ES 语义）
@@ -547,6 +927,173 @@ func (e *Engine) collectTermLocked(field, term string, s float64) map[uint64]*ca
 		}
 	}
 	return out
+}
+
+// evalMultiTermLocked 多 term 并集（prefix/wildcard/fuzzy 展开产物）：
+// 每个 term 复用 collectTermLocked 合并缓冲与各段，恒定 score=1（filter 语义）
+func (e *Engine) evalMultiTermLocked(node plugin.MultiTermNode) map[uint64]*candidate {
+	out := map[uint64]*candidate{}
+	for _, term := range node.Terms {
+		for k, c := range e.collectTermLocked(node.Field, term, 1) {
+			out[k] = c
+		}
+	}
+	return out
+}
+
+// expandTerms 供 ParseContext.ExpandTerms：解析期展开 multi-term 查询的词典。
+// 自持读锁——DSL 解析发生在 Search 加锁之前，展开结果（term 字符串集合）在段合并
+// 前后保持有效（merge 从原文重解析不丢 term），执行时按当时快照收集倒排即可。
+func (e *Engine) expandTerms(field, prefix string, match func(string) bool, maxExpansions int) []string {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+	if e.closed {
+		return nil
+	}
+	return e.expandTermsLocked(field, prefix, match, maxExpansions)
+}
+
+// expandTermsLocked 合并缓冲内存 term map 与各段词典的枚举结果：去重、字典序、
+// 最多 maxExpansions 个（超出截断字典序最小者；词典扫描为 O(词典)，不承诺大词典性能）。
+// 各段按字典序各取前 maxExpansions 个即不丢全局前 maxExpansions 候选
+// （若某候选不在其所在段的前 maxExpansions 内，则该段已有 maxExpansions 个更小候选）。
+func (e *Engine) expandTermsLocked(field, prefix string, match func(string) bool, maxExpansions int) []string {
+	if maxExpansions <= 0 {
+		return nil
+	}
+	set := make(map[string]struct{})
+	// 缓冲侧：直接遍历内存 term map（规模受 flush 阈值约束，全收不截断）
+	if terms, ok := e.buf.inv[field]; ok {
+		for term := range terms {
+			if prefix != "" && !strings.HasPrefix(term, prefix) {
+				continue
+			}
+			if match != nil && !match(term) {
+				continue
+			}
+			set[term] = struct{}{}
+		}
+	}
+	// 段侧：有序字典扫描（prefix 非空时借稀疏索引缩范围）
+	for _, seg := range e.segs {
+		for _, term := range seg.Terms(field, prefix, match, maxExpansions) {
+			set[term] = struct{}{}
+		}
+	}
+	if len(set) == 0 {
+		return nil
+	}
+	out := make([]string, 0, len(set))
+	for term := range set {
+		out = append(out, term)
+	}
+	sort.Strings(out)
+	if len(out) > maxExpansions {
+		out = out[:maxExpansions]
+	}
+	return out
+}
+
+// evalExistsLocked 字段存在性过滤：缓冲侧直接查文档解析产物（与段 has 位同一套语义，
+// 见 segment.Doc.HasField）；段侧优先走 has 位（v2 覆盖全部字段，v1 仅 number 类），
+// 字段无 has 位时（v1 段、stored 类无索引结构字段、后加字段的老段）回落原文 JSON 检查
+// （慢但语义一致）。空串 text 分词后 0 token、null 均视为不存在（对齐 ES）。
+func (e *Engine) evalExistsLocked(node plugin.ExistsNode) (map[uint64]*candidate, error) {
+	f, ok := e.schema.Field(node.Field)
+	if !ok {
+		return nil, fmt.Errorf("index: 字段 %q 不存在", node.Field)
+	}
+	fp, err := plugin.GetFieldType(f.Type)
+	if err != nil {
+		return nil, err
+	}
+	// 有索引结构（倒排/正排）的字段可查解析产物；stored 类字段只能查原文
+	indexed := fp.Inverted() || fp.DocValuesKind() != plugin.DVNone
+
+	out := map[uint64]*candidate{}
+	add := func(segIdx int, loc uint32) {
+		out[srcKey(segIdx, loc)] = &candidate{segIdx: segIdx, loc: loc, score: 1}
+	}
+	for loc := range e.buf.docs {
+		d := &e.buf.docs[loc]
+		if indexed {
+			if d.HasField(node.Field) {
+				add(-1, uint32(loc))
+			}
+			continue
+		}
+		if ok, err := e.rawFieldExistsLocked(f, d.Raw); err != nil {
+			return nil, err
+		} else if ok {
+			add(-1, uint32(loc))
+		}
+	}
+	for si, seg := range e.segs {
+		hasBits := indexed && seg.HasField(node.Field)
+		for loc := 0; loc < seg.DocCount(); loc++ {
+			if hasBits {
+				if seg.Has(node.Field, uint32(loc)) {
+					add(si, uint32(loc))
+				}
+				continue
+			}
+			raw, err := seg.Stored(uint32(loc))
+			if err != nil {
+				return nil, err
+			}
+			if ok, err := e.rawFieldExistsLocked(f, raw); err != nil {
+				return nil, err
+			} else if ok {
+				add(si, uint32(loc))
+			}
+		}
+	}
+	return out, nil
+}
+
+// rawFieldExistsLocked 从原文 JSON 判断字段存在性（无 has 位时的回落路径）：
+// 嵌套对象按 flattenDoc 展开、multi-field 子字段取父路径值（与 parseDocFields 一致）；
+// null 不可解析为字段值视为不存在；text 经分词后 0 token（如空串）视为不存在
+func (e *Engine) rawFieldExistsLocked(f schema.Field, raw json.RawMessage) (bool, error) {
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(raw, &fields); err != nil {
+		return false, fmt.Errorf("index: 原文不是合法 JSON 对象: %w", err)
+	}
+	flat := flattenDoc(fields)
+	fv, ok := flat[f.Name]
+	if !ok {
+		if i := strings.LastIndex(f.Name, "."); i >= 0 {
+			fv, ok = flat[f.Name[:i]]
+		}
+		if !ok {
+			return false, nil
+		}
+	}
+	if string(fv) == "null" {
+		return false, nil
+	}
+	p, err := plugin.GetFieldType(f.Type)
+	if err != nil {
+		return false, err
+	}
+	pv, err := p.Parse(fv)
+	if err != nil {
+		// 值无法解析为该字段类型（如 number 字段上的字符串），视为不存在
+		return false, nil
+	}
+	if p.Inverted() {
+		a, err := analyzerOf(f)
+		if err != nil {
+			return false, err
+		}
+		return len(a.Analyze(pv.Text)) > 0, nil
+	}
+	if p.DocValuesKind() == plugin.DVKeyword {
+		// keyword 空串与 kw 列"空串即无值"语义一致，视为不存在
+		return pv.Text != "", nil
+	}
+	// number 类 Parse 成功即有值；stored 类字段原文出现且非 null 即存在
+	return true, nil
 }
 
 // matchAllLocked 枚举全部文档（score 恒为 1）

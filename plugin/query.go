@@ -16,14 +16,24 @@ type QNode interface{ qnode() }
 type MatchNode struct {
 	Field    string
 	Text     string
-	Operator string // "or"（默认）或 "and"
-	Scorer   string // 打分器名，空表示引擎默认
+	Operator string  // "or"（默认）或 "and"
+	Scorer   string  // 打分器名，空表示引擎默认
+	Boost    float64 // 查询时加权（得分 *= Boost），<=0 视为 1；multi_match 的 field^boost 展开用
 }
 
 // TermNode 倒排精确匹配（keyword 等字段）：字段 + 精确 term
 type TermNode struct {
 	Field string
 	Term  string
+}
+
+// PhraseNode 短语匹配（match_phrase）：查询串经字段分词器切分后，
+// 要求各 term 在文档中按连续位置依次出现（依赖 v2 段的 positions）。
+// 本期仅支持 Slop=0；Slop>0 暂未支持。
+type PhraseNode struct {
+	Field string
+	Text  string
+	Slop  int
 }
 
 // RangeNode number 类字段（number/date/bool）的范围过滤：走 docvalues。
@@ -39,6 +49,22 @@ type RangeNode struct {
 // MatchAllNode 匹配全部文档
 type MatchAllNode struct{}
 
+// MultiTermNode 多 term 并集（prefix/wildcard/fuzzy 的词典展开产物）：
+// 命中任一 term 即命中，恒定 score=1（filter 语义，不参与打分）。
+// Terms 为解析期经 ParseContext.ExpandTerms 对当前分片词典展开的结果（去重、字典序）；
+// 协调层纯 schema 解析时 ExpandTerms 为 nil、Terms 为空——该产物不会被协调层执行，
+// 分片侧基于本地引擎重新解析时才真正展开（与 ES 的 per-shard rewrite 同构）。
+type MultiTermNode struct {
+	Field string
+	Terms []string
+}
+
+// ExistsNode 字段存在性过滤：文档在该字段有索引值即命中
+// （空串 text 分词后 0 token、null 均视为不存在，对齐 ES），恒定 score=1（filter 语义）
+type ExistsNode struct {
+	Field string
+}
+
 // IDsNode 按外部文档 ID 精确命中
 type IDsNode struct {
 	IDs []string
@@ -53,12 +79,15 @@ type BoolNode struct {
 	MustNot []QNode
 }
 
-func (MatchNode) qnode()    {}
-func (TermNode) qnode()     {}
-func (RangeNode) qnode()    {}
-func (MatchAllNode) qnode() {}
-func (IDsNode) qnode()      {}
-func (BoolNode) qnode()     {}
+func (MatchNode) qnode()     {}
+func (TermNode) qnode()      {}
+func (PhraseNode) qnode()    {}
+func (RangeNode) qnode()     {}
+func (MatchAllNode) qnode()  {}
+func (MultiTermNode) qnode() {}
+func (ExistsNode) qnode()    {}
+func (IDsNode) qnode()       {}
+func (BoolNode) qnode()      {}
 
 // ParseClause 解析一个 DSL 查询子句：{"<子句名>": <body>}。
 // 子句名必须已注册，这是注册表查找而非硬编码分发。

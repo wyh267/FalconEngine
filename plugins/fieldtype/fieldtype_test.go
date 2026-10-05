@@ -35,18 +35,22 @@ func TestBuiltinFieldTypes(t *testing.T) {
 	}
 
 	// 索引能力声明检查
-	want := map[string]struct{ inv, dv, norms bool }{
-		"text":    {true, false, true},
-		"keyword": {true, false, false},
-		"number":  {false, true, false},
-		"date":    {false, true, false},
-		"bool":    {false, true, false},
-		"stored":  {false, false, false},
+	want := map[string]struct {
+		inv   bool
+		dv    plugin.DVKind
+		norms bool
+	}{
+		"text":    {true, plugin.DVNone, true},
+		"keyword": {true, plugin.DVKeyword, false},
+		"number":  {false, plugin.DVNum, false},
+		"date":    {false, plugin.DVNum, false},
+		"bool":    {false, plugin.DVNum, false},
+		"stored":  {false, plugin.DVNone, false},
 	}
 	for name, w := range want {
 		p, _ := plugin.GetFieldType(name)
-		if p.Inverted() != w.inv || p.DocValues() != w.dv || p.HasNorms() != w.norms {
-			t.Errorf("%s 能力声明 = (%v,%v,%v), want %v", name, p.Inverted(), p.DocValues(), p.HasNorms(), w)
+		if p.Inverted() != w.inv || p.DocValuesKind() != w.dv || p.HasNorms() != w.norms {
+			t.Errorf("%s 能力声明 = (%v,%v,%v), want %v", name, p.Inverted(), p.DocValuesKind(), p.HasNorms(), w)
 		}
 	}
 

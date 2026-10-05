@@ -5,10 +5,9 @@
 //   - 索引表：索引名 -> {分片数、副本数、mapping}
 //   - 路由表：索引 -> 分片 -> {主分片节点、副本分片节点}
 //
-// 简化决策（注释见各函数）：
-//   - 使用 raft.MemoryStorage，不做 raft WAL/快照持久化；
-//     节点重启后以全新成员身份重新 join 重建状态
-//   - data-only 节点不进 raft group，通过 JoinNode gRPC 注册进元数据
+// 持久化（P0-1）：raft 日志/快照/成员 ID 落盘到 <data>/.falcon/raft/
+// （自研精简 WAL，见 store.go），节点重启后从磁盘恢复 CSM；
+// data-only 节点不进 raft group，通过 JoinNode gRPC 注册进元数据。
 package cluster
 
 import (
@@ -16,6 +15,7 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/FalconEngine/falcon/schema"
 	"github.com/FalconEngine/falcon/transport"
 )
 
@@ -31,6 +31,9 @@ type IndexMeta struct {
 	// WaitAll 对应 write.wait_for_active_shards=all：
 	// 写请求等全部存活副本 ack 后才返回
 	WaitAll bool `json:"wait_all,omitempty"`
+	// DateDetection 动态 mapping 日期检测开关（nil 默认 true）：
+	// 随 CSM 分发，各节点落地新分片时透传给索引设置
+	DateDetection *bool `json:"date_detection,omitempty"`
 }
 
 // ShardRoute 一个分片的路由：主分片所在节点与副本节点列表
@@ -58,6 +61,11 @@ const (
 	CmdNodeAlive CommandType = "node_alive"
 	// CmdUpdateRoute 更新单个分片的路由（故障转移/副本补建）
 	CmdUpdateRoute CommandType = "update_route"
+	// CmdRemoveNode 彻底摘除陈旧节点：节点表/Dead 表/分片状态清理，
+	// 路由表中其分片摘除并确定性补建（remove_node，配合 raft 成员移除使用）
+	CmdRemoveNode CommandType = "remove_node"
+	// CmdUpdateMapping 更新索引 mapping（载荷为增量字段，CSM 只增合并）
+	CmdUpdateMapping CommandType = "update_mapping"
 )
 
 // Command raft 日志承载的控制面命令
@@ -66,7 +74,7 @@ type Command struct {
 	Node      *NodeMeta    `json:"node,omitempty"`
 	Index     *IndexMeta   `json:"index,omitempty"`
 	Routes    []ShardRoute `json:"routes,omitempty"`     // CmdAddIndex 时携带
-	IndexName string       `json:"index_name,omitempty"` // CmdDeleteIndex / CmdUpdateRoute 时携带
+	IndexName string       `json:"index_name,omitempty"` // CmdDeleteIndex / CmdUpdateRoute / CmdUpdateMapping 时携带
 
 	// CmdShardStatus / CmdNodeDead / CmdNodeAlive 载荷
 	NodeID uint64        `json:"node_id,omitempty"`
@@ -75,6 +83,9 @@ type Command struct {
 	// CmdUpdateRoute 载荷
 	ShardID int        `json:"shard_id,omitempty"`
 	Route   ShardRoute `json:"route,omitempty"`
+
+	// CmdUpdateMapping 载荷：{"fields":[...]} 增量字段（CSM 只增合并）
+	Mapping json.RawMessage `json:"mapping,omitempty"`
 }
 
 // ShardStatus 单分片状态（心跳上报与 CSM 存储共用）
@@ -129,6 +140,11 @@ func (sm *StateMachine) Apply(cmd Command) {
 		delete(sm.ShardStats, cmd.IndexName)
 	case CmdShardStatus:
 		for _, st := range cmd.Shards {
+			// 索引已删除时忽略其状态上报：节点心跳可能先于本地删除发出，
+			// 否则已删索引的分片状态会被在途心跳重新写回 CSM
+			if _, ok := sm.Indices[st.Index]; !ok {
+				continue
+			}
 			if sm.ShardStats[st.Index] == nil {
 				sm.ShardStats[st.Index] = map[int]map[uint64]ShardStatus{}
 			}
@@ -145,20 +161,143 @@ func (sm *StateMachine) Apply(cmd Command) {
 		if routes, ok := sm.Routes[cmd.IndexName]; ok && cmd.ShardID >= 0 && cmd.ShardID < len(routes) {
 			routes[cmd.ShardID] = cmd.Route
 		}
+	case CmdRemoveNode:
+		sm.removeNodeLocked(cmd.NodeID)
+	case CmdUpdateMapping:
+		// mapping 只增不改：新字段并入 CSM（合并安全——并发提案天然做字段并集），
+		// 已有字段定义以 CSM 现有为准。纯结构合并不依赖插件注册表，
+		// 保证 FSM apply 的确定性（字段合法性由提案边界校验）。
+		if meta, ok := sm.Indices[cmd.IndexName]; ok && len(cmd.Mapping) > 0 {
+			if merged, err := schema.MergeMappingJSON(meta.Mapping, cmd.Mapping); err == nil {
+				meta.Mapping = merged
+				sm.Indices[cmd.IndexName] = meta
+			}
+		}
 	}
 }
 
-// Snapshot 返回状态机的 JSON 快照（ClusterState gRPC 用）
+// removeNodeLocked 彻底摘除节点：节点表/Dead 表摘除、分片状态清理、
+// 路由表中其分片摘除并确定性补建副本。
+// 确定性保证：全部节点按同一日志序列应用，CSM 状态一致，分配结果一致。
+// 典型场景：节点磁盘清空后以同地址（同 NodeID）新 RaftID 重新加入，
+// 其旧分片数据已不存在，必须摘除重分配。
+func (sm *StateMachine) removeNodeLocked(id uint64) {
+	delete(sm.Nodes, id)
+	delete(sm.Dead, id)
+	for _, byShard := range sm.ShardStats {
+		for _, byNode := range byShard {
+			delete(byNode, id)
+		}
+	}
+	for name, routes := range sm.Routes {
+		meta := sm.Indices[name]
+		for i, r := range routes {
+			// primary 摘除：优先提升首个副本；无副本时数据已随旧磁盘丢失，
+			// 确定性选一个存活 data 节点作空 primary 恢复可写（语义同 ES 空分配）
+			if r.Primary == id {
+				r.Primary = 0
+				if len(r.Replicas) > 0 {
+					r.Primary = r.Replicas[0]
+					r.Replicas = append([]uint64(nil), r.Replicas[1:]...)
+				}
+			}
+			// 副本摘除
+			if len(r.Replicas) > 0 {
+				reps := make([]uint64, 0, len(r.Replicas))
+				for _, rid := range r.Replicas {
+					if rid != id {
+						reps = append(reps, rid)
+					}
+				}
+				r.Replicas = reps
+			}
+			if r.Primary == 0 {
+				r.Primary = sm.pickDataNodeLocked(r)
+			}
+			// 副本补建：补足副本数（无更多存活节点则保持降级）
+			for r.Primary != 0 && len(r.Replicas) < meta.NumReplicas {
+				pick := sm.pickDataNodeLocked(r)
+				if pick == 0 {
+					break
+				}
+				r.Replicas = append(r.Replicas, pick)
+			}
+			routes[i] = r
+		}
+	}
+}
+
+// pickDataNodeLocked 为分片确定性挑选一个不持有该分片的存活 data 节点
+// （负载最小、ID 最小优先）；无可用节点返回 0。调用方需持写锁。
+func (sm *StateMachine) pickDataNodeLocked(r ShardRoute) uint64 {
+	load := map[uint64]int{}
+	for _, routes := range sm.Routes {
+		for _, rt := range routes {
+			load[rt.Primary]++
+			for _, rid := range rt.Replicas {
+				load[rid]++
+			}
+		}
+	}
+	var best uint64
+	found := false
+	for nid, n := range sm.Nodes {
+		if !n.Data || sm.Dead[nid] || nid == r.Primary || contains(r.Replicas, nid) {
+			continue
+		}
+		if !found || load[nid] < load[best] || (load[nid] == load[best] && nid < best) {
+			best, found = nid, true
+		}
+	}
+	return best
+}
+
+// csmSnapshot CSM 快照结构（Snapshot/Restore 共用）
+type csmSnapshot struct {
+	Nodes      map[uint64]NodeMeta                       `json:"nodes"`
+	Indices    map[string]IndexMeta                      `json:"indices"`
+	Routes     map[string][]ShardRoute                   `json:"routes"`
+	Dead       map[uint64]bool                           `json:"dead,omitempty"`
+	ShardStats map[string]map[int]map[uint64]ShardStatus `json:"shard_stats,omitempty"`
+}
+
+// Snapshot 返回状态机的 JSON 快照（ClusterState gRPC 与 raft 快照落盘共用）
 func (sm *StateMachine) Snapshot() ([]byte, error) {
 	sm.mu.RLock()
 	defer sm.mu.RUnlock()
-	return json.Marshal(struct {
-		Nodes      map[uint64]NodeMeta                       `json:"nodes"`
-		Indices    map[string]IndexMeta                      `json:"indices"`
-		Routes     map[string][]ShardRoute                   `json:"routes"`
-		Dead       map[uint64]bool                           `json:"dead,omitempty"`
-		ShardStats map[string]map[int]map[uint64]ShardStatus `json:"shard_stats,omitempty"`
-	}{Nodes: sm.Nodes, Indices: sm.Indices, Routes: sm.Routes, Dead: sm.Dead, ShardStats: sm.ShardStats})
+	return json.Marshal(csmSnapshot{Nodes: sm.Nodes, Indices: sm.Indices, Routes: sm.Routes, Dead: sm.Dead, ShardStats: sm.ShardStats})
+}
+
+// Restore 从快照数据整体恢复状态机（raft 重启加载/收到 leader 快照时调用）
+func (sm *StateMachine) Restore(data []byte) error {
+	var snap csmSnapshot
+	if err := json.Unmarshal(data, &snap); err != nil {
+		return fmt.Errorf("cluster: CSM 快照解码失败: %w", err)
+	}
+	sm.mu.Lock()
+	defer sm.mu.Unlock()
+	sm.Nodes = snap.Nodes
+	sm.Indices = snap.Indices
+	sm.Routes = snap.Routes
+	sm.Dead = snap.Dead
+	sm.ShardStats = snap.ShardStats
+	// JSON 缺省字段恢复为 nil，补为空 map 保证 Apply 各 case 不用判空
+	if sm.Nodes == nil {
+		sm.Nodes = map[uint64]NodeMeta{}
+	}
+	if sm.Indices == nil {
+		sm.Indices = map[string]IndexMeta{}
+	}
+	if sm.Routes == nil {
+		sm.Routes = map[string][]ShardRoute{}
+	}
+	if sm.Dead == nil {
+		sm.Dead = map[uint64]bool{}
+	}
+	if sm.ShardStats == nil {
+		sm.ShardStats = map[string]map[int]map[uint64]ShardStatus{}
+	}
+	return nil
 }
 
 // AllNodes 返回全部节点

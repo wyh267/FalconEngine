@@ -4,13 +4,16 @@
 //
 //	PUT    /{index}                建索引（mappings 可省略 = 纯动态 mapping）
 //	DELETE /{index}                删除索引
+//	PUT    /{index}/_mapping       显式更新 mapping（{"fields":[...]}，只增不改）
+//	GET    /{index}/_mapping       查看当前 mapping
 //	PUT    /{index}/_doc/{id}      写入/更新文档
 //	POST   /{index}/_doc           自动生成 ID 写入
 //	GET    /{index}/_doc/{id}      取原文
 //	DELETE /{index}/_doc/{id}      删除文档
 //	POST   /{index}/_bulk          NDJSON 批量写入/删除
 //	POST|GET /{index}/_search      DSL 查询
-//	POST   /{index}/_refresh       手动刷新（当前实现 refresh==Flush，见代码注释）
+//	POST   /{index}/_refresh       手动刷新（缓冲实时可搜，refresh 为轻量 no-op）
+//	POST   /{index}/_flush         缓冲落盘为段并轮替 translog（重操作）
 //	GET    /_cluster/health        集群健康（单机桩，阶段5替换）
 //	GET    /_cat/shards            分片列表（单机桩）
 //	GET    /_cat/indices           索引列表与文档数
@@ -24,6 +27,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/FalconEngine/falcon/index"
@@ -38,6 +42,12 @@ import (
 type ClusterProvider interface {
 	// CreateIndex 集群感知建索引（leader 分配路由并 propose）
 	CreateIndex(name string, settings index.IndexSettings, sch *schema.Schema) error
+	// DeleteIndex 集群感知删索引（leader propose 后各节点清理本地数据）；
+	// found=false 表示索引不存在
+	DeleteIndex(name string) (bool, error)
+	// UpdateMapping 集群感知 mapping 更新（leader 校验合并并 propose 广播；
+	// 与现有字段定义冲突返回错误；幂等）
+	UpdateMapping(name string, fields []schema.Field) error
 	// ClusterState 集群状态快照（JSON）
 	ClusterState() ([]byte, error)
 	// WriteDoc 路由写入（协调 -> primary -> 复制）
@@ -79,6 +89,8 @@ func (s *Server) SetCluster(c ClusterProvider) {
 func (s *Server) routes() {
 	s.mux.HandleFunc("PUT /{index}", s.log(s.handleCreateIndex))
 	s.mux.HandleFunc("DELETE /{index}", s.log(s.handleDeleteIndex))
+	s.mux.HandleFunc("PUT /{index}/_mapping", s.log(s.handlePutMapping))
+	s.mux.HandleFunc("GET /{index}/_mapping", s.log(s.handleGetMapping))
 	s.mux.HandleFunc("PUT /{index}/_doc/{id}", s.log(s.handlePutDoc))
 	s.mux.HandleFunc("POST /{index}/_doc", s.log(s.handlePostDoc))
 	s.mux.HandleFunc("GET /{index}/_doc/{id}", s.log(s.handleGetDoc))
@@ -87,6 +99,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("POST /{index}/_search", s.log(s.handleSearch))
 	s.mux.HandleFunc("GET /{index}/_search", s.log(s.handleSearch))
 	s.mux.HandleFunc("POST /{index}/_refresh", s.log(s.handleRefresh))
+	s.mux.HandleFunc("POST /{index}/_flush", s.log(s.handleFlush))
 	s.mux.HandleFunc("GET /_cluster/health", s.log(s.handleClusterHealth))
 	s.mux.HandleFunc("GET /_cat/shards", s.log(s.handleCatShards))
 	s.mux.HandleFunc("GET /_cat/indices", s.log(s.handleCatIndices))
@@ -202,10 +215,18 @@ func (s *Server) handleCreateIndex(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"acknowledged": true, "index": name})
 }
 
-// handleDeleteIndex 删除索引（删除数据目录）
+// handleDeleteIndex 删除索引（删除数据目录）。
+// 集群模式：经 provider 走 raft 提案，各节点 apply/轮询后清理本地分片与数据目录；
+// 单机模式：本地直删。
 func (s *Server) handleDeleteIndex(w http.ResponseWriter, r *http.Request) {
 	name := r.PathValue("index")
-	ok, err := s.mgr.Delete(name)
+	var ok bool
+	var err error
+	if s.cluster != nil {
+		ok, err = s.cluster.DeleteIndex(name)
+	} else {
+		ok, err = s.mgr.Delete(name)
+	}
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err)
 		return
@@ -215,6 +236,87 @@ func (s *Server) handleDeleteIndex(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"acknowledged": true, "index": name})
+}
+
+// ---------- mapping ----------
+
+// handlePutMapping 显式更新 mapping：body {"fields":[...]}。
+// 新字段（含已有字段的新子字段）追加；与现有字段定义冲突返回 400；幂等。
+// 字段名不允许含 '.'（与建索引声明一致，避免与嵌套对象点路径展开歧义）。
+// 集群模式经 provider 走 leader 提案广播；单机模式直接合并进本地分片。
+func (s *Server) handlePutMapping(w http.ResponseWriter, r *http.Request) {
+	name := r.PathValue("index")
+	body, err := readBody(r)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+	var req struct {
+		Fields []schema.Field `json:"fields"`
+	}
+	if err := json.Unmarshal(body, &req); err != nil || len(req.Fields) == 0 {
+		writeError(w, http.StatusBadRequest, fmt.Errorf("请求体应为 {\"fields\":[...]} 且字段列表非空"))
+		return
+	}
+	for _, f := range req.Fields {
+		if strings.Contains(f.Name, ".") {
+			writeError(w, http.StatusBadRequest, fmt.Errorf("字段名 %q 不允许含 '.'（避免与嵌套对象的点路径展开歧义）", f.Name))
+			return
+		}
+	}
+	if s.cluster != nil {
+		if err := s.cluster.UpdateMapping(name, req.Fields); err != nil {
+			writeError(w, http.StatusBadRequest, err)
+			return
+		}
+	} else {
+		e := s.engine(w, name)
+		if e == nil {
+			return
+		}
+		if err := e.UpdateMapping(req.Fields); err != nil {
+			writeError(w, http.StatusBadRequest, err)
+			return
+		}
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"acknowledged": true, "index": name})
+}
+
+// handleGetMapping 返回当前 mapping：{"index":..., "mappings":{"fields":[...]}}。
+// 单机/本地持有分片时返回本地各分片 schema 并集；集群协调节点不持有分片时
+// 回落到集群状态（CSM）中的 mapping（权威）。
+func (s *Server) handleGetMapping(w http.ResponseWriter, r *http.Request) {
+	name := r.PathValue("index")
+	if ix, ok := s.mgr.Get(name); ok {
+		writeJSON(w, http.StatusOK, map[string]any{
+			"index":    name,
+			"mappings": map[string]any{"fields": ix.UnionSchema().Fields},
+		})
+		return
+	}
+	if s.cluster != nil {
+		state, err := s.cluster.ClusterState()
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, err)
+			return
+		}
+		var snap struct {
+			Indices map[string]struct {
+				Mapping json.RawMessage `json:"mapping"`
+			} `json:"indices"`
+		}
+		if err := json.Unmarshal(state, &snap); err == nil {
+			if meta, ok := snap.Indices[name]; ok {
+				var mapping json.RawMessage = meta.Mapping
+				if len(mapping) == 0 {
+					mapping = json.RawMessage(`{"fields":[]}`)
+				}
+				writeJSON(w, http.StatusOK, map[string]any{"index": name, "mappings": mapping})
+				return
+			}
+		}
+	}
+	writeError(w, http.StatusNotFound, fmt.Errorf("索引 %q 不存在", name))
 }
 
 // ---------- 文档读写 ----------
@@ -375,12 +477,25 @@ func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, res)
 }
 
-// handleRefresh 手动刷新。
-// 当前实现 refresh == Flush（缓冲落盘为段并轮替 translog），
-// 因为本引擎的内存缓冲实时可查，无需单独的 refresh 语义；
-// 阶段5 引入近实时副本后再拆分两者。
+// handleRefresh 手动刷新。本引擎内存缓冲实时可搜（写入即可查，
+// 契约见 index.TestBufferRealtimeVisibility），refresh 无需任何动作，
+// 返回 ack 保持 API 兼容；需要落盘持久化请用 _flush。
 func (s *Server) handleRefresh(w http.ResponseWriter, r *http.Request) {
-	// 集群模式：刷新本节点持有的该索引分片（协调节点可能不持有，视为成功）
+	// 集群模式：协调节点可能不持有该索引分片，无法本地校验存在性，直接 ack
+	if s.cluster != nil {
+		writeJSON(w, http.StatusOK, map[string]any{"acknowledged": true})
+		return
+	}
+	if e := s.engine(w, r.PathValue("index")); e == nil {
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"acknowledged": true})
+}
+
+// handleFlush 手动落盘：缓冲写为新段并轮替 translog 代际（重操作）。
+// 集群模式：flush 本节点持有的该索引分片（协调节点可能不持有，视为成功）。
+// 分片作为恢复源被段拷贝期间 Flush 被冻结，本接口返回 500（恢复完成后自愈）。
+func (s *Server) handleFlush(w http.ResponseWriter, r *http.Request) {
 	if s.cluster != nil {
 		if ix, ok := s.mgr.Get(r.PathValue("index")); ok {
 			if err := ix.Flush(); err != nil {

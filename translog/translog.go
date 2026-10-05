@@ -53,6 +53,49 @@ func logPath(dir string, generation uint64) string {
 	return filepath.Join(dir, fmt.Sprintf("translog-%d.log", generation))
 }
 
+// GenInfo 一个代际在保留清单中的记录。
+// 该代际覆盖的 LSN 区间为 [BaseLSN, BaseLSN+Count)；
+// 当前活跃代际的 Count 只反映最近一次 Flush 落盘清单时的值（读取时以文件实际内容为准）。
+type GenInfo struct {
+	Gen     uint64 `json:"gen"`
+	BaseLSN int64  `json:"base_lsn"`
+	Count   int64  `json:"count"`
+}
+
+// manifestPath 代际保留清单路径（Flush 轮替后全量重写）
+func manifestPath(dir string) string { return filepath.Join(dir, "translog-gens.json") }
+
+// ReadManifest 读取代际保留清单；文件不存在返回 (nil, nil)（老数据目录无清单，
+// 调用方按"只认最新代际"的兼容逻辑处理）
+func ReadManifest(dir string) ([]GenInfo, error) {
+	b, err := os.ReadFile(manifestPath(dir))
+	if os.IsNotExist(err) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	var gens []GenInfo
+	if err := json.Unmarshal(b, &gens); err != nil {
+		return nil, fmt.Errorf("translog: 解析代际清单失败: %w", err)
+	}
+	return gens, nil
+}
+
+// WriteManifest 全量重写代际保留清单（先写临时文件再原子 rename，
+// 避免崩溃留下半个 JSON 导致 Open 失败）
+func WriteManifest(dir string, gens []GenInfo) error {
+	b, err := json.Marshal(gens)
+	if err != nil {
+		return err
+	}
+	p := manifestPath(dir)
+	if err := os.WriteFile(p+".tmp", b, 0o644); err != nil {
+		return fmt.Errorf("translog: 写入代际清单失败: %w", err)
+	}
+	return os.Rename(p+".tmp", p)
+}
+
 // Open 创建（或追加打开）该代际日志。baseLSN 为本代际第一条记录的 LSN
 // （此前所有代际的记录总数；首个代际传 0），保证 LSN 跨代际单调递增，
 // 复制协议（按 LSN 拉取/对齐）依赖此性质。

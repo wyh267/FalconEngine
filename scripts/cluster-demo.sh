@@ -123,4 +123,27 @@ curl -s -X POST "http://127.0.0.1:${HTTP1}/logs/_search" -d '{"size":0,"aggs":{"
 say "集群健康"
 curl -s "http://127.0.0.1:${HTTP1}/_cluster/health" | jq .
 
+say "删除索引 logs（经 leader node1，验证集群级路由清理）"
+curl -s -X DELETE "http://127.0.0.1:${HTTP1}/logs" | jq .
+for i in 1 2 3; do
+    HTTP_PORT=$((BASE_PORT + (i - 1) * 10))
+    for _ in $(seq 1 100); do
+        R=$(curl -s "http://127.0.0.1:${HTTP_PORT}/_cluster/state" | jq -c '.routes.logs // empty')
+        [ -z "$R" ] && [ ! -d "$WORK/n$i/data/logs" ] && break
+        sleep 0.3
+    done
+    [ -z "$R" ] || { echo "node$i 路由表未清除" >&2; exit 1; }
+    [ ! -d "$WORK/n$i/data/logs" ] || { echo "node$i 数据目录未删除" >&2; exit 1; }
+    N=$(curl -s "http://127.0.0.1:${HTTP_PORT}/_cat/indices" | jq '[.[] | select(.name=="logs")] | length')
+    [ "$N" = "0" ] || { echo "node$i 本地索引未清理" >&2; exit 1; }
+    echo "node$i 索引已删除（路由表/数据目录/本地索引均清除）"
+done
+
+say "重建同名索引并验证可写可查"
+curl -s -X PUT "http://127.0.0.1:${HTTP1}/logs" -d '{"settings":{"number_of_shards":1,"number_of_replicas":2},"mappings":{"fields":[{"name":"content","type":"text"}]}}' | jq -c .
+curl -s -X PUT "http://127.0.0.1:${HTTP1}/logs/_doc/rebuild-1" -d '{"content":"重建后的文档"}' | jq -c .
+TOTAL=$(curl -s -X POST "http://127.0.0.1:${HTTP1}/logs/_search" -d '{"query":{"match":{"content":"重建"}}}' | jq -r '.total')
+[ "$TOTAL" = "1" ] || { echo "重建索引查询失败 total=$TOTAL" >&2; exit 1; }
+echo "重建索引查询 total=$TOTAL"
+
 say "清理并退出（cluster demo 全部通过）"

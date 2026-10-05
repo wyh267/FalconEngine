@@ -1,9 +1,9 @@
 // Package fieldtype 内置字段类型插件：text / keyword / number / date / bool / stored。
 //
 //	text     全文检索：倒排 + norms，分词器 standard
-//	keyword  精确匹配：倒排（无 norms），分词器 keyword（整词）
+//	keyword  精确匹配：倒排（无 norms）+ keyword ord 正排列，分词器 keyword（整词）
 //	number   整数：正排，支持过滤与排序
-//	date     日期：解析 "2006-01-02 15:04:05" 或 "2006-01-02" 为 unix 秒，正排
+//	date     日期：解析 "2006-01-02 15:04:05" 或 "2006-01-02" 为 unix 秒（本地时区，精度到秒），正排
 //	bool     布尔：true/false 按 1/0 存储，正排
 //	stored   仅存储原文，不可检索
 package fieldtype
@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/FalconEngine/falcon/plugin"
+	"github.com/FalconEngine/falcon/schema"
 )
 
 // dateLayouts 支持的日期格式（按本地时区解析）
@@ -34,15 +35,15 @@ type base struct {
 	name     string
 	analyzer string
 	inverted bool
-	docvals  bool
+	dvKind   plugin.DVKind
 	norms    bool
 }
 
-func (b base) Name() string     { return b.name }
-func (b base) Analyzer() string { return b.analyzer }
-func (b base) Inverted() bool   { return b.inverted }
-func (b base) DocValues() bool  { return b.docvals }
-func (b base) HasNorms() bool   { return b.norms }
+func (b base) Name() string                 { return b.name }
+func (b base) Analyzer() string             { return b.analyzer }
+func (b base) Inverted() bool               { return b.inverted }
+func (b base) DocValuesKind() plugin.DVKind { return b.dvKind }
+func (b base) HasNorms() bool               { return b.norms }
 
 // parseString 提取 JSON 字符串值
 func parseString(v json.RawMessage) (string, error) {
@@ -133,9 +134,15 @@ func (storedType) Parse(v json.RawMessage) (plugin.Value, error) {
 
 func init() {
 	plugin.RegisterFieldType(textType{base{name: "text", analyzer: "standard", inverted: true, norms: true}})
-	plugin.RegisterFieldType(keywordType{base{name: "keyword", analyzer: "keyword", inverted: true}})
-	plugin.RegisterFieldType(numberType{base{name: "number", docvals: true}})
-	plugin.RegisterFieldType(dateType{base{name: "date", docvals: true}})
-	plugin.RegisterFieldType(boolType{base{name: "bool", docvals: true}})
+	plugin.RegisterFieldType(keywordType{base{name: "keyword", analyzer: "keyword", inverted: true, dvKind: plugin.DVKeyword}})
+	plugin.RegisterFieldType(numberType{base{name: "number", dvKind: plugin.DVNum}})
+	plugin.RegisterFieldType(dateType{base{name: "date", dvKind: plugin.DVNum}})
+	plugin.RegisterFieldType(boolType{base{name: "bool", dvKind: plugin.DVNum}})
 	plugin.RegisterFieldType(storedType{base{name: "stored"}})
+	// 向 schema 包注入日期检测器（动态 mapping 的 date_detection 用；
+	// schema 处于依赖链底层不能 import 本包，以注册方式解耦）
+	schema.RegisterDateDetector(func(s string) bool {
+		_, err := ParseDate(s)
+		return err == nil
+	})
 }

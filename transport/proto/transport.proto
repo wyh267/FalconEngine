@@ -37,8 +37,16 @@ service Transport {
   // 副本追赶（replica -> primary 拉取 translog）
   rpc FetchTranslog(FetchTranslogRequest) returns (FetchTranslogResponse);
 
+  // 分片恢复（peer recovery）：段拷贝 + translog 补差两阶段
+  rpc PrepareShardRecovery(PrepareShardRecoveryRequest) returns (PrepareShardRecoveryResponse);
+  rpc FetchShardFile(FetchShardFileRequest) returns (FetchShardFileResponse);
+  rpc FinishShardRecovery(FinishShardRecoveryRequest) returns (FinishShardRecoveryResponse);
+
   // 心跳与分片状态上报（data 节点 -> master leader）
   rpc ShardStatusReport(ShardStatusRequest) returns (ShardStatusResponse);
+
+  // mapping 更新（任意节点 -> master leader）：leader 校验并提案 CmdUpdateMapping
+  rpc UpdateMapping(UpdateMappingRequest) returns (UpdateMappingResponse);
 
   // 拉取集群状态（路由表等，5b  scatter-gather 寻址用）
   rpc GetClusterState(GetClusterStateRequest) returns (GetClusterStateResponse);
@@ -94,13 +102,40 @@ message FetchTranslogRequest {
   int32 shard = 2;
   int64 from_lsn = 3;
   int32 limit = 4;
+  uint64 node_id = 5; // 拉取方节点 ID：primary 按它刷新副本 ack（retention lease）
 }
 message FetchTranslogResponse {
   repeated bytes ops = 1;
   int64 from_lsn = 2;
   int64 next_lsn = 3;
   string error = 4;
+  int64 oldest_lsn = 5; // 保留窗口内最老可用 LSN（from_lsn < oldest_lsn 表示落后出窗）
 }
+
+// 分片恢复（peer recovery）
+message RecoveryFileInfo {
+  string seg_dir = 1; // 段目录名（相对分片目录）
+  string name = 2;
+  int64 size = 3;     // Prepare 时刻大小（按此前缀拷贝）
+}
+message PrepareShardRecoveryRequest { string index = 1; int32 shard = 2; }
+message PrepareShardRecoveryResponse {
+  int64 lsn_base = 1; // 当前代际基线 LSN：副本重建后从此处拉取差量
+  bytes schema_json = 2;
+  repeated RecoveryFileInfo files = 3;
+  string error = 4;
+}
+message FetchShardFileRequest {
+  string index = 1;
+  int32 shard = 2;
+  string seg_dir = 3;
+  string name = 4;
+  int64 off = 5;
+  int64 limit = 6; // 单块上限 1MB
+}
+message FetchShardFileResponse { bytes data = 1; string error = 2; }
+message FinishShardRecoveryRequest { string index = 1; int32 shard = 2; }
+message FinishShardRecoveryResponse { string error = 1; }
 
 // 心跳 + 分片状态上报
 message ShardStatusItem {
@@ -112,6 +147,10 @@ message ShardStatusItem {
 }
 message ShardStatusRequest { NodeMeta node = 1; repeated ShardStatusItem shards = 2; }
 message ShardStatusResponse { string error = 1; }
+
+// mapping 更新请求（mapping 为 {"fields":[...]} 增量 schema JSON，CSM 只增合并）
+message UpdateMappingRequest { string index = 1; bytes mapping = 2; }
+message UpdateMappingResponse { string error = 1; }
 
 message RaftMessageRequest { bytes data = 1; }
 message RaftMessageResponse { string error = 1; }

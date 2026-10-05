@@ -2,7 +2,8 @@
 //
 // 全部为两段式实现：局部聚合产生可序列化的中间结果（Marshal），
 // 协调层 Merge 多个中间结果后取最终结果（Result），阶段 5 分布式复用。
-// terms/cardinality 消费字段原始字符串值（取自 stored 原文）；
+// terms/cardinality 消费字段字符串值（keyword dv 字段走 kw 列，其余取自
+// stored 原文；text 本体不支持聚合，解析期报错引导用 keyword 子字段）；
 // min/max/avg/sum 消费 number 类正排值。
 package agg
 
@@ -20,7 +21,8 @@ type specBody struct {
 	Size  int    `json:"size"`
 }
 
-// parseBody 解析子句体并校验字段存在
+// parseBody 解析子句体并校验字段存在；
+// text 本体不支持聚合——本引擎明确不做 fielddata，引导改用 keyword 子字段
 func parseBody(body json.RawMessage, ctx *plugin.ParseContext, name string) (specBody, error) {
 	var b specBody
 	if err := json.Unmarshal(body, &b); err != nil {
@@ -29,8 +31,12 @@ func parseBody(body json.RawMessage, ctx *plugin.ParseContext, name string) (spe
 	if b.Field == "" {
 		return b, fmt.Errorf("%s: 缺少 field", name)
 	}
-	if _, ok := ctx.FieldPlugin(b.Field); !ok {
+	fp, ok := ctx.FieldPlugin(b.Field)
+	if !ok {
 		return b, fmt.Errorf("%s: 字段 %q 不存在", name, b.Field)
+	}
+	if fp.Inverted() && fp.DocValuesKind() == plugin.DVNone {
+		return b, fmt.Errorf("%s: text 字段 %q 不支持聚合，请使用其 keyword 子字段（如 %q）；本引擎不做 fielddata", name, b.Field, b.Field+".keyword")
 	}
 	return b, nil
 }
@@ -42,7 +48,7 @@ func parseNumBody(body json.RawMessage, ctx *plugin.ParseContext, name string) (
 		return b, err
 	}
 	fp, _ := ctx.FieldPlugin(b.Field)
-	if !fp.DocValues() {
+	if fp.DocValuesKind() != plugin.DVNum {
 		return b, fmt.Errorf("%s: 字段 %q 不是正排字段", name, b.Field)
 	}
 	return b, nil

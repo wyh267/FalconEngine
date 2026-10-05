@@ -2,6 +2,7 @@ package api
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
@@ -9,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/FalconEngine/falcon/index"
+	"github.com/FalconEngine/falcon/schema"
 )
 
 // newTestServer 创建测试服务（临时数据目录）
@@ -114,6 +116,82 @@ func TestIndexLifecycle(t *testing.T) {
 	code, _ = do(t, "DELETE", srv.URL+"/weibo", "")
 	if code != 404 {
 		t.Fatalf("重复删除应 404, got %d", code)
+	}
+}
+
+// fakeCluster 测试用 ClusterProvider：记录 DeleteIndex 调用，其余方法桩返回
+type fakeCluster struct {
+	deleteIndexNames []string
+	deleteIndexFound bool
+	updatedMappings  map[string][]schema.Field
+	updateMappingErr error
+}
+
+func (f *fakeCluster) CreateIndex(name string, settings index.IndexSettings, sch *schema.Schema) error {
+	return nil
+}
+func (f *fakeCluster) DeleteIndex(name string) (bool, error) {
+	f.deleteIndexNames = append(f.deleteIndexNames, name)
+	return f.deleteIndexFound, nil
+}
+func (f *fakeCluster) UpdateMapping(name string, fields []schema.Field) error {
+	if f.updateMappingErr != nil {
+		return f.updateMappingErr
+	}
+	if f.updatedMappings == nil {
+		f.updatedMappings = map[string][]schema.Field{}
+	}
+	f.updatedMappings[name] = append(f.updatedMappings[name], fields...)
+	return nil
+}
+func (f *fakeCluster) ClusterState() ([]byte, error) { return []byte(`{}`), nil }
+func (f *fakeCluster) WriteDoc(indexName, id string, doc []byte) error {
+	return nil
+}
+func (f *fakeCluster) DeleteDoc(indexName, id string) (bool, error) { return true, nil }
+func (f *fakeCluster) GetDoc(indexName, id string) ([]byte, bool, error) {
+	return nil, false, nil
+}
+func (f *fakeCluster) Search(indexName string, dsl []byte) ([]byte, error) { return nil, nil }
+func (f *fakeCluster) ClusterHealth() ([]byte, error)                      { return []byte(`{}`), nil }
+func (f *fakeCluster) CatShards() ([]byte, error)                          { return []byte(`[]`), nil }
+
+// TestDeleteIndexClusterRouting 集群模式下 DELETE /{index} 必须路由到
+// ClusterProvider（由 leader 提案清理全集群），而不是只删本地数据
+func TestDeleteIndexClusterRouting(t *testing.T) {
+	mgr, err := index.OpenManager(filepath.Join(t.TempDir(), "data"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mgr.Close()
+	// 本地预建同名索引：用于验证集群模式不走本地删除路径
+	if _, err := mgr.Create("weibo", index.IndexSettings{}, nil); err != nil {
+		t.Fatal(err)
+	}
+	fake := &fakeCluster{deleteIndexFound: true}
+	s := NewServer(mgr)
+	s.SetCluster(fake)
+	srv := httptest.NewServer(s.mux)
+	defer srv.Close()
+
+	// 删除存在索引：路由到 provider 并返回 200
+	code, out := do(t, "DELETE", srv.URL+"/weibo", "")
+	if code != 200 || out["acknowledged"] != true {
+		t.Fatalf("集群删索引: code=%d out=%v", code, out)
+	}
+	if len(fake.deleteIndexNames) != 1 || fake.deleteIndexNames[0] != "weibo" {
+		t.Fatalf("DeleteIndex 未被路由到 provider: %v", fake.deleteIndexNames)
+	}
+	// 本地索引不应被直接删除（清理由各节点 raft apply 回调完成，非 REST 层）
+	if _, ok := mgr.Get("weibo"); !ok {
+		t.Fatal("集群模式下本地索引被 REST 层直接删除")
+	}
+
+	// 索引不存在（provider 返回 found=false）应 404
+	fake.deleteIndexFound = false
+	code, _ = do(t, "DELETE", srv.URL+"/ghost", "")
+	if code != 404 {
+		t.Fatalf("索引不存在应 404, got %d", code)
 	}
 }
 
@@ -249,6 +327,74 @@ func TestSearchEndpoint(t *testing.T) {
 	}
 }
 
+// TestRefreshFlushSemantics _refresh 与 _flush 语义分离：
+// _refresh 为轻量 no-op（缓冲本事实时可搜，段落盘数量不变）；
+// _flush 才把缓冲落盘为新段
+func TestRefreshFlushSemantics(t *testing.T) {
+	srv := newTestServer(t)
+	createWeiboIndex(t, srv.URL)
+
+	// 辅助：当前段总数（经 _cat/indices 观察）
+	segCount := func() int {
+		t.Helper()
+		resp, err := http.Get(srv.URL + "/_cat/indices")
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer resp.Body.Close()
+		var indices []map[string]any
+		if err := json.NewDecoder(resp.Body).Decode(&indices); err != nil {
+			t.Fatal(err)
+		}
+		if len(indices) != 1 {
+			t.Fatalf("_cat/indices = %v", indices)
+		}
+		return int(indices[0]["segs"].(float64))
+	}
+
+	code, out := do(t, "PUT", srv.URL+"/weibo/_doc/1", `{"content":"刷新语义 验证","likes":10}`)
+	if code != 200 {
+		t.Fatalf("写入失败: %d %v", code, out)
+	}
+
+	// _refresh：返回 200 且段数不变（不再落盘）
+	before := segCount()
+	code, out = do(t, "POST", srv.URL+"/weibo/_refresh", "")
+	if code != 200 || out["acknowledged"] != true {
+		t.Fatalf("_refresh: code=%d out=%v", code, out)
+	}
+	if after := segCount(); after != before {
+		t.Fatalf("_refresh 不应改变段数: before=%d after=%d", before, after)
+	}
+
+	// _flush：段数 +1，数据可查
+	code, out = do(t, "POST", srv.URL+"/weibo/_flush", "")
+	if code != 200 || out["acknowledged"] != true {
+		t.Fatalf("_flush: code=%d out=%v", code, out)
+	}
+	if after := segCount(); after != before+1 {
+		t.Fatalf("_flush 后段数 = %d, want %d", after, before+1)
+	}
+	code, out = do(t, "POST", srv.URL+"/weibo/_search", `{"query":{"match":{"content":"刷新"}}}`)
+	if code != 200 || out["total"].(float64) != 1 {
+		t.Fatalf("_flush 后查询失败: %d %v", code, out)
+	}
+
+	// 空缓冲 _flush 不再产段（幂等）
+	code, _ = do(t, "POST", srv.URL+"/weibo/_flush", "")
+	if code != 200 || segCount() != before+1 {
+		t.Fatalf("空缓冲 _flush: code=%d segs=%d", code, segCount())
+	}
+
+	// 不存在索引：_refresh 与 _flush 均 404（单机模式校验存在性）
+	if code, _ = do(t, "POST", srv.URL+"/nope/_refresh", ""); code != 404 {
+		t.Fatalf("不存在索引 _refresh 应 404, got %d", code)
+	}
+	if code, _ = do(t, "POST", srv.URL+"/nope/_flush", ""); code != 404 {
+		t.Fatalf("不存在索引 _flush 应 404, got %d", code)
+	}
+}
+
 func TestBulkDeleteAndError(t *testing.T) {
 	srv := newTestServer(t)
 	createWeiboIndex(t, srv.URL)
@@ -304,5 +450,133 @@ func TestDynamicMappingViaAPI(t *testing.T) {
 	_, out = do(t, "POST", srv.URL+"/dyn/_search", `{"query":{"range":{"count":{"gte":40}}}}`)
 	if out["total"].(float64) != 1 {
 		t.Fatalf("动态 number 过滤失败: %v", out)
+	}
+}
+
+// TestMappingEndpoint PUT/GET /{index}/_mapping：
+// PUT 新字段后可写可查；改已有字段类型 400；幂等重复 PUT 200；GET 返回当前 mapping
+func TestMappingEndpoint(t *testing.T) {
+	srv := newTestServer(t)
+
+	// 纯动态 mapping 建索引
+	code, out := do(t, "PUT", srv.URL+"/shop", "")
+	if code != 200 {
+		t.Fatalf("建索引失败: %d %v", code, out)
+	}
+
+	// PUT 新字段（含 multi-fields）
+	code, out = do(t, "PUT", srv.URL+"/shop/_mapping", `{"fields":[
+		{"name":"tag","type":"keyword"},
+		{"name":"title","type":"text","fields":[{"name":"keyword","type":"keyword"}]}
+	]}`)
+	if code != 200 || out["acknowledged"] != true {
+		t.Fatalf("PUT mapping: code=%d out=%v", code, out)
+	}
+	// 幂等重复 PUT
+	code, out = do(t, "PUT", srv.URL+"/shop/_mapping", `{"fields":[{"name":"tag","type":"keyword"}]}`)
+	if code != 200 {
+		t.Fatalf("幂等 PUT 应 200: %d %v", code, out)
+	}
+	// 改已有字段类型 → 400
+	code, out = do(t, "PUT", srv.URL+"/shop/_mapping", `{"fields":[{"name":"tag","type":"text"}]}`)
+	if code != 400 || out["error"] == nil {
+		t.Fatalf("改字段类型应 400: %d %v", code, out)
+	}
+	// 字段名含 . → 400
+	code, _ = do(t, "PUT", srv.URL+"/shop/_mapping", `{"fields":[{"name":"a.b","type":"text"}]}`)
+	if code != 400 {
+		t.Fatalf("字段名含 . 应 400: %d", code)
+	}
+	// 空字段列表 → 400
+	code, _ = do(t, "PUT", srv.URL+"/shop/_mapping", `{"fields":[]}`)
+	if code != 400 {
+		t.Fatalf("空字段列表应 400: %d", code)
+	}
+	// 不存在索引 → 404
+	code, _ = do(t, "PUT", srv.URL+"/ghost/_mapping", `{"fields":[{"name":"x","type":"text"}]}`)
+	if code != 404 {
+		t.Fatalf("不存在索引应 404: %d", code)
+	}
+
+	// 写入含新字段的文档 → 可查
+	code, out = do(t, "PUT", srv.URL+"/shop/_doc/1", `{"title":"红 苹果","tag":"fruit"}`)
+	if code != 200 {
+		t.Fatalf("写入失败: %d %v", code, out)
+	}
+	_, out = do(t, "POST", srv.URL+"/shop/_search", `{"query":{"term":{"tag":"fruit"}}}`)
+	if out["total"].(float64) != 1 {
+		t.Fatalf("term tag 查询失败: %v", out)
+	}
+	_, out = do(t, "POST", srv.URL+"/shop/_search", `{"query":{"term":{"title.keyword":"红 苹果"}}}`)
+	if out["total"].(float64) != 1 {
+		t.Fatalf("term title.keyword 查询失败: %v", out)
+	}
+
+	// GET 返回当前 mapping
+	code, out = do(t, "GET", srv.URL+"/shop/_mapping", "")
+	if code != 200 {
+		t.Fatalf("GET mapping: %d %v", code, out)
+	}
+	fields := out["mappings"].(map[string]any)["fields"].([]any)
+	byName := map[string]string{}
+	for _, f := range fields {
+		fm := f.(map[string]any)
+		byName[fm["name"].(string)] = fm["type"].(string)
+	}
+	if byName["tag"] != "keyword" || byName["title"] != "text" {
+		t.Fatalf("GET mapping 字段不符: %v", byName)
+	}
+
+	// date_detection=false 设置端到端：日期串推断为 text
+	code, out = do(t, "PUT", srv.URL+"/nodd", `{"settings":{"date_detection":false}}`)
+	if code != 200 {
+		t.Fatalf("建索引失败: %d %v", code, out)
+	}
+	code, _ = do(t, "PUT", srv.URL+"/nodd/_doc/1", `{"d":"2024-01-01"}`)
+	if code != 200 {
+		t.Fatalf("写入失败: %d", code)
+	}
+	_, out = do(t, "GET", srv.URL+"/nodd/_mapping", "")
+	fields = out["mappings"].(map[string]any)["fields"].([]any)
+	found := ""
+	for _, f := range fields {
+		fm := f.(map[string]any)
+		if fm["name"] == "d" {
+			found = fm["type"].(string)
+		}
+	}
+	if found != "text" {
+		t.Fatalf("date_detection=false 时 d 应为 text, got %q", found)
+	}
+}
+
+// TestPutMappingClusterRouting 集群模式下 PUT /{index}/_mapping 必须路由到
+// ClusterProvider（由 leader 校验提案广播），而不是只改本地分片
+func TestPutMappingClusterRouting(t *testing.T) {
+	mgr, err := index.OpenManager(filepath.Join(t.TempDir(), "data"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mgr.Close()
+	fake := &fakeCluster{}
+	s := NewServer(mgr)
+	s.SetCluster(fake)
+	srv := httptest.NewServer(s.mux)
+	defer srv.Close()
+
+	code, out := do(t, "PUT", srv.URL+"/logs/_mapping", `{"fields":[{"name":"tag","type":"keyword"}]}`)
+	if code != 200 || out["acknowledged"] != true {
+		t.Fatalf("集群 PUT mapping: code=%d out=%v", code, out)
+	}
+	got := fake.updatedMappings["logs"]
+	if len(got) != 1 || got[0].Name != "tag" || got[0].Type != "keyword" {
+		t.Fatalf("UpdateMapping 未被路由到 provider: %v", got)
+	}
+
+	// provider 返回冲突错误 → 400
+	fake.updateMappingErr = fmt.Errorf("schema: 字段已存在且定义不一致")
+	code, out = do(t, "PUT", srv.URL+"/logs/_mapping", `{"fields":[{"name":"tag","type":"text"}]}`)
+	if code != 400 || out["error"] == nil {
+		t.Fatalf("provider 冲突应 400: %d %v", code, out)
 	}
 }

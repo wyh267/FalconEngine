@@ -97,13 +97,35 @@ func (n *Node) reportOnce() {
 func (n *Node) failoverLoop() {
 	ticker := time.NewTicker(n.DeadTimeout / 3)
 	defer ticker.Stop()
+	wasLeader := false
 	for {
 		select {
 		case <-ticker.C:
+			rn := n.RaftNode()
+			isLeader := rn != nil && rn.IsLeader()
+			if isLeader && !wasLeader {
+				n.reseedLastSeen()
+			}
+			wasLeader = isLeader
 			n.failoverOnce()
 		case <-n.stopc:
 			return
 		}
+	}
+}
+
+// reseedLastSeen 新当选 leader 时把全体 data 节点的心跳基线重置为当前时刻。
+// lastSeen 是 leader 本地观察：上任期（或加入时的兜底时间）留下的旧时间戳
+// 不能用于本任期判活——选主空窗期心跳中断会让旧时间戳集体过期，健康节点被
+// 误判下线、引发不必要的 primary 转移。重置后死节点最多再过一个 DeadTimeout
+// 被重新判出（活节点一个心跳周期内即刷新）。
+func (n *Node) reseedLastSeen() {
+	now := time.Now()
+	nodes := n.state().DataNodes() // state() 自带读锁，须在写锁外取（RWMutex 不可重入）
+	n.mu.Lock()
+	defer n.mu.Unlock()
+	for _, meta := range nodes {
+		n.lastSeen[meta.ID] = now
 	}
 }
 

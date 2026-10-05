@@ -17,6 +17,7 @@ import (
 	"errors"
 	"fmt"
 	"sort"
+	"strings"
 
 	"github.com/FalconEngine/falcon/types"
 )
@@ -202,6 +203,52 @@ func (r *Reader) Get(key string) (uint64, bool) {
 		return 0, false
 	}
 	return found, hit
+}
+
+// Scan 按字典序全量枚举全部记录；visit 返回 false 时提前终止。
+// 数据损坏时静默停止（与 Get 的容错口径一致：读路径不向外暴露损坏错误）。
+func (r *Reader) Scan(visit func(key string, value uint64) bool) {
+	r.scanFrom(0, visit)
+}
+
+// ScanPrefix 按字典序枚举以 prefix 开头的记录；visit 返回 false 时提前终止。
+// 用稀疏索引定位起始块，越过前缀范围即整体结束（前缀区间在字典序上连续）。
+func (r *Reader) ScanPrefix(prefix string, visit func(key string, value uint64) bool) {
+	if prefix == "" {
+		r.Scan(visit)
+		return
+	}
+	if len(r.keys) == 0 {
+		return
+	}
+	// 起始块：最后一个首 key <= prefix 的块；prefix 比全部首 key 还小时从块 0 起
+	blk := sort.Search(len(r.keys), func(i int) bool { return r.keys[i] > prefix }) - 1
+	if blk < 0 {
+		blk = 0
+	}
+	r.scanFrom(blk, func(k string, v uint64) bool {
+		if !strings.HasPrefix(k, prefix) {
+			// 起始块内可能还有小于 prefix 的 key，跳过继续；
+			// 一旦 k > prefix 且不带前缀，其后所有 key 都不可能带前缀，整体结束
+			return k < prefix
+		}
+		return visit(k, v)
+	})
+}
+
+// scanFrom 从第 blk 块起顺序枚举；visit 返回 false 时终止
+func (r *Reader) scanFrom(blk int, visit func(key string, value uint64) bool) {
+	for ; blk < len(r.keys); blk++ {
+		stop := false
+		if _, err := r.scanBlock(blk, func(k string, v uint64) bool {
+			if !visit(k, v) {
+				stop = true
+			}
+			return !stop
+		}); err != nil || stop {
+			return
+		}
+	}
 }
 
 // scanBlock 顺序扫描第 blk 个块内的记录。

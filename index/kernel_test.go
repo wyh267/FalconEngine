@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"sort"
+	"strings"
 	"testing"
 
 	"github.com/FalconEngine/falcon/plugins/fieldtype"
@@ -245,6 +246,204 @@ func TestSortByNumberField(t *testing.T) {
 	res = searchDSL(t, e, `{"sort":[{"_score":"desc"}]}`)
 	if res.Total != 4 {
 		t.Fatalf("_score 排序 Total = %d, want 4", res.Total)
+	}
+}
+
+// ---------- date / bool 字段 ----------
+
+// TestKeywordSortAndTextGuidance keyword dv 字段排序走 kw 列/Kws（缓冲与段混合）；
+// text 本体排序/聚合报引导性错误（本引擎不做 fielddata），
+// multi-fields 的 title.keyword 子字段排序与 terms 聚合正确
+func TestKeywordSortAndTextGuidance(t *testing.T) {
+	sch, _ := schema.New([]schema.Field{
+		{Name: "title", Type: "text", Fields: []schema.Field{{Name: "keyword", Type: "keyword"}}},
+		{Name: "tag", Type: "keyword"},
+		{Name: "level", Type: "number"},
+	})
+	e, err := Open(filepath.Join(t.TempDir(), "kwsort"), sch)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer e.Close()
+
+	mustIndex(t, e, "a", `{"title":"banana split","tag":"fruit","level":1}`)
+	mustIndex(t, e, "b", `{"title":"apple pie","tag":"food","level":2}`)
+	e.Flush() // a、b 落盘；c、d 留在缓冲，制造混合态
+	mustIndex(t, e, "c", `{"title":"cherry cake","tag":"food","level":3}`)
+	mustIndex(t, e, "d", `{"title":"apple tart","level":4}`) // 缺 tag，恒排最后
+
+	// keyword 升序：food(b,c 同值按 ID 兜底) < fruit(a)，缺失的 d 最后
+	res := searchDSL(t, e, `{"sort":[{"tag":"asc"}],"size":10}`)
+	if got, want := hitIDs(res), []string{"b", "c", "a", "d"}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("keyword 升序 = %v, want %v", got, want)
+	}
+	// 命中携带实际排序键（协调层归并用）：缺失为 null，keyword 为 JSON 字符串
+	if got := string(res.Hits[0].Sort[0]); got != `"food"` {
+		t.Fatalf("b 的排序键 = %s, want %q", got, `"food"`)
+	}
+	if got := string(res.Hits[3].Sort[0]); got != "null" {
+		t.Fatalf("d（缺 tag）的排序键 = %s, want null", got)
+	}
+	// keyword 降序：缺失仍最后
+	res = searchDSL(t, e, `{"sort":[{"tag":"desc"}],"size":10}`)
+	if got, want := hitIDs(res), []string{"a", "b", "c", "d"}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("keyword 降序 = %v, want %v", got, want)
+	}
+
+	// multi-fields 子字段排序：title.keyword 按整串比较
+	res = searchDSL(t, e, `{"sort":[{"title.keyword":"asc"}],"size":10}`)
+	if got, want := hitIDs(res), []string{"b", "d", "a", "c"}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("title.keyword 升序 = %v, want %v", got, want)
+	}
+
+	// text 本体排序/聚合：引导性报错（指向 keyword 子字段）
+	if _, err := e.SearchDSL([]byte(`{"sort":[{"title":"asc"}]}`)); err == nil ||
+		!strings.Contains(err.Error(), "keyword 子字段") {
+		t.Fatalf("text 排序应报引导性错误, got %v", err)
+	}
+	if _, err := e.SearchDSL([]byte(`{"aggs":{"x":{"terms":{"field":"title"}}}}`)); err == nil ||
+		!strings.Contains(err.Error(), "keyword 子字段") {
+		t.Fatalf("text 聚合应报引导性错误, got %v", err)
+	}
+
+	// tag 的 terms 聚合走 kw 列（缓冲+段混合计数正确）
+	res = searchDSL(t, e, `{"aggs":{"by_tag":{"terms":{"field":"tag"}}}}`)
+	if got := string(res.Aggs["by_tag"]); got != `{"buckets":[{"key":"food","count":2},{"key":"fruit","count":1}]}` {
+		t.Fatalf("tag terms = %s", got)
+	}
+	// title.keyword 的 terms 聚合（子字段 kw 列）
+	res = searchDSL(t, e, `{"aggs":{"by_title":{"terms":{"field":"title.keyword"}}}}`)
+	want := `{"buckets":[{"key":"apple pie","count":1},{"key":"apple tart","count":1},` +
+		`{"key":"banana split","count":1},{"key":"cherry cake","count":1}]}`
+	if got := string(res.Aggs["by_title"]); got != want {
+		t.Fatalf("title.keyword terms = %s, want %s", got, want)
+	}
+}
+
+// TestSortAggFlushConsistency 写入不 flush 与 flush 后结果对拍：
+// sort(num/date/keyword/子字段) + terms/avg 聚合 + range 在缓冲态与落盘态一致
+func TestSortAggFlushConsistency(t *testing.T) {
+	sch, _ := schema.New([]schema.Field{
+		{Name: "title", Type: "text", Fields: []schema.Field{{Name: "keyword", Type: "keyword"}}},
+		{Name: "tag", Type: "keyword"},
+		{Name: "level", Type: "number"},
+		{Name: "ts", Type: "date"},
+	})
+	e, err := Open(filepath.Join(t.TempDir(), "flushcmp"), sch)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer e.Close()
+
+	mustIndex(t, e, "1", `{"title":"go 语言","tag":"tech","level":3,"ts":"2024-01-02 03:04:05"}`)
+	mustIndex(t, e, "2", `{"title":"go 进阶","tag":"tech","level":5,"ts":"2024-06-01"}`)
+	mustIndex(t, e, "3", `{"title":"烹饪 大全","tag":"life","level":1,"ts":"2024-03-15 10:00:00"}`)
+	mustIndex(t, e, "4", `{"title":"生活 小贴士","tag":"life","level":2}`)           // 缺 ts
+	mustIndex(t, e, "5", `{"title":"随记","level":9,"ts":"2024-05-20 08:00:00"}`) // 缺 tag
+
+	queries := []string{
+		`{"sort":[{"level":"asc"}],"size":100}`,
+		`{"sort":[{"ts":"desc"}],"size":100}`,
+		`{"sort":[{"tag":"asc"}],"size":100}`,
+		`{"sort":[{"title.keyword":"desc"}],"size":100}`,
+		`{"sort":[{"ts":"asc"},{"level":"desc"}],"size":100}`, // 多键排序
+		`{"query":{"range":{"ts":{"gte":"2024-02-01","lte":"2024-12-01"}}},"size":100}`,
+		`{"query":{"range":{"level":{"gte":2,"lte":5}}},"size":100}`,
+		`{"aggs":{"by_tag":{"terms":{"field":"tag"}},"avg_level":{"avg":{"field":"level"}},
+			"by_title":{"terms":{"field":"title.keyword"}},"max_ts":{"max":{"field":"ts"}}},"size":100}`,
+	}
+	// 抓取（Total, 有序命中, 聚合结果, 排序键）快照；map 经 fmt 按键序输出，可直接比较
+	capture := func() []string {
+		rows := make([]string, 0, len(queries))
+		for _, q := range queries {
+			res := searchDSL(t, e, q)
+			rows = append(rows, fmt.Sprintf("%d|%v|%v|%v", res.Total, hitIDs(res), res.Aggs, sortKeysOf(res)))
+		}
+		return rows
+	}
+
+	before := capture() // 全部在缓冲
+	if err := e.Flush(); err != nil {
+		t.Fatal(err)
+	}
+	after := capture() // 全部落盘为段
+	if !reflect.DeepEqual(before, after) {
+		t.Fatalf("flush 前后结果不一致:\n前: %v\n后: %v", before, after)
+	}
+}
+
+// sortKeysOf 提取全部命中的排序键（对拍用）
+func sortKeysOf(res *Result) []string {
+	out := make([]string, 0, len(res.Hits))
+	for _, h := range res.Hits {
+		var keys []string
+		for _, k := range h.Sort {
+			keys = append(keys, string(k))
+		}
+		out = append(out, strings.Join(keys, ","))
+	}
+	return out
+}
+
+// TestScatterPlanSortValidation 协调层排序校验：text 本体排序在 NewScatterPlan
+// 即快速失败（否则分片错误会被 node 层降级语义吞成 partial 空结果）；
+// keyword 子字段/number/_score 放行
+func TestScatterPlanSortValidation(t *testing.T) {
+	sch, _ := schema.New([]schema.Field{
+		{Name: "title", Type: "text", Fields: []schema.Field{{Name: "keyword", Type: "keyword"}}},
+		{Name: "level", Type: "number"},
+	})
+	if _, err := NewScatterPlan([]byte(`{"sort":[{"title":"asc"}]}`), sch); err == nil ||
+		!strings.Contains(err.Error(), "keyword 子字段") {
+		t.Fatalf("协调层 text 排序应报引导性错误, got %v", err)
+	}
+	if _, err := NewScatterPlan([]byte(`{"sort":[{"nope":"asc"}]}`), sch); err == nil {
+		t.Fatal("协调层不存在字段排序应报错")
+	}
+	for _, q := range []string{
+		`{"sort":[{"title.keyword":"asc"}]}`,
+		`{"sort":[{"level":"desc"},{"_score":"desc"}]}`,
+	} {
+		if _, err := NewScatterPlan([]byte(q), sch); err != nil {
+			t.Fatalf("协调层解析 %s 应通过: %v", q, err)
+		}
+	}
+}
+
+// TestCompareSortKey 协调层排序键比较：字符串按字典序、数字按数值
+// （"100" 字典序小于 "20"，必须按数值比）、类型不一致按原文兜底
+func TestCompareSortKey(t *testing.T) {
+	cases := []struct {
+		a, b string
+		want int
+	}{
+		{`"apple"`, `"banana"`, -1},
+		{`"banana"`, `"apple"`, 1},
+		{`"apple"`, `"apple"`, 0},
+		{`100`, `20`, 1},    // 数值比较，非字典序
+		{`1.25`, `1.5`, -1}, // _score 等 float 键
+		{`1735689600`, `1735689600`, 0},
+	}
+	for _, c := range cases {
+		if got := compareSortKey(json.RawMessage(c.a), json.RawMessage(c.b)); got != c.want {
+			t.Fatalf("compareSortKey(%s, %s) = %d, want %d", c.a, c.b, got, c.want)
+		}
+	}
+	// 类型不一致（异常兜底）：与原文比较一致，保证确定性
+	mixed := compareSortKey(json.RawMessage(`"10"`), json.RawMessage(`9`))
+	if mixed != strings.Compare(`"10"`, `9`) {
+		t.Fatalf("混合类型比较 = %d, want %d", mixed, strings.Compare(`"10"`, `9`))
+	}
+	// hitSortKey：null 与越界视为缺失
+	h := Hit{Sort: []json.RawMessage{json.RawMessage("null"), json.RawMessage(`5`)}}
+	if _, ok := hitSortKey(h, 0); ok {
+		t.Fatal("null 排序键应视为缺失")
+	}
+	if _, ok := hitSortKey(h, 2); ok {
+		t.Fatal("越界排序键应视为缺失")
+	}
+	if v, ok := hitSortKey(h, 1); !ok || string(v) != "5" {
+		t.Fatalf("hitSortKey(1) = %s,%v, want 5,true", v, ok)
 	}
 }
 

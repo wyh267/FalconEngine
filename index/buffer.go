@@ -6,8 +6,8 @@ import (
 
 // bufPosting 内存缓冲中的一条倒排记录
 type bufPosting struct {
-	docID uint32
-	tf    uint32
+	docID     uint32
+	positions []uint32 // term 在 doc 内的出现位置（取自 Token.Position，可能跳号），freq = len(positions)
 }
 
 // memBuf 内存索引缓冲：新写入的文档先进入缓冲，Flush 时整体落盘为一个段。
@@ -34,17 +34,18 @@ func (b *memBuf) add(d segment.Doc) uint32 {
 	b.id2loc[d.ID] = docID
 
 	for field, tokens := range d.Terms {
-		tf := make(map[string]uint32, len(tokens))
+		pos := make(map[string][]uint32, len(tokens))
 		for _, tok := range tokens {
-			tf[tok]++
+			// 位置取 Token.Position 而非下标：token filter 删除词元会造成跳号
+			pos[tok.Term] = append(pos[tok.Term], uint32(tok.Position))
 		}
 		terms := b.inv[field]
 		if terms == nil {
 			terms = make(map[string][]bufPosting)
 			b.inv[field] = terms
 		}
-		for term, cnt := range tf {
-			terms[term] = append(terms[term], bufPosting{docID: docID, tf: cnt})
+		for term, ps := range pos {
+			terms[term] = append(terms[term], bufPosting{docID: docID, positions: ps})
 		}
 	}
 	return docID
@@ -64,6 +65,15 @@ func (b *memBuf) postings(field, term string) ([]bufPosting, bool) {
 func (b *memBuf) num(field string, docID uint32) (int64, bool) {
 	v, ok := b.docs[docID].Nums[field]
 	return v, ok
+}
+
+// kw 读缓冲内 keyword 字段值；字段缺失或值为空串（与 kw 列"空串即无值"语义一致）返回 false
+func (b *memBuf) kw(field string, docID uint32) (string, bool) {
+	v, ok := b.docs[docID].Kws[field]
+	if !ok || v == "" {
+		return "", false
+	}
+	return v, true
 }
 
 // docLen 返回 text 字段在缓冲内 docID 处的文档长度（term 数），BM25 用
